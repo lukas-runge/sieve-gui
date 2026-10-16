@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { closesMenu } from "../menu";
   // A part of the script the rule model can't represent, kept verbatim.
   import { importRules } from "#tauri/commands";
   import type { ScriptEditor } from "../editor.svelte";
@@ -50,8 +51,8 @@
       {editing ? t("raw.done") : t("raw.edit")}
     </button>
     <div class="dropdown dropdown-end">
-      <button class="btn btn-ghost btn-sm btn-square" aria-label="More">⋯</button>
-      <ul class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
+      <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square" aria-label={t("menu.more")}>⋯</div>
+      <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
         <li><button onclick={() => onmove(-1)}>{t("rule.moveUp")}</button></li>
         <li><button onclick={() => onmove(1)}>{t("rule.moveDown")}</button></li>
         <li><button class="text-error" onclick={ondelete}>{t("rule.delete")}</button></li>

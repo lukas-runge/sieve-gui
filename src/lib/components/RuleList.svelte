@@ -100,7 +100,7 @@
   </button>
 {/snippet}
 
-<div class="grid gap-3" role="list">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-3" role="list">
   {#each editor.rules.items as item, index (item.uid)}
     <div
       role="listitem"
@@ -153,7 +153,7 @@
     </p>
   {/each}
 
-  <div class="flex gap-2">
+  <div class="flex flex-wrap gap-2">
     <button class="btn btn-primary btn-sm" onclick={addRule}>+ {t("editor.addRule")}</button>
     <button class="btn btn-ghost btn-sm" onclick={addCode}>+ {t("editor.addCode")}</button>
   </div>

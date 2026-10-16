@@ -13,7 +13,9 @@
 
   let accountDialog = $state<{ account: Account | null } | null>(null);
   let deploying = $state(false);
-  let showCode = $state(false);
+  // The code sidebar stays open or closed across restarts.
+  let showCode = $state(localStorage.getItem("showCode") === "1");
+  $effect(() => localStorage.setItem("showCode", showCode ? "1" : "0"));
 
   const editor = $derived(session.editor);
   const active = $derived(editor ? session.isActive(editor.accountId, editor.name) : false);
@@ -45,7 +47,7 @@
 
 <svelte:window {onkeydown} />
 
-<div class="grid h-screen grid-cols-[15rem_1fr]">
+<div class={["grid h-screen", showCode && editor ? "grid-cols-[15rem_1fr_clamp(20rem,36vw,44rem)]" : "grid-cols-[15rem_1fr]"]}>
   <aside class="border-r border-base-300 bg-base-200">
     <Sidebar onaccount={(account) => (accountDialog = { account })} />
   </aside>
@@ -59,11 +61,12 @@
             {editor.dirty ? t("editor.unsaved") : t("editor.saved")}
           </p>
         </div>
-        <button class="btn btn-ghost btn-sm" disabled={!editor.canUndo} onclick={() => editor.undo()} title="{t('editor.undo')} (⌘Z)">
-          {t("editor.undo")}
+        <div class="ml-auto flex items-center gap-1">
+        <button class="btn btn-ghost btn-sm btn-square text-base" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
+          ↶
         </button>
-        <button class="btn btn-ghost btn-sm" disabled={!editor.canRedo} onclick={() => editor.redo()} title="{t('editor.redo')} (⇧⌘Z)">
-          {t("editor.redo")}
+        <button class="btn btn-ghost btn-sm btn-square text-base" disabled={!editor.canRedo} onclick={() => editor.redo()} aria-label={t("editor.redo")} title="{t('editor.redo')} (⇧⌘Z)">
+          ↷
         </button>
         <button class="btn btn-ghost btn-sm" aria-pressed={showCode} onclick={() => (showCode = !showCode)}>
           {showCode ? t("editor.hideCode") : t("editor.showCode")}
@@ -71,11 +74,11 @@
         <button class="btn btn-primary btn-sm" disabled={!editor.dirty} onclick={() => (deploying = true)} title="⌘S">
           {t("editor.deploy")}
         </button>
+        </div>
       </header>
 
-      <div class="relative flex min-h-0 grow">
-      <div class="min-w-0 grow overflow-y-auto">
-        <div class="mx-auto grid max-w-3xl gap-4 px-5 py-5">
+      <div class="min-h-0 grow overflow-y-auto">
+        <div class="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-4 px-5 py-5">
           {#if !active}
             <p class="rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm">{t("editor.inactive")}</p>
           {/if}
@@ -100,22 +103,6 @@
           />
         </div>
       </div>
-
-      {#if showCode}
-        <!-- Beside the rules on wide windows, otherwise over their right edge. -->
-        <aside
-          class="absolute inset-y-0 right-0 z-20 flex w-[min(32rem,95%)] flex-col gap-2 border-l border-base-300 bg-base-200 p-3 shadow-xl xl:static xl:w-[32rem] xl:shrink-0 2xl:w-[44rem] xl:shadow-none"
-        >
-          <div class="flex items-center gap-2">
-            <h2 class="grow font-semibold">{t("code.heading")}</h2>
-            <button class="btn btn-ghost btn-sm btn-square" aria-label={t("editor.hideCode")} title={t("editor.hideCode")} onclick={() => (showCode = false)}>✕</button>
-          </div>
-          <div class="min-h-0 overflow-auto">
-            <CodeEditor value={editor.code} readonly label={t("code.heading")} />
-          </div>
-        </aside>
-      {/if}
-      </div>
     {:else}
       <div class="grid h-full place-items-center p-8 text-center text-base-content/70">
         {#if session.loadingScript}
@@ -130,6 +117,17 @@
     {/if}
   </main>
 
+  {#if showCode && editor}
+    <aside class="flex min-w-0 flex-col gap-2 overflow-hidden border-l border-base-300 bg-base-200 p-3" aria-label={t("code.heading")}>
+      <div class="flex items-center gap-2">
+        <h2 class="grow font-semibold">{t("code.heading")}</h2>
+        <button class="btn btn-ghost btn-sm btn-square" aria-label={t("editor.hideCode")} title={t("editor.hideCode")} onclick={() => (showCode = false)}>✕</button>
+      </div>
+      <div class="min-h-0 overflow-auto">
+        <CodeEditor value={editor.code} readonly label={t("code.heading")} />
+      </div>
+    </aside>
+  {/if}
 </div>
 
 {#if accountDialog}

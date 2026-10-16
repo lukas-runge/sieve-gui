@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { getAppInfo } from "tauri/commands";
-  import type { AppInfo } from "tauri/types";
+  import { getAppInfo } from "#tauri/commands";
+  import type { AppInfo } from "#tauri/types";
 
   let info = $state<AppInfo | null>(null);
 

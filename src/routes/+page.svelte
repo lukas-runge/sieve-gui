@@ -56,19 +56,20 @@
   <main class="flex min-w-0 flex-col overflow-hidden bg-base-200">
     {#if editor}
       <header class="flex flex-wrap items-center gap-2 border-b border-base-300 px-5 py-3">
-        <div class="flex items-center gap-1">
-          <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
-            <Icon name="undo" />
-          </button>
-          <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canRedo} onclick={() => editor.redo()} aria-label={t("editor.redo")} title="{t('editor.redo')} (⇧⌘Z)">
-            <Icon name="redo" />
-          </button>
-        </div>
         <div class="min-w-0 grow">
           <h1 class="truncate text-xl font-semibold">{editor.name}</h1>
-          <p class="text-sm text-base-content/60" aria-live="polite">
-            {editor.dirty ? t("editor.unsaved") : t("editor.saved")}
-          </p>
+          <!-- -ml-1 lines the undo icon up with the name above. -->
+          <div class="-ml-1 flex items-center gap-1">
+            <button class="btn btn-ghost btn-xs btn-square" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
+              <Icon name="undo" size={15} />
+            </button>
+            <button class="btn btn-ghost btn-xs btn-square" disabled={!editor.canRedo} onclick={() => editor.redo()} aria-label={t("editor.redo")} title="{t('editor.redo')} (⇧⌘Z)">
+              <Icon name="redo" size={15} />
+            </button>
+            <p class="ml-1 truncate text-sm text-base-content/60" aria-live="polite">
+              {editor.dirty ? t("editor.unsaved") : t("editor.saved")}
+            </p>
+          </div>
         </div>
         <div class="ml-auto flex items-center gap-1">
         <button class="btn btn-primary btn-sm" disabled={!editor.dirty} onclick={() => (deploying = true)} title="⌘S">

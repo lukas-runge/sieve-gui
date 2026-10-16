@@ -104,7 +104,7 @@
       {#if showCode}
         <!-- Beside the rules on wide windows, otherwise over their right edge. -->
         <aside
-          class="absolute inset-y-0 right-0 z-20 flex w-[min(32rem,95%)] flex-col gap-2 border-l border-base-300 bg-base-200 p-3 shadow-xl xl:static xl:w-[32rem] xl:shrink-0 xl:shadow-none"
+          class="absolute inset-y-0 right-0 z-20 flex w-[min(32rem,95%)] flex-col gap-2 border-l border-base-300 bg-base-200 p-3 shadow-xl xl:static xl:w-[32rem] xl:shrink-0 2xl:w-[44rem] xl:shadow-none"
         >
           <div class="flex items-center gap-2">
             <h2 class="grow font-semibold">{t("code.heading")}</h2>

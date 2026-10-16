@@ -16,6 +16,11 @@
   let port = $state(initial?.port ?? 4190);
   let username = $state(initial?.username ?? "");
   let password = $state("");
+  // IMAP for the folder list: on by default for new accounts.
+  let imapEnabled = $state(initial ? initial.imap !== null : true);
+  let imapHost = $state(initial?.imap?.host ?? "");
+  let imapSecurity = $state<AccountSecurity>(initial?.imap?.security ?? "implicitTls");
+  let imapPort = $state(initial?.imap?.port ?? 993);
   let saving = $state(false);
   let error = $state<string | null>(null);
 
@@ -33,6 +38,7 @@
         port,
         security,
         username,
+        imap: imapEnabled ? { host: imapHost.trim() || host, port: imapPort, security: imapSecurity } : null,
         password: password || (initial ? null : ""),
       });
       dialog.close();
@@ -44,6 +50,12 @@
   }
 
   const securities: AccountSecurity[] = ["startTls", "implicitTls", "insecure"];
+
+  /** Follows the standard IMAP port when the security changes, unless customized. */
+  function setImapSecurity(value: AccountSecurity) {
+    if (imapPort === 993 || imapPort === 143) imapPort = value === "implicitTls" ? 993 : 143;
+    imapSecurity = value;
+  }
 </script>
 
 <dialog bind:this={dialog} class="modal" {onclose} aria-labelledby="account-heading">
@@ -55,7 +67,7 @@
     <fieldset class="fieldset">
       <label class="fieldset-legend" for="acc-label">{t("account.label")}</label>
       <input id="acc-label" class="input w-full" bind:value={label} placeholder={host || "Work"} />
-      <p class="label">{t("account.labelHint")}</p>
+      <p class="label whitespace-normal">{t("account.labelHint")}</p>
     </fieldset>
 
     <div class="grid grid-cols-[1fr_6rem] gap-2">
@@ -86,8 +98,37 @@
     <fieldset class="fieldset">
       <label class="fieldset-legend" for="acc-pass">{t("account.password")}</label>
       <input id="acc-pass" type="password" class="input w-full" bind:value={password} required={!initial} autocomplete="current-password" />
-      <p class="label">{initial ? t("account.passwordKeep") : t("account.passwordStored")}</p>
+      <p class="label whitespace-normal">{initial ? t("account.passwordKeep") : t("account.passwordStored")}</p>
     </fieldset>
+
+    <fieldset class="fieldset">
+      <label class="label text-base-content">
+        <input type="checkbox" class="toggle toggle-sm" bind:checked={imapEnabled} />
+        {t("account.imap")}
+      </label>
+      <p class="label whitespace-normal">{t("account.imapHint")}</p>
+    </fieldset>
+
+    {#if imapEnabled}
+      <div class="grid grid-cols-[1fr_6rem] gap-2">
+        <fieldset class="fieldset">
+          <label class="fieldset-legend" for="acc-imap-host">{t("account.imapHost")}</label>
+          <input id="acc-imap-host" class="input w-full" bind:value={imapHost} placeholder={host || "imap.example.com"} autocapitalize="off" spellcheck="false" />
+        </fieldset>
+        <fieldset class="fieldset">
+          <label class="fieldset-legend" for="acc-imap-port">{t("account.port")}</label>
+          <input id="acc-imap-port" type="number" min="1" max="65535" class="input w-full" bind:value={imapPort} required />
+        </fieldset>
+      </div>
+      <fieldset class="fieldset">
+        <label class="fieldset-legend" for="acc-imap-security">{t("account.security")}</label>
+        <select id="acc-imap-security" class="select w-full" value={imapSecurity} onchange={(e) => setImapSecurity(e.currentTarget.value as AccountSecurity)}>
+          {#each securities as s}
+            <option value={s}>{t(`account.imapSecurity.${s}` as MessageKey)}</option>
+          {/each}
+        </select>
+      </fieldset>
+    {/if}
 
     {#if error}<p role="alert" class="text-error">{error}</p>{/if}
 

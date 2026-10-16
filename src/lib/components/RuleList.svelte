@@ -1,25 +1,30 @@
 <script lang="ts">
   import { flip } from "svelte/animate";
+  import type { Folder } from "#tauri/types";
   import type { ScriptEditor } from "../editor.svelte";
   import { uid } from "../editor.svelte";
   import { t } from "../i18n.svelte";
-  import { detectMailboxEncoding, mailboxLabel, type ScriptFolders } from "../rules/mailbox";
+  import { scriptFolders, type ScriptFolders } from "../rules/mailbox";
   import { newRule } from "../rules/view";
   import RawCard from "./RawCard.svelte";
   import RuleCard from "./RuleCard.svelte";
 
-  let { editor, extensions }: { editor: ScriptEditor; extensions: string[] } = $props();
+  let {
+    editor,
+    extensions,
+    serverFolders,
+  }: { editor: ScriptEditor; extensions: string[]; serverFolders: Folder[] | null } = $props();
 
   let editingUid = $state<string | null>(null);
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
 
-  /** Folders used anywhere in the script, for folder inputs. */
+  /** Folders on the server and used anywhere in the script, for folder inputs. */
   const folders: ScriptFolders = $derived.by(() => {
     const raw = editor.rules.items.flatMap((item) =>
       item.type === "rule" ? item.actions.flatMap((a) => (a.type === "fileInto" && a.mailbox ? [a.mailbox] : [])) : [],
     );
-    return { labels: [...new Set(raw.map(mailboxLabel))].sort(), encoding: detectMailboxEncoding(raw) };
+    return scriptFolders(raw, serverFolders);
   });
 
   function move(from: number, to: number) {

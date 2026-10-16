@@ -3,16 +3,20 @@
 // Names are kept exactly as the script has them; the UI shows them readable
 // and writes new names in the encoding the script already uses.
 
+import type { Folder } from "#tauri/types";
+
 const BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+,";
 
 export type MailboxEncoding = "utf8" | "utf7";
 
-/** The folders a script uses, for folder inputs. */
+/** What folder inputs need to know about folders. */
 export interface ScriptFolders {
-  /** Readable names, as suggestions. */
+  /** Readable names as suggestions: the server's folders, then the script's. */
   labels: string[];
   /** How new names are written. */
   encoding: MailboxEncoding;
+  /** Readable names of the folders on the server; null if unknown. */
+  existing: Set<string> | null;
 }
 
 /**
@@ -118,6 +122,23 @@ export function detectMailboxEncoding(rawNames: Iterable<string>): MailboxEncodi
     if (decodeModifiedUtf7(raw) !== null) return "utf7";
   }
   return "utf8";
+}
+
+/**
+ * Folder suggestions from the names used in the script (`raw`, as written)
+ * and the server's folder list (`server`, null without IMAP).
+ */
+export function scriptFolders(raw: string[], server: Folder[] | null): ScriptFolders {
+  const onServer = server?.filter((f) => f.selectable).map((f) => mailboxLabel(f.name)) ?? [];
+  const existing = server ? new Set(onServer) : null;
+  const fromScript = [...new Set(raw.map(mailboxLabel))].filter((l) => !folderExists(existing, l)).sort();
+  return { labels: [...onServer, ...fromScript], encoding: detectMailboxEncoding(raw), existing };
+}
+
+/** Whether `label` is a known server folder (INBOX is case-insensitive). */
+export function folderExists(existing: Set<string> | null, label: string): boolean {
+  if (!existing) return false;
+  return existing.has(label) || (label.toUpperCase() === "INBOX" && [...existing].some((l) => l.toUpperCase() === "INBOX"));
 }
 
 /** The name to write into the script for a name the user typed. */

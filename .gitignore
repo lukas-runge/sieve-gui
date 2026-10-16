@@ -15,5 +15,7 @@ vite.config.ts.timestamp-*
 /.claude
 # Rust
 /target
+# Downloaded test inputs (scripts/fetch-pigeonhole.sh)
+/.cache
 # Throwaway TLS material for the Dovecot test container (gen-certs.sh)
 /crates/managesieve/tests/dovecot/certs

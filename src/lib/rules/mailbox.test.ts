@@ -4,9 +4,12 @@ import {
   decodeModifiedUtf7,
   detectMailboxEncoding,
   encodeModifiedUtf7,
+  folderExists,
   mailboxLabel,
   mailboxRaw,
+  scriptFolders,
 } from "./mailbox.ts";
+import type { Folder } from "#tauri/types";
 
 // Examples from RFC 3501 §5.1.3 and the Roundcube fixtures.
 const PAIRS: [string, string][] = [
@@ -44,4 +47,20 @@ test("new names follow the script's encoding", () => {
   assert.equal(mailboxRaw("Entwürfe", "utf7"), "Entw&APw-rfe");
   assert.equal(mailboxRaw("Entwürfe", "utf8"), "Entwürfe");
   assert.equal(mailboxRaw("Q&A", "utf7"), "Q&-A");
+});
+
+test("suggests server folders first, then the script's", () => {
+  const folder = (name: string, selectable = true): Folder => ({ name, delimiter: "/", selectable, specialUse: null });
+  const server = [folder("INBOX"), folder("B&APw-cher"), folder("Archiv", false), folder("Archiv/2025")];
+  const folders = scriptFolders(["Steuern", "B&APw-cher", "Alt"], server);
+  assert.deepEqual(folders.labels, ["INBOX", "Bücher", "Archiv/2025", "Alt", "Steuern"]);
+  assert.equal(folders.encoding, "utf7");
+  assert.ok(folderExists(folders.existing, "Bücher"));
+  assert.ok(folderExists(folders.existing, "inbox"));
+  assert.ok(!folderExists(folders.existing, "Steuern"));
+  assert.ok(!folderExists(folders.existing, "Archiv"));
+
+  const offline = scriptFolders(["Steuern"], null);
+  assert.deepEqual(offline.labels, ["Steuern"]);
+  assert.equal(offline.existing, null);
 });

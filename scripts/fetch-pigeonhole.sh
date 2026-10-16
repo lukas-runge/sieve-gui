@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Downloads the Dovecot Pigeonhole sources (LGPL-2.1) into target/pigeonhole so
+# Downloads the Dovecot Pigeonhole sources (LGPL-2.1) into .cache/pigeonhole so
 # their test scripts can be used as parser test input. Nothing is vendored.
 #
 #   scripts/fetch-pigeonhole.sh
-#   PIGEONHOLE_DIR=target/pigeonhole cargo test -p sieve-core --test pigeonhole -- --ignored
+#   PIGEONHOLE_DIR=.cache/pigeonhole cargo test -p sieve-core --test pigeonhole -- --ignored
 set -euo pipefail
 
-dest="$(cd "$(dirname "$0")/.." && pwd)/target/pigeonhole"
+dest="$(cd "$(dirname "$0")/.." && pwd)/.cache/pigeonhole"
 ref="${PIGEONHOLE_REF:-main}"
 
 if [ -d "$dest/.git" ]; then

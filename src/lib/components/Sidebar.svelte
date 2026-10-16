@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { closesMenu } from "../menu";
   import type { Account } from "#tauri/types";
   import { t } from "../i18n.svelte";
   import { session } from "../session.svelte";
@@ -41,8 +42,8 @@
       <div class="flex items-center gap-1">
         <h2 class="grow truncate font-semibold" title="{account.username}@{account.host}">{account.label}</h2>
         <div class="dropdown dropdown-end">
-          <button class="btn btn-ghost btn-xs btn-square" aria-label="{t('accounts.edit')}: {account.label}">⋯</button>
-          <ul class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
+          <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label="{t('accounts.edit')}: {account.label}">⋯</div>
+          <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
             <li><button onclick={() => onaccount(account)}>{t("accounts.edit")}</button></li>
             <li><button class="text-error" onclick={() => removeAccount(account)}>{t("accounts.delete")}</button></li>
           </ul>
@@ -74,8 +75,8 @@
                 <span class="badge badge-sm badge-primary mr-1">{t("scripts.active")}</span>
               {/if}
               <div class="dropdown dropdown-end">
-                <button class="btn btn-ghost btn-xs btn-square opacity-60 group-hover:opacity-100 focus:opacity-100" aria-label="{script.name}: …">⋯</button>
-                <ul class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
+                <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square opacity-60 group-hover:opacity-100 focus:opacity-100" aria-label="{script.name}: …">⋯</div>
+                <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
                   {#if script.active}
                     <li><button onclick={() => session.activate(account.id, null)}>{t("scripts.deactivate")}</button></li>
                   {:else}
@@ -91,6 +92,13 @@
           {/each}
         </ul>
         <button class="btn btn-ghost btn-xs justify-self-start w-fit" onclick={() => create(account.id)}>+ {t("scripts.new")}</button>
+        {@const folders = session.folders[account.id]}
+        {#if folders?.status === "error"}
+          <div role="alert" class="grid gap-1 text-xs">
+            <p class="text-base-content/70">{t("folders.error", { message: folders.error ?? "" })}</p>
+            <button class="btn btn-xs self-start" onclick={() => session.loadFolders(account.id)}>{t("accounts.retry")}</button>
+          </div>
+        {/if}
       {/if}
     </section>
   {:else}

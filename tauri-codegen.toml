@@ -1,5 +1,5 @@
 [input]
-source_dirs = ["src-tauri/src", "crates/sieve-core/src", "crates/managesieve/src"]
+source_dirs = ["src-tauri/src", "crates/sieve-core/src", "crates/managesieve/src", "crates/mailstore/src"]
 exclude = ["tests", "target"]
 use_cargo_expand = false
 

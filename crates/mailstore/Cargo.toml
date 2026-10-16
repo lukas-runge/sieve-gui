@@ -1,0 +1,22 @@
+[package]
+name = "mailstore"
+description = "Read-only IMAP access to the user's mail store"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+async-imap = { version = "0.12.0", default-features = false, features = ["runtime-tokio"] }
+futures-util = "0.3.34"
+managesieve = { version = "0.1.0", path = "../managesieve" }
+rustls-pki-types = "1.15.1"
+serde = { version = "1.0.229", features = ["derive"] }
+thiserror = "2.0.21"
+tokio = { version = "1.53.3", default-features = false, features = ["net", "time"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["tls12", "ring"] }
+
+[dev-dependencies]
+tokio = { version = "1.53.3", features = ["macros", "rt"] }

@@ -7,11 +7,12 @@ import {
   deleteScript,
   getScript,
   listAccounts,
+  listFolders,
   listScripts,
   renameScript,
   saveAccount,
 } from "#tauri/commands";
-import type { Account, AccountInput, ServerInfo } from "#tauri/types";
+import type { Account, AccountInput, Folder, ServerInfo } from "#tauri/types";
 import { describeError } from "./api";
 import { ScriptEditor } from "./editor.svelte";
 
@@ -21,9 +22,17 @@ export interface ServerState {
   error: string | null;
 }
 
+export interface FolderState {
+  status: "loading" | "ready" | "error";
+  folders: Folder[];
+  error: string | null;
+}
+
 class Session {
   accounts = $state<Account[]>([]);
   servers = $state<Record<string, ServerState>>({});
+  /** IMAP folder lists, only for accounts with IMAP set up. */
+  folders = $state<Record<string, FolderState>>({});
   editor = $state<ScriptEditor | null>(null);
   loadingScript = $state(false);
   error = $state<string | null>(null);
@@ -48,6 +57,21 @@ class Session {
       this.servers[id] = { status: "ready", info, error: null };
     } catch (e) {
       this.servers[id] = { status: "error", info: null, error: describeError(e) };
+      return;
+    }
+    void this.loadFolders(id);
+  }
+
+  async loadFolders(id: string) {
+    if (!this.accounts.find((a) => a.id === id)?.imap) {
+      delete this.folders[id];
+      return;
+    }
+    this.folders[id] = { status: "loading", folders: this.folders[id]?.folders ?? [], error: null };
+    try {
+      this.folders[id] = { status: "ready", folders: await listFolders(id), error: null };
+    } catch (e) {
+      this.folders[id] = { status: "error", folders: [], error: describeError(e) };
     }
   }
 
@@ -72,6 +96,7 @@ class Session {
     await deleteAccount(id);
     if (this.editor?.accountId === id) this.editor = null;
     delete this.servers[id];
+    delete this.folders[id];
     await this.loadAccounts();
   }
 

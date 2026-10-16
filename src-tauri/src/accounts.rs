@@ -22,6 +22,18 @@ pub struct Account {
     pub port: u16,
     pub security: AccountSecurity,
     pub username: String,
+    /// IMAP access for the folder list, with the same credentials.
+    /// `None` disables it.
+    #[serde(default)]
+    pub imap: Option<ImapSettings>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImapSettings {
+    pub host: String,
+    pub port: u16,
+    pub security: AccountSecurity,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -35,6 +47,16 @@ pub enum AccountSecurity {
     Insecure,
 }
 
+impl From<AccountSecurity> for managesieve::Security {
+    fn from(security: AccountSecurity) -> Self {
+        match security {
+            AccountSecurity::StartTls => Self::StartTls,
+            AccountSecurity::ImplicitTls => Self::ImplicitTls,
+            AccountSecurity::Insecure => Self::Insecure,
+        }
+    }
+}
+
 /// An account as entered in the account form.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,6 +68,7 @@ pub struct AccountInput {
     pub port: u16,
     pub security: AccountSecurity,
     pub username: String,
+    pub imap: Option<ImapSettings>,
     /// `None` keeps the stored password.
     pub password: Option<String>,
 }
@@ -137,6 +160,7 @@ pub async fn save_account(
         port: input.port,
         security: input.security,
         username: input.username.trim().to_owned(),
+        imap: input.imap.map(|imap| ImapSettings { host: imap.host.trim().to_owned(), ..imap }),
     };
     if let Some(pw) = &input.password {
         keychain_entry(&account.id)?.set_password(pw).map_err(keychain_error)?;

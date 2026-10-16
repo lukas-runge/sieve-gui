@@ -17,7 +17,26 @@ const account = {
   port: 4190,
   security: "startTls",
   username: "lukas",
+  imap: { host: "mail.example.com", port: 993, security: "implicitTls" },
 };
+
+// Modified UTF-7 names, as IMAP sends them.
+const folders = (
+  [
+    ["INBOX"],
+    ["Archiv", "archive"],
+    ["Archiv/2025"],
+    ["Entw&APw-rfe", "drafts"],
+    ["Gesendet", "sent"],
+    ["Lists"],
+    ["Lists/Rust"],
+    ["Papierkorb", "trash"],
+    ["Spam", "junk"],
+    ["Steuern"],
+    ["Steuern/Gesch&AOQ-ftlich"],
+    ["Steuern/Privat"],
+  ] as [string, string?][]
+).map(([name, specialUse]) => ({ name, delimiter: "/", selectable: true, specialUse: specialUse ?? null }));
 
 const sieve = ["fileinto", "reject", "envelope", "vacation", "subaddress", "relational", "regex", "imap4flags", "copy", "body", "variables", "mailbox", "date"];
 
@@ -34,6 +53,9 @@ export function installMock() {
           capabilities: { implementation: "Dovecot Pigeonhole", sasl: ["PLAIN"], sieve, starttls: true, maxRedirects: 4, notify: [], language: null, owner: "lukas", version: "1.0", unauthenticate: false, other: [] },
           scripts: Object.keys(scripts).map((name) => ({ name, active: name === active })),
         };
+      case "list_folders":
+        await new Promise((r) => setTimeout(r, 200));
+        return folders;
       case "list_scripts":
         return Object.keys(scripts).map((name) => ({ name, active: name === active }));
       case "get_script":

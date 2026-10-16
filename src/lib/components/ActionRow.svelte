@@ -2,7 +2,7 @@
   import type { Action } from "#tauri/types";
   import { t, type MessageKey } from "../i18n.svelte";
   import { ACTION_KINDS, actionExtension, actionKind, buildAction, type ActionKind } from "../rules/view";
-  import { mailboxLabel, mailboxRaw, type ScriptFolders } from "../rules/mailbox";
+  import { folderExists, mailboxLabel, mailboxRaw, type ScriptFolders } from "../rules/mailbox";
 
   let {
     action,
@@ -46,17 +46,38 @@
   </select>
 
   {#if action.type === "fileInto"}
-    <input
-      class="input input-sm grow min-w-48 font-mono"
-      aria-label={t("action.folder")}
-      placeholder={t("action.folder")}
-      list={folderListId}
-      value={mailboxLabel(action.mailbox)}
-      oninput={(e) => onchange({ ...action, mailbox: mailboxRaw(e.currentTarget.value, folders.encoding) }, true)}
-    />
-    <datalist id={folderListId}>
-      {#each folders.labels as folder}<option value={folder}></option>{/each}
-    </datalist>
+    {@const label = mailboxLabel(action.mailbox)}
+    {@const missing = folders.existing !== null && label !== "" && !folderExists(folders.existing, label)}
+    <div class="grow min-w-48">
+      <input
+        class={["input input-sm w-full font-mono", missing && "input-warning"]}
+        aria-label={t("action.folder")}
+        aria-describedby={missing ? `${folderListId}-missing` : undefined}
+        placeholder={t("action.folder")}
+        list={folderListId}
+        value={label}
+        oninput={(e) => onchange({ ...action, mailbox: mailboxRaw(e.currentTarget.value, folders.encoding) }, true)}
+      />
+      <datalist id={folderListId}>
+        {#each folders.labels as folder}<option value={folder}></option>{/each}
+      </datalist>
+      {#if missing}
+        <div id="{folderListId}-missing" class="mt-1 grid gap-1 text-xs">
+          <p class="justify-self-start rounded-field border border-warning/40 bg-warning/10 px-2 py-0.5">{t("action.folderMissing")}</p>
+          {#if extensions.includes("mailbox")}
+            <label class="flex items-center gap-2">
+              <input
+                type="checkbox"
+                class="checkbox checkbox-xs"
+                checked={action.create}
+                onchange={(e) => onchange({ ...action, create: e.currentTarget.checked }, false)}
+              />
+              {t("action.folderCreate")}
+            </label>
+          {/if}
+        </div>
+      {/if}
+    </div>
   {:else if action.type === "redirect"}
     <input
       type="email"

@@ -79,7 +79,11 @@
           {#if session.error}
             <p role="alert" class="rounded-box border border-error/40 bg-error/10 px-3 py-2 text-sm">{session.error}</p>
           {/if}
-          <RuleList {editor} extensions={session.extensions} />
+          <RuleList
+            {editor}
+            extensions={session.extensions}
+            serverFolders={session.folders[editor.accountId]?.status === "ready" ? session.folders[editor.accountId].folders : null}
+          />
         </div>
       </div>
     {:else}

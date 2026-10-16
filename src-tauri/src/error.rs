@@ -62,6 +62,19 @@ impl AppError {
     }
 }
 
+impl From<mailstore::Error> for AppError {
+    fn from(err: mailstore::Error) -> Self {
+        use mailstore::Error as E;
+        let kind = match &err {
+            E::Tls(_) | E::InvalidServerName(_) => ErrorKind::Tls,
+            E::Auth(_) => ErrorKind::Auth,
+            E::Io(_) | E::Timeout => ErrorKind::Connection,
+            E::Imap(_) => ErrorKind::Server,
+        };
+        Self::new(kind, err.to_string())
+    }
+}
+
 impl From<sieve_core::ParseError> for AppError {
     fn from(err: sieve_core::ParseError) -> Self {
         Self::new(ErrorKind::Parse, err.to_string())

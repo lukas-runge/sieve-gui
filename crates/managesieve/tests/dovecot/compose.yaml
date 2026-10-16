@@ -6,3 +6,5 @@ services:
     ports:
       - "127.0.0.1:14190:34190" # ManageSieve (plain + STARTTLS)
       - "127.0.0.1:14191:35190" # ManageSieve over implicit TLS
+      - "127.0.0.1:14143:31143" # IMAP (plain + STARTTLS), for crates/mailstore
+      - "127.0.0.1:14993:31993" # IMAP over implicit TLS

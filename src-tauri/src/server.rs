@@ -2,12 +2,12 @@
 
 use std::collections::HashMap;
 
-use managesieve::{Capabilities, Client, ConnectOptions, Credentials, Diagnostic, ScriptInfo, Security};
+use managesieve::{Capabilities, Client, ConnectOptions, Credentials, Diagnostic, ScriptInfo};
 use serde::Serialize;
 use tauri::{AppHandle, State};
 use tokio::sync::Mutex;
 
-use crate::accounts::{self, Account, AccountSecurity, AccountStore};
+use crate::accounts::{self, Account, AccountStore};
 use crate::error::{AppError, AppResult, ErrorKind};
 
 /// One open connection per account, reused across commands.
@@ -25,12 +25,7 @@ impl Sessions {
 }
 
 async fn connect(account: &Account) -> AppResult<Client> {
-    let security = match account.security {
-        AccountSecurity::StartTls => Security::StartTls,
-        AccountSecurity::ImplicitTls => Security::ImplicitTls,
-        AccountSecurity::Insecure => Security::Insecure,
-    };
-    let opts = ConnectOptions::new(&account.host).port(account.port).security(security);
+    let opts = ConnectOptions::new(&account.host).port(account.port).security(account.security.into());
     let mut client = Client::connect(&opts).await.map_err(|e| AppError::from_sieve(e, false))?;
     let credentials = Credentials::new(&account.username, accounts::password(&account.id)?);
     client.authenticate(&credentials).await.map_err(|e| AppError::from_sieve(e, true))?;

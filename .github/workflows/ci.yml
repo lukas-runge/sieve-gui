@@ -60,16 +60,18 @@ jobs:
       - name: Tests
         run: cargo test --workspace
 
-      - name: ManageSieve tests against Dovecot
+      - name: ManageSieve and IMAP tests against Dovecot
         run: |
           crates/managesieve/tests/dovecot/gen-certs.sh
           docker compose -f crates/managesieve/tests/dovecot/compose.yaml up -d --build
           timeout 60 sh -c 'until nc -z localhost 14190; do sleep 1; done'
           MANAGESIEVE_TEST_ADDR=localhost:14190 MANAGESIEVE_TEST_TLS_ADDR=localhost:14191 \
             cargo test -p managesieve --test dovecot
+          MAILSTORE_TEST_ADDR=localhost:14143 MAILSTORE_TEST_TLS_ADDR=localhost:14993 \
+            cargo test -p mailstore --test dovecot
           docker compose -f crates/managesieve/tests/dovecot/compose.yaml down
 
       - name: Parser tests against the Pigeonhole test suite
         run: |
           scripts/fetch-pigeonhole.sh
-          PIGEONHOLE_DIR=target/pigeonhole cargo test -p sieve-core --test pigeonhole -- --ignored
+          PIGEONHOLE_DIR=.cache/pigeonhole cargo test -p sieve-core --test pigeonhole -- --ignored

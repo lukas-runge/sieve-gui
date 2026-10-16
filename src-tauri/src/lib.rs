@@ -1,5 +1,6 @@
 mod accounts;
 mod error;
+mod folders;
 mod rules;
 mod server;
 
@@ -45,6 +46,7 @@ pub fn run() {
             server::activate_script,
             server::rename_script,
             server::delete_script,
+            folders::list_folders,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

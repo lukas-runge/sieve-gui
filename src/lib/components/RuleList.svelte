@@ -3,6 +3,7 @@
   import type { ScriptEditor } from "../editor.svelte";
   import { uid } from "../editor.svelte";
   import { t } from "../i18n.svelte";
+  import { detectMailboxEncoding, mailboxLabel, type ScriptFolders } from "../rules/mailbox";
   import { newRule } from "../rules/view";
   import RawCard from "./RawCard.svelte";
   import RuleCard from "./RuleCard.svelte";
@@ -13,16 +14,13 @@
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
 
-  /** Folders used anywhere in the script, as suggestions for folder inputs. */
-  const folders = $derived(
-    [
-      ...new Set(
-        editor.rules.items.flatMap((item) =>
-          item.type === "rule" ? item.actions.flatMap((a) => (a.type === "fileInto" && a.mailbox ? [a.mailbox] : [])) : [],
-        ),
-      ),
-    ].sort(),
-  );
+  /** Folders used anywhere in the script, for folder inputs. */
+  const folders: ScriptFolders = $derived.by(() => {
+    const raw = editor.rules.items.flatMap((item) =>
+      item.type === "rule" ? item.actions.flatMap((a) => (a.type === "fileInto" && a.mailbox ? [a.mailbox] : [])) : [],
+    );
+    return { labels: [...new Set(raw.map(mailboxLabel))].sort(), encoding: detectMailboxEncoding(raw) };
+  });
 
   function move(from: number, to: number) {
     const count = editor.rules.items.length;

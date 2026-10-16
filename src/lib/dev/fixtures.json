@@ -419,7 +419,7 @@
               "copy": false,
               "create": false,
               "flags": null,
-              "mailbox": "Taxes",
+              "mailbox": "Steuern/Gesch&AOQ-ftlich",
               "type": "fileInto"
             }
           ],
@@ -459,6 +459,6 @@
         "vacation"
       ]
     },
-    "source": "require [\"date\",\"fileinto\",\"relational\",\"vacation\"];\r\n# rule:[Out of Office]\r\nif allof (currentdate :zone \"+0100\" :value \"ge\" \"iso8601\" \"2026-12-20T08:00:00+01:00\", currentdate :zone \"+0100\" :value \"le\" \"iso8601\" \"2027-01-04T18:30:00+01:00\")\r\n{\r\n\tvacation :days 7 :addresses [\"lukas@example.com\",\"l.runge@example.com\"] :subject \"Abwesenheit: Urlaub 🌴\" :from \"lukas@example.com\" text:\r\nHallo,\r\n\r\nich bin bis zum 4. Januar nicht im Büro.\r\nIn dringenden Fällen: \"Notfall\" an info@example.com.\r\n..\r\nViele Grüße\r\nLukas\r\n.\r\n;\r\n}\r\n# rule:[Existing rule]\r\nif allof (header :contains \"from\" \"@tax-office.example\")\r\n{\r\n\tfileinto \"Taxes\";\r\n}\r\n"
+    "source": "require [\"date\",\"fileinto\",\"relational\",\"vacation\"];\r\n# rule:[Out of Office]\r\nif allof (currentdate :zone \"+0100\" :value \"ge\" \"iso8601\" \"2026-12-20T08:00:00+01:00\", currentdate :zone \"+0100\" :value \"le\" \"iso8601\" \"2027-01-04T18:30:00+01:00\")\r\n{\r\n\tvacation :days 7 :addresses [\"lukas@example.com\",\"l.runge@example.com\"] :subject \"Abwesenheit: Urlaub 🌴\" :from \"lukas@example.com\" text:\r\nHallo,\r\n\r\nich bin bis zum 4. Januar nicht im Büro.\r\nIn dringenden Fällen: \"Notfall\" an info@example.com.\r\n..\r\nViele Grüße\r\nLukas\r\n.\r\n;\r\n}\r\n# rule:[Existing rule]\r\nif allof (header :contains \"from\" \"@tax-office.example\")\r\n{\r\n\tfileinto \"Steuern/Gesch&AOQ-ftlich\";\r\n}\r\n"
   }
 }

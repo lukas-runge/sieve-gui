@@ -4,6 +4,7 @@
   import { i18n, t, type MessageKey } from "../i18n.svelte";
   import { actionKind, hasValues, viewCondition } from "../rules/view";
   import { formatDate, formatSize } from "../rules/format";
+  import { mailboxLabel } from "../rules/mailbox";
 
   let { rule }: { rule: Rule } = $props();
 
@@ -12,7 +13,7 @@
   function actionParam(a: Action): string | null {
     switch (a.type) {
       case "fileInto":
-        return a.mailbox;
+        return mailboxLabel(a.mailbox);
       case "redirect":
         return a.address;
       case "reject":

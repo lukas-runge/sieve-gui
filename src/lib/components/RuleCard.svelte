@@ -2,6 +2,7 @@
   import type { Action, Condition, Rule } from "#tauri/types";
   import type { ScriptEditor } from "../editor.svelte";
   import { t } from "../i18n.svelte";
+  import type { ScriptFolders } from "../rules/mailbox";
   import { buildAction, newCondition } from "../rules/view";
   import ActionRow from "./ActionRow.svelte";
   import ConditionRow from "./ConditionRow.svelte";
@@ -24,7 +25,7 @@
     index: number;
     editor: ScriptEditor;
     extensions: string[];
-    folders: string[];
+    folders: ScriptFolders;
     editing: boolean;
     onedit: (editing: boolean) => void;
     onmove: (delta: number) => void;

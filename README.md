@@ -95,6 +95,7 @@ sieve-gui/
 ```bash
 cargo test --workspace          # unit, round-trip, fuzz and Roundcube compatibility tests
 pnpm check                      # svelte-check
+pnpm test                       # frontend unit tests (node --test)
 
 # Parser against every script of the Dovecot Pigeonhole test suite
 scripts/fetch-pigeonhole.sh

@@ -236,3 +236,4 @@ The project is **MIT-licensed**. To keep it that way:
 | D6 | Dry-run accuracy | As accurate as possible via an explicit, user-adjustable simulation context with sensible defaults (§7) | 2026-10-16 |
 | D7 | Mac App Store | Planned as the last distribution step | 2026-10-16 |
 | D8 | Script layout | Generated scripts use Roundcube's exact layout (CRLF, tabs, `{` on its own line, sorted compact `require`, `allof (…)` for "all of", bare test for a single "any of", `if true` for all messages). Roundcube-generated scripts round-trip byte-exact (fixtures in `crates/sieve-core/tests/fixtures/roundcube`) | 2026-10-16 |
+| D9 | Folder names | Kept exactly as written in the script (UTF-8 or IMAP modified UTF-7, as Roundcube's `managesieve_mbox_encoding` decides). The UI shows them decoded; new or edited names use the encoding the script already uses, UTF-8 if none | 2026-10-16 |

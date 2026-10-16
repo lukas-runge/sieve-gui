@@ -2,6 +2,7 @@
   import type { Action } from "#tauri/types";
   import { t, type MessageKey } from "../i18n.svelte";
   import { ACTION_KINDS, actionExtension, actionKind, buildAction, type ActionKind } from "../rules/view";
+  import { mailboxLabel, mailboxRaw, type ScriptFolders } from "../rules/mailbox";
 
   let {
     action,
@@ -12,7 +13,7 @@
   }: {
     action: Action;
     extensions: string[];
-    folders: string[];
+    folders: ScriptFolders;
     onchange: (a: Action, merge: boolean) => void;
     onremove: () => void;
   } = $props();
@@ -50,11 +51,11 @@
       aria-label={t("action.folder")}
       placeholder={t("action.folder")}
       list={folderListId}
-      value={action.mailbox}
-      oninput={(e) => onchange({ ...action, mailbox: e.currentTarget.value }, true)}
+      value={mailboxLabel(action.mailbox)}
+      oninput={(e) => onchange({ ...action, mailbox: mailboxRaw(e.currentTarget.value, folders.encoding) }, true)}
     />
     <datalist id={folderListId}>
-      {#each folders as folder}<option value={folder}></option>{/each}
+      {#each folders.labels as folder}<option value={folder}></option>{/each}
     </datalist>
   {:else if action.type === "redirect"}
     <input

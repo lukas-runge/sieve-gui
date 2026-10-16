@@ -1,0 +1,3 @@
+# Fixtures are exact bytes captured from a ManageSieve server (mostly CRLF).
+# Never normalise line endings or whitespace.
+*.sieve -text

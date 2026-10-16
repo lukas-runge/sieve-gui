@@ -217,7 +217,7 @@ The project is **MIT-licensed**. To keep it that way:
 - **Permissive references may be used with attribution:** [foxcpp/go-sieve](https://github.com/foxcpp/go-sieve) (MIT, Go interpreter — structure may be ported), [tonioo/sievelib](https://github.com/tonioo/sievelib) (MIT, Python parser/generator/ManageSieve client). Ported code keeps its copyright notice.
 - **Do not read, port, or closely imitate AGPL code**, in particular [stalwartlabs/sieve](https://github.com/stalwartlabs/sieve) (`sieve-rs`, AGPL-3.0-only) and [thsmi/sieve](https://github.com/thsmi/sieve) (AGPL-3.0). Translating such code into Rust would still make it a derivative work.
 - **Dovecot Pigeonhole (LGPL-2.1)** is used only as an external black box for testing; its code and test files are not vendored.
-- New dependencies must be MIT/Apache-2.0/BSD/ISC/Zlib-compatible (to be enforced with `cargo-deny`).
+- New dependencies must be MIT/Apache-2.0/BSD/ISC/Zlib-compatible, enforced for Rust with `cargo-deny` in CI (`deny.toml`). Exceptions: MPL-2.0 for unmodified transitive dependencies of Tauri (`cssparser`, `selectors`, `option-ext`); the bundled Atkinson Hyperlegible fonts are OFL-1.1, so release builds must ship their license text.
 
 ## 11. Distribution
 

@@ -54,6 +54,9 @@ jobs:
       - name: Cargo check
         run: cargo check --workspace --all-targets
 
+      - name: Licenses and advisories
+        uses: EmbarkStudios/cargo-deny-action@v2
+
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 

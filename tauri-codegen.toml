@@ -1,6 +1,10 @@
 [input]
-source_dir = "src-tauri/src"
+# The whole repository, so that types from crates/* used by commands are found.
+source_dir = "."
 exclude = [
+    "node_modules",
+    ".svelte-kit",
+    "build",
     "tests",
     "target",
 ]

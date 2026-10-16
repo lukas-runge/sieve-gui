@@ -90,20 +90,19 @@ pub enum ConditionTest {
     /// `body [:comparator] [match] [transform] <keys>` (RFC 5173)
     Body { transform: BodyTransform, matcher: Matcher, keys: Vec<String> },
     /// `currentdate [:zone] [:comparator] [match] <date-part> <keys>` (RFC 5260)
+    #[serde(rename_all = "camelCase")]
     CurrentDate {
         zone: Option<String>,
         matcher: Matcher,
-        // Explicit rename: tauri-ts-generator ignores variant-level rename_all.
-        #[serde(rename = "datePart")]
         date_part: String,
         keys: Vec<String>,
     },
     /// `date [:zone | :originalzone] [:comparator] [match] <header> <date-part> <keys>`
+    #[serde(rename_all = "camelCase")]
     Date {
         zone: DateZone,
         matcher: Matcher,
         header: String,
-        #[serde(rename = "datePart")]
         date_part: String,
         keys: Vec<String>,
     },

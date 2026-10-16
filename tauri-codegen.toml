@@ -1,13 +1,6 @@
 [input]
-# The whole repository, so that types from crates/* used by commands are found.
-source_dir = "."
-exclude = [
-    "node_modules",
-    ".svelte-kit",
-    "build",
-    "tests",
-    "target",
-]
+source_dirs = ["src-tauri/src", "crates/sieve-core/src", "crates/managesieve/src"]
+exclude = ["tests", "target"]
 use_cargo_expand = false
 
 [output]

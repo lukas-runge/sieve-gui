@@ -1,24 +1,5 @@
 import { t } from "./i18n.svelte";
-import type { Diagnostic } from "#tauri/types";
-
-// Mirrors `AppError` in src-tauri/src/error.rs (tauri-ts-generator does not
-// export error types of command results).
-export type ErrorKind =
-  | "connection"
-  | "tls"
-  | "auth"
-  | "server"
-  | "conflict"
-  | "parse"
-  | "keychain"
-  | "config"
-  | "notFound";
-
-export interface AppError {
-  kind: ErrorKind;
-  message: string;
-  diagnostics: Diagnostic[];
-}
+import type { AppError } from "#tauri/types";
 
 export function isAppError(e: unknown): e is AppError {
   return typeof e === "object" && e !== null && "kind" in e && "message" in e;

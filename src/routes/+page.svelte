@@ -71,11 +71,17 @@
           </p>
         </div>
         <div class="ml-auto flex items-center gap-1">
-        <button class="btn btn-ghost btn-sm" aria-pressed={showCode} onclick={() => (showCode = !showCode)}>
-          {showCode ? t("editor.hideCode") : t("editor.showCode")}
-        </button>
         <button class="btn btn-primary btn-sm" disabled={!editor.dirty} onclick={() => (deploying = true)} title="⌘S">
           {t("editor.deploy")}
+        </button>
+        <button
+          class={["btn btn-ghost btn-sm gap-1.5", showCode && "btn-active"]}
+          aria-pressed={showCode}
+          title={showCode ? t("editor.hideCode") : t("editor.showCode")}
+          onclick={() => (showCode = !showCode)}
+        >
+          <Icon name="panelRight" size={16} />
+          {t("editor.code")}
         </button>
         </div>
       </header>

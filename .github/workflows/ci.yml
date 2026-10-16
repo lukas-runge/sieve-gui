@@ -30,8 +30,6 @@ jobs:
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -51,7 +49,24 @@ jobs:
         run: pnpm check
 
       - name: Cargo check
-        run: cargo check --manifest-path src-tauri/Cargo.toml
+        run: cargo check --workspace --all-targets
 
       - name: Clippy
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tests
+        run: cargo test --workspace
+
+      - name: ManageSieve tests against Dovecot
+        run: |
+          crates/managesieve/tests/dovecot/gen-certs.sh
+          docker compose -f crates/managesieve/tests/dovecot/compose.yaml up -d --build
+          timeout 60 sh -c 'until nc -z localhost 14190; do sleep 1; done'
+          MANAGESIEVE_TEST_ADDR=localhost:14190 MANAGESIEVE_TEST_TLS_ADDR=localhost:14191 \
+            cargo test -p managesieve --test dovecot
+          docker compose -f crates/managesieve/tests/dovecot/compose.yaml down
+
+      - name: Parser tests against the Pigeonhole test suite
+        run: |
+          scripts/fetch-pigeonhole.sh
+          PIGEONHOLE_DIR=target/pigeonhole cargo test -p sieve-core --test pigeonhole -- --ignored

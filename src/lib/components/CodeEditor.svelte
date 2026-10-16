@@ -51,6 +51,8 @@
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
           theme,
           editable.of([EditorState.readOnly.of(readonly), EditorView.editable.of(!readonly)]),
+          // The read-only preview sits in a narrow panel: wrap instead of scrolling sideways.
+          readonly ? EditorView.lineWrapping : [],
           EditorView.contentAttributes.of({ "aria-label": label }),
           EditorView.updateListener.of((u) => {
             if (u.docChanged) onchange?.(u.state.doc.toString());

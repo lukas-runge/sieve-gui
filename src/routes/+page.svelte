@@ -45,7 +45,7 @@
 
 <svelte:window {onkeydown} />
 
-<div class="grid h-screen grid-cols-[15rem_1fr] {showCode && editor ? 'xl:grid-cols-[15rem_1fr_32rem]' : ''}">
+<div class="grid h-screen grid-cols-[15rem_1fr]">
   <aside class="border-r border-base-300 bg-base-200">
     <Sidebar onaccount={(account) => (accountDialog = { account })} />
   </aside>
@@ -73,7 +73,8 @@
         </button>
       </header>
 
-      <div class="overflow-y-auto">
+      <div class="relative flex min-h-0 grow">
+      <div class="min-w-0 grow overflow-y-auto">
         <div class="mx-auto grid max-w-3xl gap-4 px-5 py-5">
           {#if !active}
             <p class="rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm">{t("editor.inactive")}</p>
@@ -99,6 +100,22 @@
           />
         </div>
       </div>
+
+      {#if showCode}
+        <!-- Beside the rules on wide windows, otherwise over their right edge. -->
+        <aside
+          class="absolute inset-y-0 right-0 z-20 flex w-[min(32rem,95%)] flex-col gap-2 border-l border-base-300 bg-base-200 p-3 shadow-xl xl:static xl:w-[32rem] xl:shrink-0 xl:shadow-none"
+        >
+          <div class="flex items-center gap-2">
+            <h2 class="grow font-semibold">{t("code.heading")}</h2>
+            <button class="btn btn-ghost btn-sm btn-square" aria-label={t("editor.hideCode")} title={t("editor.hideCode")} onclick={() => (showCode = false)}>✕</button>
+          </div>
+          <div class="min-h-0 overflow-auto">
+            <CodeEditor value={editor.code} readonly label={t("code.heading")} />
+          </div>
+        </aside>
+      {/if}
+      </div>
     {:else}
       <div class="grid h-full place-items-center p-8 text-center text-base-content/70">
         {#if session.loadingScript}
@@ -113,14 +130,6 @@
     {/if}
   </main>
 
-  {#if showCode && editor}
-    <aside class="hidden flex-col gap-2 overflow-hidden border-l border-base-300 bg-base-200 p-3 xl:flex">
-      <h2 class="font-semibold">{t("code.heading")}</h2>
-      <div class="min-h-0 overflow-auto">
-        <CodeEditor value={editor.code} readonly label={t("code.heading")} />
-      </div>
-    </aside>
-  {/if}
 </div>
 
 {#if accountDialog}

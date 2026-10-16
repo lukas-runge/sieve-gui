@@ -1,0 +1,154 @@
+<script lang="ts">
+  import type { Action, Condition, Rule } from "#tauri/types";
+  import type { ScriptEditor } from "../editor.svelte";
+  import { t } from "../i18n.svelte";
+  import { buildAction, newCondition } from "../rules/view";
+  import ActionRow from "./ActionRow.svelte";
+  import ConditionRow from "./ConditionRow.svelte";
+  import RuleSentence from "./RuleSentence.svelte";
+
+  let {
+    rule,
+    index,
+    editor,
+    extensions,
+    folders,
+    editing,
+    onedit,
+    onmove,
+    onduplicate,
+    ondelete,
+    dragHandle,
+  }: {
+    rule: Rule;
+    index: number;
+    editor: ScriptEditor;
+    extensions: string[];
+    folders: string[];
+    editing: boolean;
+    onedit: (editing: boolean) => void;
+    onmove: (delta: number) => void;
+    onduplicate: () => void;
+    ondelete: () => void;
+    dragHandle: import("svelte").Snippet<[number]>;
+  } = $props();
+
+  /** Mutates this rule with an undo step. */
+  function change(fn: (r: Rule) => void, merge = false) {
+    editor.edit((rules) => {
+      const item = rules.items[index];
+      if (item?.type === "rule") fn(item);
+    }, merge);
+  }
+
+  function setCondition(i: number, c: Condition, merge: boolean) {
+    change((r) => (r.conditions.items[i] = c), merge);
+  }
+  function setAction(i: number, a: Action, merge: boolean) {
+    change((r) => (r.actions[i] = a), merge);
+  }
+
+  const headingId = `rule-${Math.random().toString(36).slice(2)}`;
+</script>
+
+<article
+  class="rounded-box border border-base-300 bg-base-100 {rule.enabled ? '' : 'rule-disabled'}"
+  aria-labelledby={headingId}
+>
+  <header class="flex items-center gap-2 px-3 pt-2.5">
+    {@render dragHandle(index)}
+    {#if editing}
+      <input
+        class="input input-sm grow font-semibold"
+        aria-label={t("rule.name")}
+        placeholder={t("rule.untitled")}
+        value={rule.name}
+        oninput={(e) => change((r) => (r.name = e.currentTarget.value), true)}
+      />
+    {:else}
+      <h3 id={headingId} class="grow truncate font-semibold {rule.name ? '' : 'text-base-content/50 italic'}">
+        {rule.name || t("rule.untitled")}
+      </h3>
+    {/if}
+    <label class="flex items-center gap-1.5 text-sm text-base-content/70">
+      <input
+        type="checkbox"
+        class="toggle toggle-sm toggle-primary"
+        checked={rule.enabled}
+        onchange={(e) => change((r) => (r.enabled = e.currentTarget.checked))}
+      />
+      <span class="w-14">{rule.enabled ? t("rule.enabled") : t("rule.disabled")}</span>
+    </label>
+    <button class="btn btn-sm {editing ? 'btn-primary' : 'btn-ghost'}" onclick={() => onedit(!editing)}>
+      {editing ? t("rule.done") : t("rule.edit")}
+    </button>
+    <div class="dropdown dropdown-end">
+      <button class="btn btn-ghost btn-sm btn-square" aria-label="More">⋯</button>
+      <ul class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
+        <li><button onclick={() => onmove(-1)}>{t("rule.moveUp")}</button></li>
+        <li><button onclick={() => onmove(1)}>{t("rule.moveDown")}</button></li>
+        <li><button onclick={onduplicate}>{t("rule.duplicate")}</button></li>
+        <li><button class="text-error" onclick={ondelete}>{t("rule.delete")}</button></li>
+      </ul>
+    </div>
+  </header>
+
+  <div class="px-3 pb-3 pt-1.5">
+    {#if !editing}
+      <button class="block w-full text-left cursor-text" onclick={() => onedit(true)}>
+        <RuleSentence {rule} />
+      </button>
+    {:else}
+      <section class="mt-1 grid gap-2" aria-label={t("conditions.heading")}>
+        <div class="flex items-center gap-2">
+          <h4 class="font-semibold">{t("conditions.heading")}</h4>
+          {#if rule.conditions.items.length > 1}
+            <select
+              class="select select-sm w-auto"
+              value={rule.conditions.join}
+              onchange={(e) => change((r) => (r.conditions.join = e.currentTarget.value as "all" | "any"))}
+            >
+              <option value="all">{t("conditions.all")}</option>
+              <option value="any">{t("conditions.any")}</option>
+            </select>
+          {:else if rule.conditions.items.length === 0}
+            <span class="text-base-content/70">{t("conditions.always")}</span>
+          {/if}
+        </div>
+        {#each rule.conditions.items as condition, i}
+          <ConditionRow
+            {condition}
+            {extensions}
+            onchange={(c, merge) => setCondition(i, c, merge)}
+            onremove={() => change((r) => r.conditions.items.splice(i, 1))}
+          />
+        {/each}
+        <button
+          class="btn btn-ghost btn-sm justify-self-start w-fit"
+          onclick={() => change((r) => r.conditions.items.push(newCondition()))}
+        >
+          + {t("conditions.add")}
+        </button>
+      </section>
+
+      <section class="mt-3 grid gap-2" aria-label={t("actions.heading")}>
+        <h4 class="font-semibold">{t("actions.heading")}</h4>
+        {#each rule.actions as action, i}
+          <ActionRow
+            {action}
+            {extensions}
+            {folders}
+            onchange={(a, merge) => setAction(i, a, merge)}
+            onremove={() => change((r) => r.actions.splice(i, 1))}
+          />
+        {/each}
+        <button
+          class="btn btn-ghost btn-sm justify-self-start w-fit"
+          onclick={() => change((r) => r.actions.push(buildAction("move")))}
+        >
+          + {t("actions.add")}
+        </button>
+      </section>
+    {/if}
+  </div>
+</article>

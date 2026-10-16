@@ -67,8 +67,8 @@ mod tests {
     }
 
     #[test]
-    fn test_ca_parses() {
-        let pem = include_bytes!("../tests/dovecot/certs/ca.crt");
+    fn sample_ca_parses() {
+        let pem = include_bytes!("../tests/data/sample-ca.crt");
         let certs = certs_from_pem(pem).unwrap();
         assert_eq!(certs.len(), 1);
         config_with_roots(certs).unwrap();

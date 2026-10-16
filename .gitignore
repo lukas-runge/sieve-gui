@@ -13,3 +13,7 @@ vite.config.ts.timestamp-*
 
 # claude
 /.claude
+# Rust
+/target
+# Throwaway TLS material for the Dovecot test container (gen-certs.sh)
+/crates/managesieve/tests/dovecot/certs

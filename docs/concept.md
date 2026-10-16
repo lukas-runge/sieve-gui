@@ -235,3 +235,4 @@ The project is **MIT-licensed**. To keep it that way:
 | D5 | Authentication | SASL `PLAIN` and `LOGIN`; others later on demand | 2026-10-16 |
 | D6 | Dry-run accuracy | As accurate as possible via an explicit, user-adjustable simulation context with sensible defaults (§7) | 2026-10-16 |
 | D7 | Mac App Store | Planned as the last distribution step | 2026-10-16 |
+| D8 | Script layout | Generated scripts use Roundcube's exact layout (CRLF, tabs, `{` on its own line, sorted compact `require`, `allof (…)` for "all of", bare test for a single "any of", `if true` for all messages). Roundcube-generated scripts round-trip byte-exact (fixtures in `crates/sieve-core/tests/fixtures/roundcube`) | 2026-10-16 |

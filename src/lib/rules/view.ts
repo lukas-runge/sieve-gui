@@ -2,7 +2,7 @@
 // values per condition, and a kind plus parameters per action. Anything the
 // editor can't express is shown read-only and left untouched.
 
-import type { Action, Condition, ConditionTest, Matcher, Rule } from "#tauri/types";
+import type { Action, AddressPart, Condition, ConditionTest, Matcher, Rule } from "#tauri/types";
 
 // ── Conditions ────────────────────────────────────────────────────────────────
 
@@ -14,6 +14,8 @@ export const TEXT_OPERATORS = [
   "notContains",
   "is",
   "notIs",
+  "isWithSubdomains",
+  "notIsWithSubdomains",
   "startsWith",
   "notStartsWith",
   "endsWith",
@@ -33,10 +35,21 @@ export type Operator =
   | (typeof SIZE_OPERATORS)[number]
   | (typeof DATE_OPERATORS)[number];
 
+/**
+ * What a condition compares: the whole header (`header` test) or a part of
+ * the addresses in it (`address` test). Like Roundcube, which writes
+ * `header` unless an address part is chosen.
+ */
+export type Part = "header" | AddressPart;
+export const PARTS: readonly Part[] = ["header", "all", "domain", "localPart", "user", "detail"];
+/** Fields that hold addresses, so an address part can be chosen. */
+const ADDRESS_FIELDS: readonly Field[] = ["from", "to", "cc", "toOrCc", "header"];
+
 export interface ConditionView {
   field: Field;
   /** Header name for the `header` field. */
   header: string;
+  part: Part;
   operator: Operator;
   /** Values as the user typed them (wildcards of starts/ends with removed).
    * For dates: `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM`. */
@@ -84,6 +97,25 @@ function unescapePattern(s: string): string | null {
   return out;
 }
 
+/**
+ * Domains of "is (incl. subdomains)": each domain `d` is written as the keys
+ * `d` and `*.d`. Null unless the keys are exactly such pairs.
+ */
+function subdomainValues(keys: string[]): string[] | null {
+  const domains: string[] = [];
+  const wildcards = new Set<string>();
+  for (const key of keys) {
+    const wildcard = key.startsWith("*.");
+    const literal = unescapePattern(wildcard ? key.slice(2) : key);
+    if (literal === null) return null;
+    if (wildcard) wildcards.add(literal);
+    else domains.push(literal);
+  }
+  const unique = new Set(domains);
+  if (domains.length === 0 || unique.size !== domains.length || unique.size !== wildcards.size) return null;
+  return domains.every((d) => wildcards.has(d)) ? domains : null;
+}
+
 /** "starts with" / "ends with" values, if every key has that shape. */
 function affixValues(keys: string[], kind: "start" | "end"): string[] | null {
   const out: string[] = [];
@@ -108,21 +140,33 @@ export function viewCondition(c: Condition): ConditionView | null {
     case "header": {
       const f = fieldOf(test.headers);
       if (!f) return null;
-      const m = textOperator(test.matcher, test.keys, c.negate);
-      return m && { ...f, ...m };
+      const m = textOperator(test.matcher, test.keys, c.negate, "header");
+      return m && { ...f, part: "header", ...m };
+    }
+    case "address": {
+      const f = fieldOf(test.headers);
+      if (!f || !ADDRESS_FIELDS.includes(f.field)) return null;
+      const m = textOperator(test.matcher, test.keys, c.negate, test.part);
+      return m && { ...f, part: test.part, ...m };
     }
     case "exists": {
       const f = fieldOf(test.headers);
-      return f && { ...f, operator: c.negate ? "notExists" : "exists", values: [] };
+      return f && { ...f, part: "header", operator: c.negate ? "notExists" : "exists", values: [] };
     }
     case "body": {
       if (test.transform.type !== "text") return null;
-      const m = textOperator(test.matcher, test.keys, c.negate);
-      return m && { field: "body", header: "", ...m };
+      const m = textOperator(test.matcher, test.keys, c.negate, "header");
+      return m && { field: "body", header: "", part: "header", ...m };
     }
     case "size":
       if (c.negate) return null;
-      return { field: "size", header: "", operator: test.over ? "over" : "under", values: [String(test.limit)] };
+      return {
+        field: "size",
+        header: "",
+        part: "header",
+        operator: test.over ? "over" : "under",
+        values: [String(test.limit)],
+      };
     case "currentDate": {
       const mt = test.matcher.matchType;
       if (c.negate || test.matcher.comparator !== null || mt.type !== "value" || test.keys.length !== 1) return null;
@@ -132,7 +176,14 @@ export function viewCondition(c: Condition): ConditionView | null {
       if (test.datePart === "date" && /^\d{4}-\d{2}-\d{2}$/.test(key)) value = key;
       else if (test.datePart === "iso8601" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(key)) value = key.slice(0, 16);
       else return null;
-      return { field: "date", header: "", operator: mt.op === "ge" ? "onOrAfter" : "onOrBefore", values: [value], zone: test.zone };
+      return {
+        field: "date",
+        header: "",
+        part: "header",
+        operator: mt.op === "ge" ? "onOrAfter" : "onOrBefore",
+        values: [value],
+        zone: test.zone,
+      };
     }
     default:
       return null;
@@ -151,6 +202,7 @@ function textOperator(
   matcher: Matcher,
   keys: string[],
   negate: boolean,
+  part: Part,
 ): { operator: Operator; values: string[] } | null {
   if (matcher.comparator !== null) return null;
   switch (matcher.matchType.type) {
@@ -159,6 +211,8 @@ function textOperator(
     case "regex":
       return { operator: negated(matcher.matchType.type, negate), values: keys };
     case "matches": {
+      const domains = part === "domain" ? subdomainValues(keys) : null;
+      if (domains) return { operator: negated("isWithSubdomains", negate), values: domains };
       const start = affixValues(keys, "start");
       if (start) return { operator: negated("startsWith", negate), values: start };
       const end = affixValues(keys, "end");
@@ -209,6 +263,10 @@ export function buildCondition(v: ConditionView): Condition {
       keys = keys.map((k) => "*" + escapePattern(k));
       matchType = { type: "matches" };
       break;
+    case "isWithSubdomains":
+      keys = keys.flatMap((k) => [escapePattern(k), "*." + escapePattern(k)]);
+      matchType = { type: "matches" };
+      break;
     case "is":
     case "matches":
     case "regex":
@@ -218,20 +276,29 @@ export function buildCondition(v: ConditionView): Condition {
       matchType = { type: "contains" };
   }
   const matcher: Matcher = { matchType, comparator: null };
-  const test: ConditionTest =
-    v.field === "body"
-      ? { type: "body", transform: { type: "text" }, matcher, keys }
-      : { type: "header", headers, matcher, keys };
+  let test: ConditionTest;
+  if (v.field === "body") test = { type: "body", transform: { type: "text" }, matcher, keys };
+  else if (v.part !== "header" && ADDRESS_FIELDS.includes(v.field)) test = { type: "address", headers, part: v.part, matcher, keys };
+  else test = { type: "header", headers, matcher, keys };
   return { negate, test };
 }
 
-export function operatorsFor(field: Field, extensions: string[]): readonly Operator[] {
+export function operatorsFor(field: Field, part: Part, extensions: string[]): readonly Operator[] {
   if (field === "size") return SIZE_OPERATORS;
   if (field === "date") return DATE_OPERATORS;
   let ops: readonly Operator[] = TEXT_OPERATORS;
-  if (field === "body") ops = ops.filter((o) => !o.endsWith("xists"));
+  // `address` has no "exists"; that is a header question.
+  if (field === "body" || part !== "header") ops = ops.filter((o) => !o.endsWith("xists"));
+  if (part !== "domain") ops = ops.filter((o) => !o.endsWith("WithSubdomains"));
   if (!extensions.includes("regex")) ops = ops.filter((o) => !/regex/i.test(o));
   return ops;
+}
+
+/** The parts that can be chosen for a field; `current` stays available. */
+export function partsFor(field: Field, extensions: string[], current: Part): readonly Part[] {
+  if (!ADDRESS_FIELDS.includes(field)) return [];
+  const subaddress = extensions.includes("subaddress");
+  return PARTS.filter((p) => p === current || subaddress || (p !== "user" && p !== "detail"));
 }
 
 export function fieldsFor(extensions: string[]): readonly Field[] {
@@ -246,17 +313,32 @@ export function hasValues(op: Operator): boolean {
   return op !== "exists" && op !== "notExists";
 }
 
-/** Changing the field keeps operator and values where they still make sense. */
+/** Changing the field keeps part, operator and values where they still make sense. */
 export function withField(v: ConditionView, field: Field): ConditionView {
-  if (field === "size") return { field, header: "", operator: "over", values: ["1048576"] };
-  if (field === "date") return { field, header: "", operator: "onOrAfter", values: [new Date().toISOString().slice(0, 10)] };
-  if (v.field === "size" || v.field === "date") return { field, header: "", operator: "contains", values: [""] };
-  const operator = field === "body" && !hasValues(v.operator) ? "contains" : v.operator;
-  return { ...v, field, operator };
+  if (field === "size") return { field, header: "", part: "header", operator: "over", values: ["1048576"] };
+  if (field === "date") {
+    return { field, header: "", part: "header", operator: "onOrAfter", values: [new Date().toISOString().slice(0, 10)] };
+  }
+  if (v.field === "size" || v.field === "date") return { field, header: "", part: "header", operator: "contains", values: [""] };
+  const part = ADDRESS_FIELDS.includes(field) ? v.part : "header";
+  return keepOperator({ ...v, field, part });
+}
+
+/** Changing the part keeps operator and values where they still make sense. */
+export function withPart(v: ConditionView, part: Part): ConditionView {
+  return keepOperator({ ...v, part });
+}
+
+/** Swaps an operator the field and part don't offer for the closest one. */
+function keepOperator(v: ConditionView): ConditionView {
+  if (operatorsFor(v.field, v.part, ["regex"]).includes(v.operator)) return v;
+  const negate = v.operator.startsWith("not");
+  if (v.operator.endsWith("WithSubdomains")) return { ...v, operator: negate ? "notIs" : "is" };
+  return { ...v, operator: negate ? "notContains" : "contains", values: hasValues(v.operator) ? v.values : [""] };
 }
 
 export function newCondition(): Condition {
-  return buildCondition({ field: "from", header: "", operator: "contains", values: [""] });
+  return buildCondition({ field: "from", header: "", part: "header", operator: "contains", values: [""] });
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────

@@ -41,7 +41,10 @@
       {#if i > 0}{" "}<span class="text-base-content/60">{joinWord}</span>{/if}
       {" "}
       {#if view}
-        <span class="slot">{view.field === "header" ? view.header : t(`field.${view.field}` as MessageKey)}</span
+        <span class="slot"
+          >{view.field === "header" ? view.header : t(`field.${view.field}` as MessageKey)}{#if view.part !== "header"}{" "}({t(
+              `part.${view.part}` as MessageKey,
+            )}){/if}</span
         >{" "}<span>{t(`op.${view.operator}` as MessageKey)}</span>
         {#if hasValues(view.operator)}
           {#each view.values as value, j}

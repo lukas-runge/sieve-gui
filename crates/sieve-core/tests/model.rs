@@ -337,3 +337,29 @@ fn json_shape_matches_the_generated_typescript() {
     let back: RuleSet = serde_json::from_value(json).unwrap();
     assert_eq!(back, set);
 }
+
+/// What the editor writes for "Sender · domain · is (incl. subdomains)".
+#[test]
+fn address_parts_roundtrip() {
+    let matcher = Matcher::new(MatchType::Matches);
+    let test = ConditionTest::Address {
+        headers: vec!["from".into()],
+        part: AddressPart::Domain,
+        matcher,
+        keys: vec!["instagram.com".into(), "*.instagram.com".into()],
+    };
+    let set = RuleSet {
+        items: vec![RuleItem::Rule(Rule {
+            name: "Instagram".into(),
+            enabled: true,
+            conditions: Conditions { join: Join::All, items: vec![Condition { negate: false, test }] },
+            actions: vec![Action::FileInto { mailbox: "Accounts/Instagram".into(), copy: false, create: false, flags: None }],
+        })],
+        ..Default::default()
+    };
+    let text = assert_stable(&set);
+    assert!(
+        text.contains(r#"address :domain :matches "from" ["instagram.com", "*.instagram.com"]"#),
+        "{text}"
+    );
+}

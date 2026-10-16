@@ -7,11 +7,14 @@
     fieldsFor,
     hasValues,
     operatorsFor,
+    partsFor,
     viewCondition,
     withField,
+    withPart,
     type ConditionView,
     type Field,
     type Operator,
+    type Part,
   } from "../rules/view";
   import { SIZE_UNITS, splitSize } from "../rules/format";
   import ValueList from "./ValueList.svelte";
@@ -30,6 +33,7 @@
 
   const view = $derived(viewCondition(condition));
   const size = $derived(view?.field === "size" ? splitSize(Number(view.values[0])) : null);
+  const parts = $derived(view ? partsFor(view.field, extensions, view.part) : []);
 
   function update(patch: Partial<ConditionView>, merge = false) {
     if (!view) return;
@@ -58,13 +62,25 @@
         oninput={(e) => update({ header: e.currentTarget.value }, true)}
       />
     {/if}
+    {#if parts.length > 0}
+      <select
+        class="select select-sm w-auto"
+        aria-label={t("part.label")}
+        value={view.part}
+        onchange={(e) => view && onchange(buildCondition(withPart(view, e.currentTarget.value as Part)), false)}
+      >
+        {#each parts as part}
+          <option value={part}>{t(`part.${part}` as MessageKey)}</option>
+        {/each}
+      </select>
+    {/if}
     <select
       class="select select-sm w-auto"
       aria-label="Operator"
       value={view.operator}
       onchange={(e) => update({ operator: e.currentTarget.value as Operator })}
     >
-      {#each operatorsFor(view.field, extensions) as op}
+      {#each operatorsFor(view.field, view.part, extensions) as op}
         <option value={op}>{t(`op.${op}` as MessageKey)}</option>
       {/each}
     </select>
@@ -117,6 +133,8 @@
         />
         {#if view.operator.toLowerCase().includes("matches")}
           <p class="mt-1 text-xs text-base-content/60">{t("op.patternHint")}</p>
+        {:else if view.operator.endsWith("WithSubdomains")}
+          <p class="mt-1 text-xs text-base-content/60">{t("op.subdomainHint")}</p>
         {/if}
       </div>
     {/if}

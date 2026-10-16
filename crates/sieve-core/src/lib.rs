@@ -16,6 +16,7 @@ pub mod metadata;
 pub mod model;
 mod parser;
 pub mod printer;
+pub mod root;
 pub mod span;
 
 pub use export::export;

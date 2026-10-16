@@ -9,6 +9,7 @@ use crate::ast::{Argument, Command, CommentKind, Script, Test, Tests};
 use crate::metadata::parse_rule_name;
 use crate::model::*;
 use crate::parser::parse;
+use crate::root::FOLDER_VARIABLE;
 use crate::span::{ParseError, Span};
 
 /// Parses `src` and maps it onto the rule model.
@@ -58,6 +59,19 @@ pub fn import_script(script: &Script, src: &str) -> RuleSet {
         i += 1;
     }
 
+    // `global "<folder variable>";` right after the requires: single-folder mode.
+    if let Some(cmd) = commands.get(i) {
+        let leading = if i == 0 { &cmd.leading_comments[first_leading..] } else { &cmd.leading_comments[..] };
+        let variables = single_string_list(&cmd.arguments);
+        let folder = matches!(variables.as_deref(), Some([v]) if v.eq_ignore_ascii_case(FOLDER_VARIABLE));
+        let comments = !leading.is_empty() || !cmd.inner_comments.is_empty() || cmd.trailing_comment.is_some();
+        if cmd.is("global") && cmd.block.is_none() && folder && !comments {
+            set.single_folder = true;
+            i += 1;
+        }
+    }
+    let single_folder = set.single_folder;
+
     while i < commands.len() {
         let cmd = &commands[i];
         if cmd.is("if") {
@@ -67,10 +81,10 @@ pub fn import_script(script: &Script, src: &str) -> RuleSet {
                 end += 1;
             }
             let skip = if i == 0 { first_leading } else { 0 };
-            let rule = (end == i + 1).then(|| rule_from_if(cmd, skip)).flatten();
+            let rule = (end == i + 1).then(|| rule_from_if(cmd, skip, single_folder)).flatten();
             push(&mut set, rule, &commands[i..end], skip, src);
             i = end;
-        } else if let Some(actions) = action_run(&commands[i..]) {
+        } else if let Some(actions) = action_run(&commands[i..], single_folder) {
             // Actions outside of `if` form an "all messages" rule. A run ends
             // at the next command with comments (such as a rule name).
             let skip = if i == 0 { first_leading } else { 0 };
@@ -134,7 +148,7 @@ fn has_comments(cmd: &Command) -> bool {
 
 /// The longest run of plain action commands at the start of `commands`, as
 /// (length, actions). Only the first command may carry (name) comments.
-fn action_run(commands: &[Command]) -> Option<(usize, Vec<Action>)> {
+fn action_run(commands: &[Command], single_folder: bool) -> Option<(usize, Vec<Action>)> {
     let mut actions = Vec::new();
     for (n, cmd) in commands.iter().enumerate() {
         let comments_ok = if n == 0 {
@@ -142,7 +156,7 @@ fn action_run(commands: &[Command]) -> Option<(usize, Vec<Action>)> {
         } else {
             !has_comments(cmd)
         };
-        let action = comments_ok.then(|| action(cmd)).flatten();
+        let action = comments_ok.then(|| action(cmd, single_folder)).flatten();
         match action {
             Some(a) => actions.push(a),
             None => break,
@@ -151,7 +165,7 @@ fn action_run(commands: &[Command]) -> Option<(usize, Vec<Action>)> {
     (!actions.is_empty()).then_some((actions.len(), actions))
 }
 
-fn rule_from_if(cmd: &Command, skip_comments: usize) -> Option<Rule> {
+fn rule_from_if(cmd: &Command, skip_comments: usize, single_folder: bool) -> Option<Rule> {
     if cmd.trailing_comment.is_some() || !cmd.arguments.args.is_empty() {
         return None;
     }
@@ -187,7 +201,7 @@ fn rule_from_if(cmd: &Command, skip_comments: usize) -> Option<Rule> {
     let actions = block
         .commands
         .iter()
-        .map(|c| if has_comments(c) { None } else { action(c) })
+        .map(|c| if has_comments(c) { None } else { action(c, single_folder) })
         .collect::<Option<Vec<_>>>()?;
     Some(Rule { name, enabled, conditions, actions })
 }
@@ -462,13 +476,26 @@ fn condition_test(test: &Test) -> Option<ConditionTest> {
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
-fn action(cmd: &Command) -> Option<Action> {
+/// In single-folder mode, `set "<folder variable>" "<folder>"` is a move and
+/// `return` is "stop". A plain `fileinto` or `stop` there (e.g. written by
+/// another editor) is read as move and stop too, so saving turns them into
+/// the single-folder form.
+fn action(cmd: &Command, single_folder: bool) -> Option<Action> {
     if cmd.block.is_some() || cmd.arguments.tests.is_some() {
         return None;
     }
     let args = &cmd.arguments.args;
     let name = cmd.name.name.to_ascii_lowercase();
     Some(match name.as_str() {
+        "set" if single_folder => {
+            let a = Args::split(args, &[])?;
+            let [variable, mailbox] = <[_; 2]>::try_from(a.single_strings(2)?).ok()?;
+            if !variable.eq_ignore_ascii_case(FOLDER_VARIABLE) {
+                return None;
+            }
+            Action::FileInto { mailbox, copy: false, create: false, flags: None }
+        }
+        "return" if single_folder && args.is_empty() => Action::Stop,
         "fileinto" => {
             let tags = &[("copy", TagArg::None), ("create", TagArg::None), ("flags", TagArg::StringList)];
             let a = Args::split(args, &[tags])?;

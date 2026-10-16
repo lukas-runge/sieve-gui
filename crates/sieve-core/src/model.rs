@@ -17,6 +17,12 @@ pub struct RuleSet {
     /// keeps these (unless they are known and unused) and adds whatever the
     /// items need.
     pub requires: Vec<String>,
+    /// Single-folder mode for scripts included by the root script (see
+    /// [`crate::root`]): "move to folder" only records the folder in a
+    /// global variable, and the root files the message into the folder
+    /// recorded last. "Stop" ends only this script (`return`).
+    #[serde(default)]
+    pub single_folder: bool,
     pub items: Vec<RuleItem>,
 }
 
@@ -283,15 +289,21 @@ pub(crate) const KNOWN_EXTENSIONS: &[&str] = &[
     "vacation",
     "vacation-seconds",
     "comparator-i;ascii-numeric",
+    "include",
+    "variables",
 ];
 
 impl RuleSet {
     /// Extensions needed by the rules (not raw blocks), in canonical order.
     pub fn needed_extensions(&self) -> Vec<&'static str> {
         let mut needed = Vec::new();
+        if self.single_folder {
+            // `global`
+            needed.extend(["include", "variables"]);
+        }
         for item in &self.items {
             if let RuleItem::Rule(rule) = item {
-                rule.collect_extensions(&mut needed);
+                rule.collect_extensions(&mut needed, self.single_folder);
             }
         }
         KNOWN_EXTENSIONS.iter().copied().filter(|e| needed.contains(e)).collect()
@@ -299,12 +311,12 @@ impl RuleSet {
 }
 
 impl Rule {
-    pub(crate) fn collect_extensions(&self, out: &mut Vec<&'static str>) {
+    pub(crate) fn collect_extensions(&self, out: &mut Vec<&'static str>, single_folder: bool) {
         for c in &self.conditions.items {
             c.test.collect_extensions(out);
         }
         for a in &self.actions {
-            a.collect_extensions(out);
+            a.collect_extensions(out, single_folder);
         }
     }
 }
@@ -345,8 +357,17 @@ impl ConditionTest {
 }
 
 impl Action {
-    fn collect_extensions(&self, out: &mut Vec<&'static str>) {
+    /// Whether this is a plain "move to folder", which single-folder mode
+    /// writes as `set` on the folder variable. Copies and moves with
+    /// `:create` or `:flags` stay `fileinto`.
+    pub fn is_plain_move(&self) -> bool {
+        matches!(self, Action::FileInto { copy: false, create: false, flags: None, .. })
+    }
+
+    fn collect_extensions(&self, out: &mut Vec<&'static str>, single_folder: bool) {
         match self {
+            Action::FileInto { .. } if single_folder && self.is_plain_move() => out.push("variables"),
+            Action::Stop if single_folder => out.push("include"),
             Action::FileInto { copy, create, flags, .. } => {
                 out.push("fileinto");
                 if *copy {

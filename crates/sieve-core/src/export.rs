@@ -4,6 +4,7 @@ use crate::ast::*;
 use crate::metadata::format_rule_name;
 use crate::model::*;
 use crate::printer::{print_command, print_test, PrintOptions};
+use crate::root::FOLDER_VARIABLE;
 use crate::span::Span;
 
 /// What Roundcube writes for a script without rules.
@@ -28,10 +29,15 @@ pub fn export(set: &RuleSet, options: &PrintOptions) -> String {
         let cmd = command("require", vec![list(requires)], None);
         out.push_str(&print_command(&cmd, 0, options));
     }
+    if set.single_folder {
+        out.push_str(&print_command(&command("global", vec![string(FOLDER_VARIABLE)], None), 0, options));
+    }
 
     for item in &set.items {
         match item {
-            RuleItem::Rule(rule) => out.push_str(&print_command(&rule_command(rule, options), 0, options)),
+            RuleItem::Rule(rule) => {
+                out.push_str(&print_command(&rule_command(rule, set.single_folder, options), 0, options))
+            }
             RuleItem::Raw(raw) => {
                 let code = raw.code.trim_end_matches(['\r', '\n']);
                 if !code.is_empty() {
@@ -78,9 +84,10 @@ fn requires(set: &RuleSet) -> Vec<String> {
 /// }
 /// ```
 ///
-/// A disabled rule becomes `if false # <test>`.
-pub fn rule_command(rule: &Rule, options: &PrintOptions) -> Command {
-    let actions: Vec<Command> = rule.actions.iter().map(action_command).collect();
+/// A disabled rule becomes `if false # <test>`. In single-folder mode, plain
+/// moves become `set` on the folder variable and "stop" becomes `return`.
+pub fn rule_command(rule: &Rule, single_folder: bool, options: &PrintOptions) -> Command {
+    let actions: Vec<Command> = rule.actions.iter().map(|a| action_command(a, single_folder)).collect();
     let test = conditions_test(&rule.conditions);
     let (test, inner_comments) = if rule.enabled {
         (test, Vec::new())
@@ -231,7 +238,16 @@ fn push_address_part(args: &mut Vec<Argument>, part: AddressPart) {
     args.push(tag(name));
 }
 
-fn action_command(action: &Action) -> Command {
+fn action_command(action: &Action, single_folder: bool) -> Command {
+    if single_folder {
+        match action {
+            Action::FileInto { mailbox, .. } if action.is_plain_move() => {
+                return command("set", vec![string(FOLDER_VARIABLE), string(mailbox)], None);
+            }
+            Action::Stop => return command("return", Vec::new(), None),
+            _ => {}
+        }
+    }
     let mut args = Vec::new();
     let push_flags = |args: &mut Vec<Argument>, flags: &Option<Vec<String>>| {
         if let Some(flags) = flags {
@@ -316,7 +332,7 @@ fn ident(name: &str) -> Identifier {
     Identifier { name: name.to_owned(), span: Span::default() }
 }
 
-fn command(name: &str, args: Vec<Argument>, tests: Option<Tests>) -> Command {
+pub(crate) fn command(name: &str, args: Vec<Argument>, tests: Option<Tests>) -> Command {
     Command {
         name: ident(name),
         arguments: Arguments { args, tests },
@@ -329,7 +345,7 @@ fn command(name: &str, args: Vec<Argument>, tests: Option<Tests>) -> Command {
     }
 }
 
-fn test(name: &str, args: Vec<Argument>, tests: Option<Tests>) -> Test {
+pub(crate) fn test(name: &str, args: Vec<Argument>, tests: Option<Tests>) -> Test {
     Test { name: ident(name), arguments: Arguments { args, tests }, span: Span::default() }
 }
 
@@ -337,7 +353,7 @@ fn bare_test(name: &str) -> Test {
     test(name, Vec::new(), None)
 }
 
-fn hash_comment(text: String) -> Comment {
+pub(crate) fn hash_comment(text: String) -> Comment {
     Comment { text, kind: CommentKind::Hash, span: Span::default() }
 }
 
@@ -345,7 +361,7 @@ fn sieve_string(value: &str, kind: StringKind) -> SieveString {
     SieveString { value: value.to_owned(), kind, span: Span::default() }
 }
 
-fn string(value: &str) -> Argument {
+pub(crate) fn string(value: &str) -> Argument {
     Argument::String(sieve_string(value, StringKind::Quoted))
 }
 
@@ -359,7 +375,7 @@ fn text(value: &str) -> Argument {
     Argument::String(sieve_string(value, kind))
 }
 
-fn list(values: Vec<String>) -> Argument {
+pub(crate) fn list(values: Vec<String>) -> Argument {
     Argument::StringList(StringList {
         items: values.iter().map(|v| sieve_string(v, StringKind::Quoted)).collect(),
         span: Span::default(),
@@ -380,6 +396,6 @@ fn number(value: u64) -> Argument {
     Argument::Number(Number { value, quantifier, span: Span::default() })
 }
 
-fn tag(name: &str) -> Argument {
+pub(crate) fn tag(name: &str) -> Argument {
     Argument::Tag(ident(name))
 }

@@ -312,6 +312,7 @@ fn json_shape_matches_the_generated_typescript() {
         serde_json::json!({
             "preamble": null,
             "requires": [],
+            "singleFolder": false,
             "items": [{
                 "type": "rule",
                 "name": "d",
@@ -362,4 +363,99 @@ fn address_parts_roundtrip() {
         text.contains(r#"address :domain :matches "from" ["instagram.com", "*.instagram.com"]"#),
         "{text}"
     );
+}
+
+/// Single-folder mode (scripts included by the root script): moves record
+/// the folder in the global variable, "stop" ends only this script.
+#[test]
+fn single_folder_mode() {
+    let src = r#"require ["fileinto", "imap4flags"];
+# rule:[Work]
+if header :contains "from" "boss@"
+{
+	fileinto "Work";
+	addflag "\\Flagged";
+}
+# rule:[Copy]
+if header :contains "subject" "invoice"
+{
+	fileinto :copy "Invoices";
+	fileinto :create "New";
+	stop;
+}
+"#;
+    let mut set = import(src).unwrap();
+    assert!(!set.single_folder);
+    set.single_folder = true;
+    let text = assert_stable(&set);
+    assert_eq!(
+        text,
+        r#"require ["copy", "fileinto", "imap4flags", "include", "mailbox", "variables"];
+global "move_to_folder";
+# rule:[Work]
+if header :contains "from" "boss@" {
+	set "move_to_folder" "Work";
+	addflag "\\Flagged";
+}
+# rule:[Copy]
+if header :contains "subject" "invoice" {
+	fileinto :copy "Invoices";
+	fileinto :create "New";
+	return;
+}
+"#
+    );
+    let again = import(&text).unwrap();
+    assert!(again.single_folder);
+    assert_eq!(again.items, set.items);
+
+    // Back to normal mode gives plain moves again; unused extensions go.
+    let mut normal = again;
+    normal.single_folder = false;
+    let text = export(&normal, &opts());
+    assert!(text.starts_with("require [\"copy\", \"fileinto\", \"imap4flags\", \"mailbox\"];\n# rule:[Work]"), "{text}");
+    assert!(text.contains("\tfileinto \"Work\";") && text.contains("\tstop;"), "{text}");
+}
+
+#[test]
+fn single_folder_mode_without_moves_needs_no_fileinto() {
+    let set = RuleSet {
+        single_folder: true,
+        items: vec![RuleItem::Rule(Rule {
+            name: "Lists".into(),
+            enabled: false,
+            conditions: Conditions::default(),
+            actions: vec![Action::FileInto { mailbox: "Lists".into(), copy: false, create: false, flags: None }],
+        })],
+        ..Default::default()
+    };
+    let text = assert_stable(&set);
+    assert!(text.starts_with("require [\"include\", \"variables\"];\nglobal \"move_to_folder\";\n"), "{text}");
+    assert!(text.contains("set \"move_to_folder\" \"Lists\";"), "{text}");
+}
+
+#[test]
+fn single_folder_mode_reads_foreign_moves_and_stops() {
+    // E.g. a rule added in Roundcube to an included script.
+    let set = import(
+        "require [\"fileinto\", \"include\", \"variables\"];\nglobal \"move_to_folder\";\nif true { fileinto \"A\"; stop; }\n",
+    )
+    .unwrap();
+    assert!(set.single_folder);
+    assert_eq!(rule(&set, 0).actions, vec![
+        Action::FileInto { mailbox: "A".into(), copy: false, create: false, flags: None },
+        Action::Stop,
+    ]);
+    let text = export(&set, &opts());
+    assert!(text.contains("set \"move_to_folder\" \"A\";\n\treturn;"), "{text}");
+
+    // Other variables, `global` elsewhere or with comments stay raw.
+    let set = import("require [\"include\", \"variables\"];\nglobal \"move_to_folder\";\nif true { set \"other\" \"x\"; }\n").unwrap();
+    assert!(set.single_folder);
+    assert_eq!(raw(&set, 0), "if true { set \"other\" \"x\"; }");
+    let set = import("require [\"include\", \"variables\"];\n# note\nglobal \"move_to_folder\";\n").unwrap();
+    assert!(!set.single_folder);
+    let set = import("require \"variables\";\nif true { set \"move_to_folder\" \"x\"; return; }\n").unwrap();
+    assert!(!set.single_folder);
+    assert!(raw(&set, 0).starts_with("if true"));
 }

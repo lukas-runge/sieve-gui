@@ -8,12 +8,16 @@
     action,
     extensions,
     folders,
+    singleFolder,
     onchange,
     onremove,
   }: {
     action: Action;
     extensions: string[];
     folders: ScriptFolders;
+    /** Single-folder mode: "stop" ends only this script, and `:create`
+     * would turn a move into a direct `fileinto`, so it isn't offered. */
+    singleFolder: boolean;
     onchange: (a: Action, merge: boolean) => void;
     onremove: () => void;
   } = $props();
@@ -41,7 +45,7 @@
     onchange={(e) => onchange(buildAction(e.currentTarget.value as ActionKind, action), false)}
   >
     {#each kinds as k}
-      <option value={k}>{t(`action.${k}` as MessageKey)}</option>
+      <option value={k}>{t(k === "stop" && singleFolder ? "action.stopScript" : (`action.${k}` as MessageKey))}</option>
     {/each}
   </select>
 
@@ -64,7 +68,7 @@
       {#if missing}
         <div id="{folderListId}-missing" class="mt-1 grid gap-1 text-xs">
           <p class="justify-self-start rounded-field border border-warning/40 bg-warning/10 px-2 py-0.5">{t("action.folderMissing")}</p>
-          {#if extensions.includes("mailbox")}
+          {#if extensions.includes("mailbox") && (!singleFolder || action.copy || action.create)}
             <label class="flex items-center gap-2">
               <input
                 type="checkbox"

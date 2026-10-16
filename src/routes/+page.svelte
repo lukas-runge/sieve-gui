@@ -11,7 +11,7 @@
   import Sidebar from "../lib/components/Sidebar.svelte";
   import { dialogs } from "../lib/dialogs.svelte";
   import { i18n, t } from "../lib/i18n.svelte";
-  import { session } from "../lib/session.svelte";
+  import { ROOT_SCRIPT, session } from "../lib/session.svelte";
 
   let accountDialog = $state<{ account: Account | null } | null>(null);
   let deploying = $state(false);
@@ -23,6 +23,9 @@
 
   const editor = $derived(session.editor);
   const active = $derived(editor ? session.isActive(editor.accountId, editor.name) : false);
+  const root = $derived(editor ? session.roots[editor.accountId] : null);
+  /** The open script runs with "last move wins", so it should record moves. */
+  const lastMoveWins = $derived(!!editor && !!root?.lastMoveWins && root.scripts.includes(editor.name));
 
   $effect(() => {
     document.documentElement.lang = i18n.locale;
@@ -100,6 +103,15 @@
             {#if !active}
               <p class="rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm">{t("editor.inactive")}</p>
           {/if}
+          <!-- Only when the script doesn't match the account's "last move wins". -->
+          {#if lastMoveWins ? !editor.rules.singleFolder : editor.rules.singleFolder && !root?.lastMoveWins}
+            <div role="note" class="flex flex-wrap items-center gap-2 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+              <p class="min-w-60 grow">{lastMoveWins ? t("root.notSingle") : t("root.singleOutside")}</p>
+              <button class="btn btn-sm" onclick={() => editor.edit((r) => (r.singleFolder = lastMoveWins))}>
+                {lastMoveWins ? t("root.convert") : t("root.convertBack")}
+              </button>
+            </div>
+          {/if}
           {#if editor.roundcubeRisks && (editor.roundcubeRisks.rawBlocks.length > 0 || editor.roundcubeRisks.bracketComments)}
             {@const risks = editor.roundcubeRisks}
             <div role="note" class="grid gap-1 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
@@ -122,6 +134,18 @@
         </div>
       </div>
       {/if}
+    {:else if session.rootView && session.rootSources[session.rootView] !== undefined}
+      <header class="border-b border-base-300 px-5 py-3">
+        <h1 class="flex items-center gap-2 truncate text-xl font-semibold">
+          <Icon name="lock" size={16} />{ROOT_SCRIPT}
+        </h1>
+        <p class="text-sm text-base-content/60">{t("root.viewHint")}</p>
+      </header>
+      <section class="flex min-h-0 grow flex-col p-3" aria-label={ROOT_SCRIPT}>
+        <div class="min-h-0 overflow-auto">
+          <CodeEditor value={session.rootSources[session.rootView]} readonly label={ROOT_SCRIPT} />
+        </div>
+      </section>
     {:else}
       <div class="grid h-full place-items-center p-8 text-center text-base-content/70">
         {#if session.loadingScript}

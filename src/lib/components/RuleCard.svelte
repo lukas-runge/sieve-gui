@@ -98,7 +98,7 @@
   <div class="px-3 pb-3 pt-1.5">
     {#if !editing}
       <button class="block w-full text-left cursor-text" onclick={() => onedit(true)}>
-        <RuleSentence {rule} />
+        <RuleSentence {rule} singleFolder={editor.rules.singleFolder} />
       </button>
     {:else}
       <section class="mt-1 grid gap-2" aria-label={t("conditions.heading")}>
@@ -140,6 +140,7 @@
             {action}
             {extensions}
             {folders}
+            singleFolder={editor.rules.singleFolder}
             onchange={(a, merge) => setAction(i, a, merge)}
             onremove={() => change((r) => r.actions.splice(i, 1))}
           />

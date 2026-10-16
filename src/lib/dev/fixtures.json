@@ -264,7 +264,8 @@
         "fileinto",
         "imap4flags",
         "regex"
-      ]
+      ],
+      "singleFolder": false
     },
     "source": "require [\"fileinto\",\"imap4flags\",\"regex\"];\r\n# rule:[allof two]\r\nif allof (header :contains \"from\" \"boss@example.com\", header :contains \"subject\" \"urgent\")\r\n{\r\n\taddflag \"\\\\Flagged\";\r\n}\r\n# rule:[anyof two]\r\nif anyof (header :contains \"from\" \"a@example.com\", header :contains \"to\" \"b@example.com\")\r\n{\r\n\tfileinto \"Lists/Rust\";\r\n}\r\n# rule:[negated]\r\nif allof (not header :contains \"subject\" \"[SPAM]\", not exists \"X-Spam-Flag\", not header :is \"from\" \"noreply@example.com\")\r\n{\r\n\tkeep;\r\n}\r\n# rule:[anyof negated]\r\nif anyof (not header :matches \"subject\" \"*invoice*\", not header :regex \"subject\" \"^re:\")\r\n{\r\n\tstop;\r\n}\r\n# rule:[single test anyof]\r\nif header :is \"subject\" \"hello\"\r\n{\r\n\tkeep;\r\n}\r\n"
   },
@@ -342,7 +343,8 @@
       "requires": [
         "fileinto",
         "variables"
-      ]
+      ],
+      "singleFolder": false
     },
     "source": "require [\"fileinto\", \"variables\"];\n# rule:[Newsletter]\nif anyof (header :contains \"list-id\" \"rust\", header :matches \"subject\" \"[RFC]*\") {\n    fileinto \"Lists/Rust\";\n    stop;\n}\nif header :matches \"subject\" \"*\" { set \"subject\" \"${1}\"; }\nif size :over 5M { fileinto \"Large\"; } elsif header :is \"x-spam\" \"yes\" { discard; } else { keep; }\n"
   },
@@ -457,7 +459,8 @@
         "fileinto",
         "relational",
         "vacation"
-      ]
+      ],
+      "singleFolder": false
     },
     "source": "require [\"date\",\"fileinto\",\"relational\",\"vacation\"];\r\n# rule:[Out of Office]\r\nif allof (currentdate :zone \"+0100\" :value \"ge\" \"iso8601\" \"2026-12-20T08:00:00+01:00\", currentdate :zone \"+0100\" :value \"le\" \"iso8601\" \"2027-01-04T18:30:00+01:00\")\r\n{\r\n\tvacation :days 7 :addresses [\"lukas@example.com\",\"l.runge@example.com\"] :subject \"Abwesenheit: Urlaub 🌴\" :from \"lukas@example.com\" text:\r\nHallo,\r\n\r\nich bin bis zum 4. Januar nicht im Büro.\r\nIn dringenden Fällen: \"Notfall\" an info@example.com.\r\n..\r\nViele Grüße\r\nLukas\r\n.\r\n;\r\n}\r\n# rule:[Existing rule]\r\nif allof (header :contains \"from\" \"@tax-office.example\")\r\n{\r\n\tfileinto \"Steuern/Gesch&AOQ-ftlich\";\r\n}\r\n"
   }

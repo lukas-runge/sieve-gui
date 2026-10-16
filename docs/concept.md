@@ -53,6 +53,21 @@ Sieve text  ⇄  parser / generator  ⇄  rule model  ⇄  UI
 
 Rule names and enabled state are stored as structured comments in the **format of the Roundcube *managesieve* plugin** (e.g. `# rule:[Name]`), so scripts can be edited alternately in Roundcube and sieve-gui without losing names. Disabled rules are kept in the script in a non-executing form instead of being removed. Before implementing the parser, the exact encoding (names, disabled rules) is captured from real Roundcube-generated scripts and turned into test fixtures.
 
+### Several active scripts, one folder per message
+
+Sieve runs every matching rule, so a message matching two "move to folder" rules ends up in both folders. ManageSieve also runs only one active script per account. Two account settings (account dialog, both on by default, each only if the server supports it) change that:
+
+1. **Last move wins** (`fileinto`, `include`, `variables`): each message lands in at most one folder; of several "move to folder" rules, the last one that runs wins, across scripts too.
+2. **Several active scripts** (`include`): active scripts run one after another, in the order of the sidebar list (drag and drop).
+
+Both work through a generated **root script** named `sieve-gui` (`sieve_core::root`), which is the server's active script whenever one of the settings is on:
+
+- The root includes the active scripts in order (`include :personal :optional`, RFC 6609). With "several active scripts" off, it includes just one, and activating another script replaces it.
+- With "last move wins", the root declares the global variable `move_to_folder` (RFC 5229) and finally files the message into the folder recorded there, if any. The included scripts use **single-folder mode** (`RuleSet::single_folder`, written as `global "move_to_folder";`): "move to folder" becomes `set "move_to_folder" "<folder>"`, and "stop" becomes `return`, which ends only that script (`stop` would also skip the root's final `fileinto`). "Copy to folder" (and moves with `:create`/`:flags`) stay `fileinto` and always apply. A plain `fileinto` or `stop` written by another editor is read as move/stop, so saving converts it.
+- The app brings the server in line with the settings whenever it connects and after the account dialog is saved: it creates, rewrites or deletes the root and switches the included scripts in or out of single-folder mode. In the order used, every step leaves a working setup if a later one fails. Turning both settings off keeps the first script of the order active and deletes the root.
+- The root is not listed in the sidebar. Run order lives in the root; where inactive scripts sit in the list is stored locally.
+- Not yet checked: whether Roundcube keeps `global` and `return` when it saves an included script.
+
 ### Capability-aware UI
 
 The server's `CAPABILITY` response (`SIEVE` extensions, limits) drives the UI: only conditions and actions the server supports are offered (e.g. `regex`, `editheader`, `vacation-seconds`).
@@ -242,3 +257,4 @@ The project is **MIT-licensed**. To keep it that way:
 | D9 | Folder names | Kept exactly as written in the script (UTF-8 or IMAP modified UTF-7, as Roundcube's `managesieve_mbox_encoding` decides). The UI shows them decoded; new or edited names use the encoding the script already uses, UTF-8 if none | 2026-10-16 |
 | D10 | IMAP access | `async-imap` in a separate `mailstore` crate, reusing the ManageSieve TLS setup. Same credentials as ManageSieve; IMAP is optional per account (default: implicit TLS on 993, same host). The folder picker suggests server folders and marks names missing on the server, offering `:create` when the `mailbox` extension is available | 2026-10-16 |
 | D11 | Webmail warning | No ownership detection (impossible, see §3); warn about concrete losses in scripts that use Roundcube's format, checked by `sieve_core::compat` against the Roundcube fixtures | 2026-10-16 |
+| D12 | Several active scripts, last move wins | Account settings (default on, if supported). Implemented with a generated root script that includes the active scripts in list order and, for "last move wins", files the message into the folder the included scripts recorded last in a global variable; included scripts end with `return` instead of `stop`. The app reconciles the server with the settings on connect and on save (§3) | 2026-10-17 |

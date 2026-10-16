@@ -6,7 +6,7 @@
   import { formatDate, formatSize } from "../rules/format";
   import { mailboxLabel } from "../rules/mailbox";
 
-  let { rule }: { rule: Rule } = $props();
+  let { rule, singleFolder }: { rule: Rule; singleFolder: boolean } = $props();
 
   const joinWord = $derived(t(rule.conditions.join === "any" ? "sentence.or" : "sentence.and"));
 
@@ -69,8 +69,9 @@
   {/if}
   {#each rule.actions as action, i}
     {@const param = actionParam(action)}
+    {@const kind = actionKind(action)}
     {#if i > 0}<span>,</span>{/if}
-    {" "}<span>{t(`sentence.${actionKind(action)}` as MessageKey)}</span>
+    {" "}<span>{t(kind === "stop" && singleFolder ? "sentence.stopScript" : (`sentence.${kind}` as MessageKey))}</span>
     {#if param !== null}
       {" "}<span class="slot slot-code">{param || "…"}</span>
     {/if}

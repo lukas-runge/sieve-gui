@@ -29,7 +29,7 @@ export class ScriptEditor {
   name = $state("");
   /** The script text on the server, or null for a script not saved yet. */
   original = $state<string | null>(null);
-  rules = $state<EditorRuleSet>({ preamble: null, requires: [], items: [] });
+  rules = $state<EditorRuleSet>({ preamble: null, requires: [], singleFolder: false, items: [] });
   /** The generated script for the current rules. */
   code = $state("");
   codeError = $state<string | null>(null);

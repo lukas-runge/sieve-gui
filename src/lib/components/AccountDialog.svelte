@@ -3,7 +3,7 @@
   import type { Account, AccountSecurity } from "#tauri/types";
   import { describeError } from "../api";
   import { t, type MessageKey } from "../i18n.svelte";
-  import { session } from "../session.svelte";
+  import { ROOT_SCRIPT, session } from "../session.svelte";
 
   let { account, onclose }: { account: Account | null; onclose: () => void } = $props();
 
@@ -21,6 +21,10 @@
   let imapHost = $state(initial?.imap?.host ?? "");
   let imapSecurity = $state<AccountSecurity>(initial?.imap?.security ?? "implicitTls");
   let imapPort = $state(initial?.imap?.port ?? 993);
+  let lastMoveWins = $state(initial?.lastMoveWins ?? true);
+  let multipleScripts = $state(initial?.multipleScripts ?? true);
+  // Unknown (all allowed) until the account has connected.
+  const supported = untrack(() => (initial ? session.supported(initial.id) : null));
   let saving = $state(false);
   let error = $state<string | null>(null);
 
@@ -39,6 +43,8 @@
         security,
         username,
         imap: imapEnabled ? { host: imapHost.trim() || host, port: imapPort, security: imapSecurity } : null,
+        multipleScripts,
+        lastMoveWins,
         password: password || (initial ? null : ""),
       });
       dialog.close();
@@ -49,6 +55,11 @@
     }
   }
 
+  function viewRoot(id: string) {
+    dialog.close();
+    void session.viewRoot(id);
+  }
+
   const securities: AccountSecurity[] = ["startTls", "implicitTls", "insecure"];
 
   /** Follows the standard IMAP port when the security changes, unless customized. */
@@ -57,6 +68,16 @@
     imapSecurity = value;
   }
 </script>
+
+{#snippet setting(label: string, hint: string, available: boolean, get: () => boolean, set: (value: boolean) => void)}
+  <div>
+    <label class="label text-base-content whitespace-normal">
+      <input type="checkbox" class="toggle toggle-sm" checked={get()} disabled={!available} onchange={(e) => set(e.currentTarget.checked)} />
+      {label}
+    </label>
+    <p class="label whitespace-normal">{available ? hint : t("account.unsupported")}</p>
+  </div>
+{/snippet}
 
 <dialog bind:this={dialog} class="modal" {onclose} aria-labelledby="account-heading">
   <form class="modal-box grid max-w-md gap-3" onsubmit={submit}>
@@ -129,6 +150,22 @@
         </select>
       </fieldset>
     {/if}
+
+    <fieldset class="fieldset gap-2">
+      <legend class="fieldset-legend">{t("account.filters")}</legend>
+      {@render setting(t("account.lastMoveWins"), t("account.lastMoveWinsHint"), supported?.lastMoveWins ?? true, () => lastMoveWins, (v) => (lastMoveWins = v))}
+      {@render setting(t("account.multipleScripts"), t("account.multipleScriptsHint"), supported?.multipleScripts ?? true, () => multipleScripts, (v) => (multipleScripts = v))}
+      {#if (lastMoveWins && supported?.lastMoveWins !== false) || (multipleScripts && supported?.multipleScripts !== false)}
+        <p class="label whitespace-normal">
+          <span>
+            {t("account.rootHint", { name: ROOT_SCRIPT })}
+            {#if initial && session.roots[initial.id]}
+              <button type="button" class="link" onclick={() => viewRoot(initial.id)}>{t("root.viewLink")}</button>
+            {/if}
+          </span>
+        </p>
+      {/if}
+    </fieldset>
 
     {#if error}<p role="alert" class="text-error">{error}</p>{/if}
 

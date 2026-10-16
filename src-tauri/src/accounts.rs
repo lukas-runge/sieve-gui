@@ -26,6 +26,18 @@ pub struct Account {
     /// `None` disables it.
     #[serde(default)]
     pub imap: Option<ImapSettings>,
+    /// Several scripts may be active at once, run through a root script
+    /// (`sieve_core::root`), if the server supports it.
+    #[serde(default = "enabled")]
+    pub multiple_scripts: bool,
+    /// Each message lands in at most one folder: of several "move to folder"
+    /// rules, the last one that runs wins (if the server supports it).
+    #[serde(default = "enabled")]
+    pub last_move_wins: bool,
+}
+
+fn enabled() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -69,6 +81,8 @@ pub struct AccountInput {
     pub security: AccountSecurity,
     pub username: String,
     pub imap: Option<ImapSettings>,
+    pub multiple_scripts: bool,
+    pub last_move_wins: bool,
     /// `None` keeps the stored password.
     pub password: Option<String>,
 }
@@ -161,6 +175,8 @@ pub async fn save_account(
         security: input.security,
         username: input.username.trim().to_owned(),
         imap: input.imap.map(|imap| ImapSettings { host: imap.host.trim().to_owned(), ..imap }),
+        multiple_scripts: input.multiple_scripts,
+        last_move_wins: input.last_move_wins,
     };
     if let Some(pw) = &input.password {
         keychain_entry(&account.id)?.set_password(pw).map_err(keychain_error)?;

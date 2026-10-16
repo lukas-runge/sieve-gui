@@ -5,6 +5,7 @@
   import AppDialog from "../lib/components/AppDialog.svelte";
   import CodeEditor from "../lib/components/CodeEditor.svelte";
   import DeployDialog from "../lib/components/DeployDialog.svelte";
+  import Icon from "../lib/components/Icon.svelte";
   import RuleList from "../lib/components/RuleList.svelte";
   import Sidebar from "../lib/components/Sidebar.svelte";
   import { dialogs } from "../lib/dialogs.svelte";
@@ -55,6 +56,14 @@
   <main class="flex min-w-0 flex-col overflow-hidden bg-base-200">
     {#if editor}
       <header class="flex flex-wrap items-center gap-2 border-b border-base-300 px-5 py-3">
+        <div class="flex items-center gap-1">
+          <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
+            <Icon name="undo" />
+          </button>
+          <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canRedo} onclick={() => editor.redo()} aria-label={t("editor.redo")} title="{t('editor.redo')} (⇧⌘Z)">
+            <Icon name="redo" />
+          </button>
+        </div>
         <div class="min-w-0 grow">
           <h1 class="truncate text-xl font-semibold">{editor.name}</h1>
           <p class="text-sm text-base-content/60" aria-live="polite">
@@ -62,12 +71,6 @@
           </p>
         </div>
         <div class="ml-auto flex items-center gap-1">
-        <button class="btn btn-ghost btn-sm btn-square text-base" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
-          ↶
-        </button>
-        <button class="btn btn-ghost btn-sm btn-square text-base" disabled={!editor.canRedo} onclick={() => editor.redo()} aria-label={t("editor.redo")} title="{t('editor.redo')} (⇧⌘Z)">
-          ↷
-        </button>
         <button class="btn btn-ghost btn-sm" aria-pressed={showCode} onclick={() => (showCode = !showCode)}>
           {showCode ? t("editor.hideCode") : t("editor.showCode")}
         </button>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { MediaQuery } from "svelte/reactivity";
   import type { Account } from "#tauri/types";
   import AccountDialog from "../lib/components/AccountDialog.svelte";
   import AppDialog from "../lib/components/AppDialog.svelte";
@@ -17,6 +18,8 @@
   // The code sidebar stays open or closed across restarts.
   let showCode = $state(localStorage.getItem("showCode") === "1");
   $effect(() => localStorage.setItem("showCode", showCode ? "1" : "0"));
+  // Wide windows show the code beside the rules, narrow ones instead of them.
+  const wide = new MediaQuery("min-width: 1280px");
 
   const editor = $derived(session.editor);
   const active = $derived(editor ? session.isActive(editor.accountId, editor.name) : false);
@@ -48,7 +51,7 @@
 
 <svelte:window {onkeydown} />
 
-<div class={["grid h-screen", showCode && editor ? "grid-cols-[15rem_1fr_clamp(20rem,36vw,44rem)]" : "grid-cols-[15rem_1fr]"]}>
+<div class={["grid h-screen", showCode && editor && wide.current ? "grid-cols-[15rem_1fr_clamp(20rem,36vw,44rem)]" : "grid-cols-[15rem_1fr]"]}>
   <aside class="border-r border-base-300 bg-base-200">
     <Sidebar onaccount={(account) => (accountDialog = { account })} />
   </aside>
@@ -87,10 +90,15 @@
         </div>
       </header>
 
-      <div class="min-h-0 grow overflow-y-auto">
-        <div class="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-4 px-5 py-5">
-          {#if !active}
-            <p class="rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm">{t("editor.inactive")}</p>
+      {#if showCode && !wide.current}
+        <section class="flex min-h-0 grow flex-col gap-2 p-3" aria-label={t("code.heading")}>
+          {@render codePanel(editor.code)}
+        </section>
+      {:else}
+        <div class="min-h-0 grow overflow-y-auto">
+          <div class="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-4 px-5 py-5">
+            {#if !active}
+              <p class="rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm">{t("editor.inactive")}</p>
           {/if}
           {#if editor.roundcubeRisks && (editor.roundcubeRisks.rawBlocks.length > 0 || editor.roundcubeRisks.bracketComments)}
             {@const risks = editor.roundcubeRisks}
@@ -113,6 +121,7 @@
           />
         </div>
       </div>
+      {/if}
     {:else}
       <div class="grid h-full place-items-center p-8 text-center text-base-content/70">
         {#if session.loadingScript}
@@ -127,18 +136,22 @@
     {/if}
   </main>
 
-  {#if showCode && editor}
+  {#if showCode && editor && wide.current}
     <aside class="flex min-w-0 flex-col gap-2 overflow-hidden border-l border-base-300 bg-base-200 p-3" aria-label={t("code.heading")}>
-      <div class="flex items-center gap-2">
-        <h2 class="grow font-semibold">{t("code.heading")}</h2>
-        <button class="btn btn-ghost btn-sm btn-square" aria-label={t("editor.hideCode")} title={t("editor.hideCode")} onclick={() => (showCode = false)}>✕</button>
-      </div>
-      <div class="min-h-0 overflow-auto">
-        <CodeEditor value={editor.code} readonly label={t("code.heading")} />
-      </div>
+      {@render codePanel(editor.code)}
     </aside>
   {/if}
 </div>
+
+{#snippet codePanel(code: string)}
+  <div class="flex items-center gap-2">
+    <h2 class="grow font-semibold">{t("code.heading")}</h2>
+    <button class="btn btn-ghost btn-sm btn-square" aria-label={t("editor.hideCode")} title={t("editor.hideCode")} onclick={() => (showCode = false)}>✕</button>
+  </div>
+  <div class="min-h-0 overflow-auto">
+    <CodeEditor value={code} readonly label={t("code.heading")} />
+  </div>
+{/snippet}
 
 {#if accountDialog}
   <AccountDialog account={accountDialog.account} onclose={() => (accountDialog = null)} />

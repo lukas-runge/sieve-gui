@@ -1,8 +1,8 @@
 // State of the script being edited: the rule cards, undo history and the
 // generated Sieve code.
 
-import { exportRules, importRules } from "#tauri/commands";
-import type { RuleItem, RuleSet } from "#tauri/types";
+import { exportRules, importRules, isRoundcubeFormat, roundcubeRisks } from "#tauri/commands";
+import type { RoundcubeRisks, RuleItem, RuleSet } from "#tauri/types";
 
 /** A rule item with a stable id for keyed lists (ignored by the backend). */
 export type EditorItem = RuleItem & { uid: string };
@@ -33,6 +33,10 @@ export class ScriptEditor {
   /** The generated script for the current rules. */
   code = $state("");
   codeError = $state<string | null>(null);
+  /** Whether the server version is in Roundcube's format. */
+  roundcube = $state(false);
+  /** What Roundcube would drop of the current rules (only if `roundcube`). */
+  roundcubeRisks = $state<RoundcubeRisks | null>(null);
 
   #past: string[] = [];
   #future: string[] = [];
@@ -52,6 +56,7 @@ export class ScriptEditor {
   static async open(accountId: string, name: string, source: string | null): Promise<ScriptEditor> {
     const rules = await importRules(source ?? "");
     const editor = new ScriptEditor(accountId, name, source, rules);
+    editor.roundcube = source !== null && (await isRoundcubeFormat(source));
     await editor.regenerate();
     return editor;
   }
@@ -104,10 +109,12 @@ export class ScriptEditor {
   async regenerate() {
     const generation = ++this.#generation;
     try {
-      const code = await exportRules($state.snapshot(this.rules) as RuleSet);
+      const rules = $state.snapshot(this.rules) as RuleSet;
+      const [code, risks] = await Promise.all([exportRules(rules), this.roundcube ? roundcubeRisks(rules) : null]);
       if (generation === this.#generation) {
         this.code = code;
         this.codeError = null;
+        this.roundcubeRisks = risks;
       }
     } catch (e) {
       if (generation === this.#generation) this.codeError = String(e);

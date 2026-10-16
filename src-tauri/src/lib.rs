@@ -34,6 +34,8 @@ pub fn run() {
             get_app_info,
             rules::import_rules,
             rules::export_rules,
+            rules::is_roundcube_format,
+            rules::roundcube_risks,
             accounts::list_accounts,
             accounts::save_account,
             accounts::delete_account,

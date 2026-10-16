@@ -64,6 +64,14 @@ export function installMock() {
         const hit = Object.values(scripts).find((s) => s.source === a.source);
         return hit ? structuredClone(hit.rules) : { preamble: null, requires: [], items: [] };
       }
+      case "is_roundcube_format":
+        return /^#\s*rule:\[/m.test(a.source);
+      case "roundcube_risks": {
+        // Rough stand-in for sieve-core's check: every raw block counts.
+        const items = a.rules.items as { type: string; code?: string }[];
+        const raw = items.flatMap((item, i) => (item.type === "raw" ? [i] : []));
+        return { rawBlocks: raw, bracketComments: raw.some((i) => items[i].code?.includes("/*")) };
+      }
       case "export_rules": {
         // Unchanged rules give the original text; real generation needs Rust.
         const strip = (v: unknown) => JSON.stringify(v, (k, x) => (k === "uid" ? undefined : x));

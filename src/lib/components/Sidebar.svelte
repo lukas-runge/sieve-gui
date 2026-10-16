@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { closesMenu } from "../menu";
   import type { Account } from "#tauri/types";
   import { t } from "../i18n.svelte";
+  import { closesMenu } from "../menu";
   import { session } from "../session.svelte";
 
   let { onaccount }: { onaccount: (account: Account | null) => void } = $props();

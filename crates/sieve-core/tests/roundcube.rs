@@ -3,6 +3,7 @@
 
 use std::path::Path;
 
+use sieve_core::compat::{is_roundcube_format, roundcube_risks};
 use sieve_core::model::{Join, RuleItem};
 use sieve_core::{export, import, PrintOptions};
 
@@ -102,4 +103,26 @@ fn roundcube_semantics() {
 
     assert!(get("16a").items.is_empty());
     assert!(get("17b").preamble.as_deref().unwrap().starts_with("# Hand-written script"));
+}
+
+/// Roundcube output is never reported as at risk in Roundcube; the
+/// hand-written inputs that Roundcube damaged are.
+#[test]
+fn roundcube_risks_match_what_roundcube_did() {
+    for (name, src) in fixtures() {
+        let risks = roundcube_risks(&import(&src).unwrap());
+        match name.split('-').next().unwrap() {
+            // free-standing comment dropped (17b); unknown test and action,
+            // nested if and elsif chain dropped or rewritten (18b)
+            "17a" => assert_eq!(risks.raw_blocks.len(), 1, "{name}"),
+            "18a" => assert_eq!(risks.raw_blocks.len(), 4, "{name}"),
+            // bracket comment: Roundcube showed no rules and replaced them (19b)
+            "19a" => assert!(risks.bracket_comments, "{name}"),
+            // edge-case names that Roundcube dropped (22b), see README
+            "22a" => {}
+            _ => assert!(risks.is_empty(), "{name}: {risks:?}"),
+        }
+        let unnamed = ["16a", "16c"].iter().any(|n| name.starts_with(n));
+        assert_eq!(is_roundcube_format(&src), !unnamed, "{name}");
+    }
 }

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { closesMenu } from "../menu";
   import type { Action, Condition, Rule } from "#tauri/types";
   import type { ScriptEditor } from "../editor.svelte";
   import { t } from "../i18n.svelte";
+  import { closesMenu } from "../menu";
   import type { ScriptFolders } from "../rules/mailbox";
   import { buildAction, newCondition } from "../rules/view";
   import ActionRow from "./ActionRow.svelte";

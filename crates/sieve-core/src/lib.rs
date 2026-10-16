@@ -8,6 +8,7 @@
 //!   [`export`] generates the script again.
 
 pub mod ast;
+pub mod compat;
 pub mod export;
 pub mod import;
 mod lexer;

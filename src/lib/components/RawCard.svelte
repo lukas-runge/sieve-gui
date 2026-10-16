@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { closesMenu } from "../menu";
   // A part of the script the rule model can't represent, kept verbatim.
   import { importRules } from "#tauri/commands";
   import type { ScriptEditor } from "../editor.svelte";
   import { describeError } from "../api";
   import { t } from "../i18n.svelte";
+  import { closesMenu } from "../menu";
   import CodeEditor from "./CodeEditor.svelte";
 
   let {
@@ -28,6 +28,7 @@
   } = $props();
 
   let syntaxError = $state<string | null>(null);
+  const lostInRoundcube = $derived(editor.roundcubeRisks?.rawBlocks.includes(index) ?? false);
 
   async function update(next: string) {
     editor.edit((rules) => {
@@ -46,7 +47,10 @@
 <article class="rounded-box border border-dashed border-base-content/30 bg-base-100">
   <header class="flex items-center gap-2 px-3 pt-2.5">
     {@render dragHandle(index)}
-    <h3 class="grow font-semibold">{t("raw.heading")}</h3>
+    <h3 class="grow font-semibold">
+      {t("raw.heading")}
+      {#if lostInRoundcube}<span class="badge badge-sm badge-soft badge-warning ml-1 align-middle">{t("roundcube.badge")}</span>{/if}
+    </h3>
     <button class="btn btn-sm {editing ? 'btn-primary' : 'btn-ghost'}" onclick={() => onedit(!editing)}>
       {editing ? t("raw.done") : t("raw.edit")}
     </button>

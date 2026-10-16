@@ -197,6 +197,12 @@ const en = {
   "deploy.conflict": "Someone changed this script on the server after you opened it. Reload it to see the current version; your changes will be lost.",
   "deploy.reload": "Reload from server",
 
+  "roundcube.badge": "Lost in Roundcube",
+  "roundcube.title": "Do you also edit this script in Roundcube?",
+  "roundcube.rawOne": "Roundcube rewrites the whole script when it saves and drops what it can't show. It would lose or change the code block marked below.",
+  "roundcube.rawMany": "Roundcube rewrites the whole script when it saves and drops what it can't show. It would lose or change the {count} code blocks marked below.",
+  "roundcube.bracket": "This script contains a /* … */ comment. Roundcube then shows no rules at all and replaces every rule the next time it saves.",
+
   "error.connection": "Can't reach the server: {message}",
   "error.tls": "Secure connection failed: {message}",
   "error.auth": "The server rejected the user name or password.",
@@ -403,6 +409,12 @@ const de: Record<MessageKey, string> = {
   "deploy.line": "Zeile {line}",
   "deploy.conflict": "Das Skript wurde auf dem Server geändert, nachdem du es geöffnet hast. Lade es neu, um die aktuelle Fassung zu sehen; deine Änderungen gehen dabei verloren.",
   "deploy.reload": "Vom Server neu laden",
+
+  "roundcube.badge": "Geht in Roundcube verloren",
+  "roundcube.title": "Bearbeitest du dieses Skript auch in Roundcube?",
+  "roundcube.rawOne": "Roundcube schreibt beim Speichern das ganze Skript neu und verwirft, was es nicht darstellen kann. Den unten markierten Codeblock würde es verlieren oder verändern.",
+  "roundcube.rawMany": "Roundcube schreibt beim Speichern das ganze Skript neu und verwirft, was es nicht darstellen kann. Die {count} unten markierten Codeblöcke würde es verlieren oder verändern.",
+  "roundcube.bracket": "Dieses Skript enthält einen /* … */-Kommentar. Roundcube zeigt dann gar keine Regeln an und ersetzt beim nächsten Speichern alle Regeln.",
 
   "error.connection": "Der Server ist nicht erreichbar: {message}",
   "error.tls": "Die sichere Verbindung ist fehlgeschlagen: {message}",

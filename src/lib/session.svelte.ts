@@ -14,6 +14,8 @@ import {
 } from "#tauri/commands";
 import type { Account, AccountInput, Folder, ServerInfo } from "#tauri/types";
 import { describeError } from "./api";
+import { ask } from "./dialogs.svelte";
+import { t } from "./i18n.svelte";
 import { ScriptEditor } from "./editor.svelte";
 
 export interface ServerState {
@@ -101,8 +103,9 @@ class Session {
   }
 
   /** Whether switching away from the open script is fine (asks if dirty). */
-  confirmLeave(message: string): boolean {
-    return !this.editor?.dirty || confirm(message);
+  async confirmLeave(): Promise<boolean> {
+    if (!this.editor?.dirty) return true;
+    return ask(t("editor.discardConfirm", { name: this.editor.name }), t("editor.discard"), true);
   }
 
   async openScript(id: string, name: string) {

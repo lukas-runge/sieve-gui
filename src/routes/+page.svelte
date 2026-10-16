@@ -2,10 +2,12 @@
   import { onMount } from "svelte";
   import type { Account } from "#tauri/types";
   import AccountDialog from "../lib/components/AccountDialog.svelte";
+  import AppDialog from "../lib/components/AppDialog.svelte";
   import CodeEditor from "../lib/components/CodeEditor.svelte";
   import DeployDialog from "../lib/components/DeployDialog.svelte";
   import RuleList from "../lib/components/RuleList.svelte";
   import Sidebar from "../lib/components/Sidebar.svelte";
+  import { dialogs } from "../lib/dialogs.svelte";
   import { i18n, t } from "../lib/i18n.svelte";
   import { session } from "../lib/session.svelte";
 
@@ -127,3 +129,6 @@
 {#if deploying && editor}
   <DeployDialog {editor} onclose={() => (deploying = false)} />
 {/if}
+{#key dialogs.current}
+  {#if dialogs.current}<AppDialog request={dialogs.current} />{/if}
+{/key}

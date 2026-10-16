@@ -39,6 +39,7 @@ const en = {
   "scripts.heading": "Filter scripts",
   "scripts.new": "New script",
   "scripts.newName": "Name of the new script",
+  "scripts.create": "Create",
   "scripts.active": "Active",
   "scripts.activate": "Make active",
   "scripts.deactivate": "Deactivate",
@@ -62,6 +63,8 @@ const en = {
   "editor.saved": "Saved to server",
   "editor.inactive": "This script is not active, so its rules don't run.",
   "editor.discardConfirm": "Discard the unsaved changes to “{name}”?",
+  "editor.discard": "Discard",
+  "dialog.ok": "OK",
   "editor.loading": "Loading script…",
 
   "rule.untitled": "Untitled rule",
@@ -252,6 +255,7 @@ const de: Record<MessageKey, string> = {
   "scripts.heading": "Filterskripte",
   "scripts.new": "Neues Skript",
   "scripts.newName": "Name des neuen Skripts",
+  "scripts.create": "Anlegen",
   "scripts.active": "Aktiv",
   "scripts.activate": "Aktivieren",
   "scripts.deactivate": "Deaktivieren",
@@ -275,6 +279,8 @@ const de: Record<MessageKey, string> = {
   "editor.saved": "Auf dem Server gespeichert",
   "editor.inactive": "Dieses Skript ist nicht aktiv, seine Regeln laufen also nicht.",
   "editor.discardConfirm": "Ungespeicherte Änderungen an „{name}“ verwerfen?",
+  "editor.discard": "Verwerfen",
+  "dialog.ok": "OK",
   "editor.loading": "Lade Skript…",
 
   "rule.untitled": "Unbenannte Regel",

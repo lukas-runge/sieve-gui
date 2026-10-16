@@ -1,37 +1,36 @@
 <script lang="ts">
   import type { Account } from "#tauri/types";
   import { t } from "../i18n.svelte";
+  import { ask, askText, tell } from "../dialogs.svelte";
   import { closesMenu } from "../menu";
   import { session } from "../session.svelte";
 
   let { onaccount }: { onaccount: (account: Account | null) => void } = $props();
 
-  function leaveOk(): boolean {
-    return session.confirmLeave(t("editor.discardConfirm", { name: session.editor?.name ?? "" }));
-  }
-
-  function open(id: string, name: string) {
+  async function open(id: string, name: string) {
     if (session.editor?.accountId === id && session.editor.name === name) return;
-    if (leaveOk()) void session.openScript(id, name);
+    if (await session.confirmLeave()) await session.openScript(id, name);
   }
 
-  function create(id: string) {
-    const name = prompt(t("scripts.newName"))?.trim();
-    if (name && leaveOk()) void session.newScript(id, name);
+  async function create(id: string) {
+    const name = await askText(t("scripts.newName"), t("scripts.create"));
+    if (name && (await session.confirmLeave())) await session.newScript(id, name);
   }
 
-  function rename(id: string, name: string) {
-    const next = prompt(t("scripts.renamePrompt", { name }), name)?.trim();
-    if (next && next !== name) void session.rename(id, name, next);
+  async function rename(id: string, name: string) {
+    const next = await askText(t("scripts.renamePrompt", { name }), t("scripts.rename"), name);
+    if (next && next !== name) await session.rename(id, name, next);
   }
 
-  function remove(id: string, name: string, active: boolean) {
-    if (active) return alert(t("scripts.deleteActive"));
-    if (confirm(t("scripts.deleteConfirm", { name }))) void session.deleteScript(id, name);
+  async function remove(id: string, name: string, active: boolean) {
+    if (active) return tell(t("scripts.deleteActive"));
+    if (await ask(t("scripts.deleteConfirm", { name }), t("scripts.delete"), true)) await session.deleteScript(id, name);
   }
 
-  function removeAccount(account: Account) {
-    if (confirm(t("accounts.deleteConfirm", { label: account.label }))) void session.deleteAccount(account.id);
+  async function removeAccount(account: Account) {
+    if (await ask(t("accounts.deleteConfirm", { label: account.label }), t("accounts.delete"), true)) {
+      await session.deleteAccount(account.id);
+    }
   }
 </script>
 

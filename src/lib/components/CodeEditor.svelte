@@ -4,8 +4,8 @@
   import { EditorState, Compartment } from "@codemirror/state";
   import { EditorView, keymap, lineNumbers, highlightActiveLine, drawSelection } from "@codemirror/view";
   import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
-  import { StreamLanguage, syntaxHighlighting, defaultHighlightStyle, bracketMatching } from "@codemirror/language";
-  import { sieve } from "@codemirror/legacy-modes/mode/sieve";
+  import { bracketMatching } from "@codemirror/language";
+  import { sieveHighlighting } from "../sieve-highlight";
 
   let {
     value,
@@ -18,23 +18,6 @@
   let view: EditorView | undefined;
   const editable = new Compartment();
 
-  const theme = EditorView.theme({
-    "&": {
-      fontSize: "0.85rem",
-      backgroundColor: "var(--color-base-100)",
-      color: "var(--color-base-content)",
-      borderRadius: "var(--radius-field)",
-    },
-    ".cm-content": { fontFamily: "var(--font-mono)", caretColor: "var(--color-base-content)" },
-    ".cm-gutters": {
-      backgroundColor: "var(--color-base-200)",
-      color: "color-mix(in oklab, var(--color-base-content) 45%, transparent)",
-      border: "none",
-    },
-    ".cm-activeLine": { backgroundColor: "color-mix(in oklab, var(--color-primary) 6%, transparent)" },
-    "&.cm-focused": { outline: "2px solid var(--color-primary)", outlineOffset: "1px" },
-  });
-
   onMount(() => {
     view = new EditorView({
       parent: host,
@@ -46,10 +29,8 @@
           drawSelection(),
           highlightActiveLine(),
           bracketMatching(),
-          StreamLanguage.define(sieve),
-          syntaxHighlighting(defaultHighlightStyle),
+          sieveHighlighting,
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
-          theme,
           editable.of([EditorState.readOnly.of(readonly), EditorView.editable.of(!readonly)]),
           // The read-only preview sits in a narrow panel: wrap instead of scrolling sideways.
           readonly ? EditorView.lineWrapping : [],

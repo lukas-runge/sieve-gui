@@ -1,7 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Condition } from "#tauri/types";
-import { buildCondition, operatorsFor, partsFor, viewCondition, withField, withPart, type ConditionView } from "./view.ts";
+import {
+  addCondition,
+  buildCondition,
+  newRule,
+  operatorsFor,
+  partsFor,
+  removeCondition,
+  viewCondition,
+  withField,
+  withPart,
+  type ConditionView,
+} from "./view.ts";
 
 const from: ConditionView = { field: "from", header: "", part: "header", operator: "contains", values: ["x"] };
 
@@ -83,4 +94,21 @@ test("switching part or field keeps what still fits", () => {
   });
   assert.deepEqual(withField(subdomains, "to"), { ...subdomains, field: "to" });
   assert.deepEqual(withField(subdomains, "subject"), { ...subdomains, field: "subject", part: "header", operator: "notIs" });
+});
+
+test("a single condition is written bare, two start with all", () => {
+  const conditions = newRule("x").conditions;
+  assert.equal(conditions.join, "any");
+  addCondition(conditions);
+  assert.equal(conditions.join, "all");
+  addCondition(conditions);
+  conditions.join = "any";
+  removeCondition(conditions, 0);
+  assert.equal(conditions.join, "any", "the user's choice stays while there are two");
+  conditions.join = "all";
+  removeCondition(conditions, 0);
+  assert.deepEqual([conditions.items.length, conditions.join], [1, "any"]);
+  removeCondition(conditions, 0);
+  addCondition(conditions);
+  assert.deepEqual([conditions.items.length, conditions.join], [1, "any"]);
 });

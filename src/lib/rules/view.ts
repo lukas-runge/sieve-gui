@@ -2,7 +2,7 @@
 // values per condition, and a kind plus parameters per action. Anything the
 // editor can't express is shown read-only and left untouched.
 
-import type { Action, AddressPart, Condition, ConditionTest, Matcher, Rule } from "#tauri/types";
+import type { Action, AddressPart, Condition, Conditions, ConditionTest, Matcher, Rule } from "#tauri/types";
 
 // ── Conditions ────────────────────────────────────────────────────────────────
 
@@ -461,5 +461,21 @@ export function buildAction(kind: ActionKind, from?: Action): Action {
 }
 
 export function newRule(name: string): Rule {
-  return { name, enabled: true, conditions: { join: "all", items: [newCondition()] }, actions: [buildAction("move")] };
+  return { name, enabled: true, conditions: { join: "any", items: [newCondition()] }, actions: [buildAction("move")] };
+}
+
+// A single condition is written bare (`if <test>`), which needs "any": a bare
+// test reads back as "any", in Roundcube too. Once there are two, the editor
+// starts with "all". Rules nobody adds or removes conditions in keep their
+// join, so imported scripts stay byte-exact.
+
+export function addCondition(conditions: Conditions) {
+  conditions.items.push(newCondition());
+  if (conditions.items.length === 2) conditions.join = "all";
+  else if (conditions.items.length === 1) conditions.join = "any";
+}
+
+export function removeCondition(conditions: Conditions, index: number) {
+  conditions.items.splice(index, 1);
+  if (conditions.items.length <= 1) conditions.join = "any";
 }

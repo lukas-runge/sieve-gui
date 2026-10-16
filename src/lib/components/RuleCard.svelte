@@ -4,7 +4,7 @@
   import { t } from "../i18n.svelte";
   import { closesMenu } from "../menu";
   import type { ScriptFolders } from "../rules/mailbox";
-  import { buildAction, newCondition } from "../rules/view";
+  import { addCondition, buildAction, removeCondition } from "../rules/view";
   import ActionRow from "./ActionRow.svelte";
   import ConditionRow from "./ConditionRow.svelte";
   import RuleSentence from "./RuleSentence.svelte";
@@ -122,12 +122,12 @@
             {condition}
             {extensions}
             onchange={(c, merge) => setCondition(i, c, merge)}
-            onremove={() => change((r) => r.conditions.items.splice(i, 1))}
+            onremove={() => change((r) => removeCondition(r.conditions, i))}
           />
         {/each}
         <button
           class="btn btn-ghost btn-sm justify-self-start w-fit"
-          onclick={() => change((r) => r.conditions.items.push(newCondition()))}
+          onclick={() => change((r) => addCondition(r.conditions))}
         >
           + {t("conditions.add")}
         </button>

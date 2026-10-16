@@ -66,7 +66,7 @@ The app window opens automatically. The Vite dev server runs on `http://localhos
 pnpm tauri build
 ```
 
-Artifacts land in `src-tauri/target/release/bundle/`.
+Artifacts land in `target/release/bundle/` (Cargo workspace target directory).
 
 ---
 

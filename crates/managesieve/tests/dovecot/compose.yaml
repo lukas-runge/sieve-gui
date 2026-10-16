@@ -1,0 +1,8 @@
+services:
+  dovecot:
+    build: .
+    image: managesieve-test-dovecot
+    container_name: managesieve-test-dovecot
+    ports:
+      - "127.0.0.1:14190:34190" # ManageSieve (plain + STARTTLS)
+      - "127.0.0.1:14191:35190" # ManageSieve over implicit TLS

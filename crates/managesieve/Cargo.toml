@@ -1,0 +1,25 @@
+[package]
+name = "managesieve"
+description = "Async ManageSieve (RFC 5804) client"
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+rust-version = "1.88"
+readme = "README.md"
+keywords = ["managesieve", "sieve", "email", "rfc5804", "async"]
+categories = ["email", "network-programming", "asynchronous"]
+
+[dependencies]
+base64 = "0.23.1"
+rustls-pki-types = { version = "1.15.1", features = ["std"] }
+rustls-platform-verifier = "0.7.1"
+serde = { version = "1.0.229", features = ["derive"] }
+thiserror = "2.0.21"
+tokio = { version = "1.53.3", default-features = false, features = ["net", "io-util", "time"] }
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["tls12", "ring"] }
+
+[dev-dependencies]
+serde_json = "1.0.154"
+tokio = { version = "1.53.3", features = ["macros", "rt", "net", "io-util", "time"] }

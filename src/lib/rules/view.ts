@@ -6,7 +6,7 @@ import type { Action, AddressPart, Condition, Conditions, ConditionTest, Matcher
 
 // ── Conditions ────────────────────────────────────────────────────────────────
 
-export const FIELDS = ["from", "to", "cc", "toOrCc", "subject", "header", "body", "size", "date"] as const;
+export const FIELDS = ["from", "to", "cc", "toOrCc", "subject", "header", "body", "parts", "size", "date"] as const;
 export type Field = (typeof FIELDS)[number];
 
 export const TEXT_OPERATORS = [
@@ -30,10 +30,16 @@ export const TEXT_OPERATORS = [
 export const SIZE_OPERATORS = ["over", "under"] as const;
 /** Delivery date (`currentdate :value "ge"/"le"`), as Roundcube's out-of-office uses. */
 export const DATE_OPERATORS = ["onOrAfter", "onOrBefore"] as const;
+/**
+ * Whether the message has a MIME part of one of the types (`body :content
+ * <types> :contains ""`: the empty key matches every part of those types).
+ */
+export const PART_OPERATORS = ["hasType", "notHasType"] as const;
 export type Operator =
   | (typeof TEXT_OPERATORS)[number]
   | (typeof SIZE_OPERATORS)[number]
-  | (typeof DATE_OPERATORS)[number];
+  | (typeof DATE_OPERATORS)[number]
+  | (typeof PART_OPERATORS)[number];
 
 /**
  * What a condition compares: the whole header (`header` test) or a part of
@@ -154,6 +160,13 @@ export function viewCondition(c: Condition): ConditionView | null {
       return f && { ...f, part: "header", operator: c.negate ? "notExists" : "exists", values: [] };
     }
     case "body": {
+      if (test.transform.type === "content") {
+        const m = test.matcher;
+        const any = m.matchType.type === "contains" && m.comparator === null && test.keys.length === 1 && test.keys[0] === "";
+        if (!any) return null;
+        const operator = c.negate ? "notHasType" : "hasType";
+        return { field: "parts", header: "", part: "header", operator, values: test.transform.value };
+      }
       if (test.transform.type !== "text") return null;
       const m = textOperator(test.matcher, test.keys, c.negate, "header");
       return m && { field: "body", header: "", part: "header", ...m };
@@ -247,6 +260,17 @@ export function buildCondition(v: ConditionView): Condition {
       },
     };
   }
+  if (v.field === "parts") {
+    return {
+      negate: v.operator === "notHasType",
+      test: {
+        type: "body",
+        transform: { type: "content", value: v.values.length ? v.values : [""] },
+        matcher: { matchType: { type: "contains" }, comparator: null },
+        keys: [""],
+      },
+    };
+  }
   const negate = v.operator.startsWith("not");
   const base = negate ? v.operator[3].toLowerCase() + v.operator.slice(4) : v.operator;
   if (base === "exists") {
@@ -286,6 +310,7 @@ export function buildCondition(v: ConditionView): Condition {
 export function operatorsFor(field: Field, part: Part, extensions: string[]): readonly Operator[] {
   if (field === "size") return SIZE_OPERATORS;
   if (field === "date") return DATE_OPERATORS;
+  if (field === "parts") return PART_OPERATORS;
   let ops: readonly Operator[] = TEXT_OPERATORS;
   // `address` has no "exists"; that is a header question.
   if (field === "body" || part !== "header") ops = ops.filter((o) => !o.endsWith("xists"));
@@ -304,7 +329,7 @@ export function partsFor(field: Field, extensions: string[], current: Part): rea
 export function fieldsFor(extensions: string[]): readonly Field[] {
   return FIELDS.filter(
     (f) =>
-      (f !== "body" || extensions.includes("body")) &&
+      ((f !== "body" && f !== "parts") || extensions.includes("body")) &&
       (f !== "date" || (extensions.includes("date") && extensions.includes("relational"))),
   );
 }
@@ -319,7 +344,10 @@ export function withField(v: ConditionView, field: Field): ConditionView {
   if (field === "date") {
     return { field, header: "", part: "header", operator: "onOrAfter", values: [new Date().toISOString().slice(0, 10)] };
   }
-  if (v.field === "size" || v.field === "date") return { field, header: "", part: "header", operator: "contains", values: [""] };
+  if (field === "parts") return { field, header: "", part: "header", operator: "hasType", values: [""] };
+  if (v.field === "size" || v.field === "date" || v.field === "parts") {
+    return { field, header: "", part: "header", operator: "contains", values: [""] };
+  }
   const part = ADDRESS_FIELDS.includes(field) ? v.part : "header";
   return keepOperator({ ...v, field, part });
 }

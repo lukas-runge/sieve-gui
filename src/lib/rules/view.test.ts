@@ -112,3 +112,39 @@ test("a single condition is written bare, two start with all", () => {
   addCondition(conditions);
   assert.deepEqual([conditions.items.length, conditions.join], [1, "any"]);
 });
+
+function partType(types: string[], negate = false, keys = [""], matchType = "contains"): Condition {
+  return {
+    negate,
+    test: {
+      type: "body",
+      transform: { type: "content", value: types },
+      matcher: { matchType: { type: matchType }, comparator: null },
+      keys,
+    },
+  } as Condition;
+}
+
+test("MIME part types are a body :content test with an empty key", () => {
+  const view: ConditionView = { field: "parts", header: "", part: "header", operator: "hasType", values: ["application/x-sogo-notification"] };
+  const c = buildCondition(view);
+  assert.deepEqual(c, partType(["application/x-sogo-notification"]));
+  assert.deepEqual(viewCondition(c), view);
+
+  const none = buildCondition({ ...view, operator: "notHasType", values: ["application/pdf", "image"] });
+  assert.deepEqual(none, partType(["application/pdf", "image"], true));
+  assert.equal(viewCondition(none)?.operator, "notHasType");
+});
+
+test("other body :content tests stay read-only", () => {
+  assert.equal(viewCondition(partType(["text/plain"], false, ["invoice"])), null);
+  assert.equal(viewCondition(partType(["text/plain"], false, [""], "is")), null);
+});
+
+test("switching to and from MIME parts", () => {
+  const parts = withField(from, "parts");
+  assert.deepEqual(parts, { field: "parts", header: "", part: "header", operator: "hasType", values: [""] });
+  assert.deepEqual(operatorsFor("parts", "header", ["body"]), ["hasType", "notHasType"]);
+  assert.deepEqual(partsFor("parts", [], "header"), []);
+  assert.deepEqual(withField(parts, "subject"), { field: "subject", header: "", part: "header", operator: "contains", values: [""] });
+});

@@ -135,6 +135,8 @@
           <p class="mt-1 text-xs text-base-content/60">{t("op.patternHint")}</p>
         {:else if view.operator.endsWith("WithSubdomains")}
           <p class="mt-1 text-xs text-base-content/60">{t("op.subdomainHint")}</p>
+        {:else if view.field === "parts"}
+          <p class="mt-1 text-xs text-base-content/60">{t("op.typeHint")}</p>
         {/if}
       </div>
     {/if}

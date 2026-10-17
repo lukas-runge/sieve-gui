@@ -23,6 +23,7 @@
   let imapPort = $state(initial?.imap?.port ?? 993);
   let lastMoveWins = $state(initial?.lastMoveWins ?? true);
   let multipleScripts = $state(initial?.multipleScripts ?? true);
+  let roundcube = $state(initial?.roundcube ?? false);
   // Unknown (all allowed) until the account has connected.
   const supported = untrack(() => (initial ? session.supported(initial.id) : null));
   let saving = $state(false);
@@ -45,6 +46,7 @@
         imap: imapEnabled ? { host: imapHost.trim() || host, port: imapPort, security: imapSecurity } : null,
         multipleScripts,
         lastMoveWins,
+        roundcube,
         password: password || (initial ? null : ""),
       });
       dialog.close();
@@ -165,6 +167,13 @@
           </span>
         </p>
       {/if}
+      <div>
+        <label class="label text-base-content whitespace-normal">
+          <input type="checkbox" class="toggle toggle-sm" bind:checked={roundcube} />
+          {t("account.roundcube")}
+        </label>
+        <p class="label whitespace-normal">{t("account.roundcubeHint")}</p>
+      </div>
     </fieldset>
 
     {#if error}<p role="alert" class="text-error">{error}</p>{/if}

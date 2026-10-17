@@ -1,7 +1,7 @@
 // State of the script being edited: the rule cards, undo history and the
 // generated Sieve code.
 
-import { exportRules, importRules, isRoundcubeFormat, roundcubeRisks } from "#tauri/commands";
+import { exportRules, importRules, roundcubeRisks } from "#tauri/commands";
 import type { RoundcubeRisks, RuleItem, RuleSet } from "#tauri/types";
 
 /** A rule item with a stable id for keyed lists (ignored by the backend). */
@@ -33,7 +33,7 @@ export class ScriptEditor {
   /** The generated script for the current rules. */
   code = $state("");
   codeError = $state<string | null>(null);
-  /** Whether the server version is in Roundcube's format. */
+  /** Whether the account's filters are also edited in Roundcube. */
   roundcube = $state(false);
   /** What Roundcube would drop of the current rules (only if `roundcube`). */
   roundcubeRisks = $state<RoundcubeRisks | null>(null);
@@ -53,10 +53,11 @@ export class ScriptEditor {
     this.rules = withUids(rules);
   }
 
-  static async open(accountId: string, name: string, source: string | null): Promise<ScriptEditor> {
+  /** `roundcube`: the account's filters are also edited in Roundcube. */
+  static async open(accountId: string, name: string, source: string | null, roundcube: boolean): Promise<ScriptEditor> {
     const rules = await importRules(source ?? "");
     const editor = new ScriptEditor(accountId, name, source, rules);
-    editor.roundcube = source !== null && (await isRoundcubeFormat(source));
+    editor.roundcube = roundcube;
     await editor.regenerate();
     return editor;
   }
@@ -110,7 +111,7 @@ export class ScriptEditor {
     const generation = ++this.#generation;
     try {
       const rules = $state.snapshot(this.rules) as RuleSet;
-      const [code, risks] = await Promise.all([exportRules(rules), this.roundcube ? roundcubeRisks(rules) : null]);
+      const [code, risks] = await Promise.all([exportRules(rules, this.roundcube), this.roundcube ? roundcubeRisks(rules) : null]);
       if (generation === this.#generation) {
         this.code = code;
         this.codeError = null;

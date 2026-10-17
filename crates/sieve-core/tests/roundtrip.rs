@@ -94,6 +94,7 @@ fn corpus_roundtrips() {
         roundtrip(src, &lf);
         roundtrip(src, &crlf);
         roundtrip(src, &PrintOptions::roundcube());
+        roundtrip(src, &PrintOptions::readable());
     }
 }
 

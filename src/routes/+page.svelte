@@ -112,14 +112,15 @@
               </button>
             </div>
           {/if}
-          {#if editor.roundcubeRisks && (editor.roundcubeRisks.rawBlocks.length > 0 || editor.roundcubeRisks.bracketComments)}
+          {#if editor.roundcubeRisks && (editor.roundcubeRisks.rawBlocks.length + editor.roundcubeRisks.rules.length > 0 || editor.roundcubeRisks.bracketComments)}
             {@const risks = editor.roundcubeRisks}
+            {@const count = risks.rawBlocks.length + risks.rules.length}
             <div role="note" class="grid gap-1 rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
               <p class="font-semibold">{t("roundcube.title")}</p>
               {#if risks.bracketComments}
                 <p>{t("roundcube.bracket")}</p>
               {:else}
-                <p>{risks.rawBlocks.length === 1 ? t("roundcube.rawOne") : t("roundcube.rawMany", { count: risks.rawBlocks.length })}</p>
+                <p>{count === 1 ? t("roundcube.rawOne") : t("roundcube.rawMany", { count })}</p>
               {/if}
             </div>
           {/if}

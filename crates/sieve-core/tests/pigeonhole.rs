@@ -48,6 +48,7 @@ fn pigeonhole_suite_parses_and_roundtrips() {
             Ok(_) => {
                 parsed += 1;
                 common::roundtrip(&src, &options);
+                common::roundtrip(&src, &PrintOptions::readable());
             }
             Err(e) if may_fail => {
                 expected_errors += 1;

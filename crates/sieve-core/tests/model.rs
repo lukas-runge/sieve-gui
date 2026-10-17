@@ -240,7 +240,7 @@ fn invalid_arguments_stay_raw() {
         "if header \"a\" :contains \"b\" { keep; }",      // tag after positional
         "if size 10 { keep; }",                           // missing :over/:under
         "if header :value \"xx\" \"a\" \"b\" { keep; }",   // bad relational op
-        "if anyof (allof (true, true)) { keep; }",        // nested lists
+        "if anyof (allof (exists)) { keep; }",            // invalid test in a group
         "fileinto [\"a\", \"b\"];",                       // list where string expected
         "vacation :days 1 :seconds 5 \"x\";",             // conflicting tags
         "if not not exists \"a\" { keep; }",
@@ -458,4 +458,92 @@ fn single_folder_mode_reads_foreign_moves_and_stops() {
     let set = import("require \"variables\";\nif true { set \"move_to_folder\" \"x\"; return; }\n").unwrap();
     assert!(!set.single_folder);
     assert!(raw(&set, 0).starts_with("if true"));
+}
+
+/// Conditions may nest `allof`/`anyof` groups to any depth.
+#[test]
+fn nested_condition_groups() {
+    let src = "require [\"body\", \"fileinto\"];\n# rule:[Nextcloud]\nif anyof (\n\
+        \taddress :is \"from\" \"cloud@service42.me\",\n\
+        \tallof (\n\
+        \t\theader :contains \"references\" \"@service42.me>\",\n\
+        \t\tbody :content \"text/calendar\" :contains \"\"\n\
+        \t)\n\
+        ) {\n\tfileinto \"Accounts/Nextcloud\";\n}\n";
+    let set = import(src).unwrap();
+    let nextcloud = rule(&set, 0);
+    assert_eq!(nextcloud.conditions.join, Join::Any);
+    let ConditionTest::Group { join, items } = &nextcloud.conditions.items[1].test else {
+        panic!("not a group: {:?}", nextcloud.conditions.items[1]);
+    };
+    assert_eq!((*join, items.len()), (Join::All, 2));
+    assert_eq!(assert_stable(&set), src);
+
+    // Deeper, negated, and a single test in a group stays a group.
+    let set = import("if allof (not anyof (exists \"x\", allof (size :over 1K, not header :is \"a\" \"b\")), anyof (exists \"y\")) { keep; }\n").unwrap();
+    let deep = rule(&set, 0);
+    assert!(deep.conditions.items[0].negate);
+    let ConditionTest::Group { join: Join::Any, items } = &deep.conditions.items[0].test else { panic!() };
+    assert!(matches!(&items[1].test, ConditionTest::Group { join: Join::All, items } if items.len() == 2 && items[1].negate));
+    assert!(matches!(&deep.conditions.items[1].test, ConditionTest::Group { join: Join::Any, items } if items.len() == 1));
+    let text = assert_stable(&set);
+    assert!(
+        text.starts_with(
+            "if allof (\n\tnot anyof (\n\t\texists \"x\",\n\t\tallof (\n\t\t\tsize :over 1K,\n\t\t\tnot header :is \"a\" \"b\"\n\
+             \t\t)\n\t),\n\tanyof (\n\t\texists \"y\"\n\t)\n) {"
+        ),
+        "{text}"
+    );
+
+    // An empty group is `true` (all of nothing) or `false` (any of nothing).
+    let empty = |join| RuleSet {
+        items: vec![RuleItem::Rule(Rule {
+            name: String::new(),
+            enabled: true,
+            conditions: Conditions {
+                join: Join::All,
+                items: vec![
+                    Condition { negate: false, test: ConditionTest::Exists { headers: vec!["x".into()] } },
+                    Condition { negate: false, test: ConditionTest::Group { join, items: vec![] } },
+                ],
+            },
+            actions: vec![Action::Keep { flags: None }],
+        })],
+        ..Default::default()
+    };
+    assert!(assert_stable(&empty(Join::All)).contains("allof (exists \"x\", true)"));
+    assert!(assert_stable(&empty(Join::Any)).contains("allof (exists \"x\", false)"));
+
+    // Extensions are collected from nested tests too.
+    let set = import("if anyof (allof (body :text :contains \"x\")) { keep; }").unwrap();
+    assert!(export(&set, &opts()).starts_with("require [\"body\"];"));
+}
+
+/// The readable layout puts an empty line before each rule and code block.
+#[test]
+fn readable_layout_separates_rules() {
+    let set = import(
+        "require \"fileinto\";\n# rule:[A]\nif exists \"a\" { fileinto \"A\"; }\n# rule:[B]\nif exists \"b\" { keep; }\nif exists \"c\" { keep; } else { stop; }\n",
+    )
+    .unwrap();
+    let text = export(&set, &PrintOptions::readable()).replace("\r\n", "\n");
+    assert_eq!(
+        text,
+        "require [\"fileinto\"];\n\n# rule:[A]\nif exists \"a\" {\n\tfileinto \"A\";\n}\n\n# rule:[B]\nif exists \"b\" {\n\tkeep;\n}\n\n\
+         if exists \"c\" { keep; } else { stop; }\n"
+    );
+    let again = import(&text).unwrap();
+    assert_eq!(again.items, set.items);
+    assert_eq!(export(&again, &PrintOptions::readable()).replace("\r\n", "\n"), text);
+
+    // An empty code block adds nothing, not even an empty line.
+    let mut with_empty = set.clone();
+    with_empty.items.insert(1, RuleItem::Raw(RawBlock { code: String::new() }));
+    assert_eq!(export(&with_empty, &PrintOptions::readable()).replace("\r\n", "\n"), text);
+
+    // Nothing before the first rule of a script without require.
+    let set = import("if exists \"a\" { keep; }").unwrap();
+    assert!(export(&set, &PrintOptions::readable()).starts_with("if exists"));
+    // Roundcube's layout has no empty lines.
+    assert!(!export(&set, &PrintOptions::roundcube()).contains("\r\n\r\n"));
 }

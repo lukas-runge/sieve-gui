@@ -112,6 +112,9 @@ pub enum ConditionTest {
         date_part: String,
         keys: Vec<String>,
     },
+    /// A nested `allof (…)` / `anyof (…)`. An empty group is written as
+    /// `true` (all of nothing) or `false` (any of nothing).
+    Group { join: Join, items: Vec<Condition> },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -331,6 +334,10 @@ impl ConditionTest {
                 (Some(matcher), Some(part))
             }
             ConditionTest::Exists { .. } | ConditionTest::Size { .. } => (None, None),
+            ConditionTest::Group { items, .. } => {
+                items.iter().for_each(|c| c.test.collect_extensions(out));
+                (None, None)
+            }
             ConditionTest::Body { matcher, .. } => {
                 out.push("body");
                 (Some(matcher), None)

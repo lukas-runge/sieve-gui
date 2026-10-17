@@ -60,6 +60,11 @@ class Session {
   roots = $state<Record<string, Root | null>>({});
   /** Per account: the root script's text on the server, if there is a root. */
   rootSources = $state<Record<string, string>>({});
+  /**
+   * Per account: the root script exists but another script (or none) was
+   * made active elsewhere, e.g. by saving filters in SOGo. Holds that script.
+   */
+  displaced = $state<Record<string, { active: string | null }>>({});
   /** The account whose root script is shown (read-only) instead of an editor. */
   rootView = $state<string | null>(null);
   /** Per account: script names in the order the user arranged them. */
@@ -131,6 +136,7 @@ class Session {
       // Then it's shown as a plain active script.
     }
     this.roots[id] = root;
+    if (root) delete this.displaced[id];
     if (root) this.rootSources[id] = source;
     else delete this.rootSources[id];
   }
@@ -170,14 +176,21 @@ class Session {
     const settings = this.rootSettings(id);
     const needed = settings.multipleScripts || settings.lastMoveWins;
     const root = this.roots[id];
+    delete this.displaced[id];
     if (!needed && !root) return;
     const affected = root ? root.scripts : info.scripts.filter((s) => s.active).map((s) => s.name);
     if (!(await this.#canRewrite(id, affected))) return;
     try {
       if (needed && !root) {
-        // A script of that name that is not a root (or not active) is the user's.
-        if (info.scripts.some((s) => s.name === ROOT_SCRIPT) && !(await parseRoot(await getScript(id, ROOT_SCRIPT)))) {
-          this.error = t("root.nameTaken", { name: ROOT_SCRIPT });
+        if (info.scripts.some((s) => s.name === ROOT_SCRIPT)) {
+          // A script of that name that is no root is the user's.
+          if (!(await parseRoot(await getScript(id, ROOT_SCRIPT)))) {
+            this.error = t("root.nameTaken", { name: ROOT_SCRIPT });
+            return;
+          }
+          // Ours, but something else was activated meanwhile. Leave it to the
+          // user: taking over again here would undo what they just did there.
+          this.displaced[id] = { active: info.scripts.find((s) => s.active)?.name ?? null };
           return;
         }
         const current = info.scripts.find((s) => s.active)?.name;
@@ -211,9 +224,17 @@ class Session {
     await this.refreshScripts(id);
   }
 
+  #roundcube(id: string): boolean {
+    return this.accounts.find((a) => a.id === id)?.roundcube ?? false;
+  }
+
   async saveAccount(input: AccountInput): Promise<Account> {
     const account = await saveAccount(input);
     await this.loadAccounts();
+    if (this.editor?.accountId === account.id) {
+      this.editor.roundcube = account.roundcube;
+      void this.editor.regenerate();
+    }
     void this.connect(account.id);
     return account;
   }
@@ -235,6 +256,17 @@ class Session {
     return ask(t("editor.discardConfirm", { name: this.editor.name }), t("editor.discard"), true);
   }
 
+  /** Makes the root script active again after something else replaced it. */
+  async reactivateRoot(id: string) {
+    try {
+      await activateScript(id, ROOT_SCRIPT);
+      await this.refreshScripts(id);
+      await this.#applySettings(id);
+    } catch (e) {
+      this.error = describeError(e);
+    }
+  }
+
   /** Shows the account's root script (read-only) in place of the editor. */
   async viewRoot(id: string) {
     if (this.rootView === id || !(await this.confirmLeave())) return;
@@ -248,7 +280,7 @@ class Session {
     this.error = null;
     try {
       const source = await getScript(id, name);
-      this.editor = await ScriptEditor.open(id, name, source);
+      this.editor = await ScriptEditor.open(id, name, source, this.#roundcube(id));
     } catch (e) {
       this.error = describeError(e);
     } finally {
@@ -258,7 +290,7 @@ class Session {
 
   async newScript(id: string, name: string) {
     this.rootView = null;
-    this.editor = await ScriptEditor.open(id, name, null);
+    this.editor = await ScriptEditor.open(id, name, null, this.#roundcube(id));
   }
 
   /**
@@ -267,8 +299,10 @@ class Session {
    * all scripts (without a root script).
    */
   async activate(id: string, name: string | null) {
-    const root = this.roots[id];
     if (name !== null && !(await this.#canRewrite(id, [name]))) return;
+    // Activating a script means running the root again.
+    if (name !== null && this.displaced[id]) await this.reactivateRoot(id);
+    const root = this.roots[id];
     try {
       // Every step leaves a working setup: a script not yet in single-folder
       // mode just files messages directly.
@@ -313,7 +347,8 @@ class Session {
    */
   scriptOrder(id: string): string[] {
     const root = this.roots[id];
-    const names = (this.servers[id]?.info?.scripts ?? []).map((s) => s.name).filter((n) => !root || n !== ROOT_SCRIPT);
+    const managed = !!root || !!this.displaced[id];
+    const names = (this.servers[id]?.info?.scripts ?? []).map((s) => s.name).filter((n) => !managed || n !== ROOT_SCRIPT);
     const saved = (this.#order[id] ?? []).filter((n) => names.includes(n));
     const list = [...saved, ...names.filter((n) => !saved.includes(n))];
     if (!root) return list;
@@ -374,10 +409,10 @@ class Session {
     const rules = await importRules(source);
     if (rules.singleFolder === on) return;
     rules.singleFolder = on;
-    const code = await exportRules(rules);
+    const code = await exportRules(rules, this.#roundcube(id));
     await deployScript(id, name, code, source);
     if (this.editor?.accountId === id && this.editor.name === name) {
-      this.editor = await ScriptEditor.open(id, name, code);
+      this.editor = await ScriptEditor.open(id, name, code, this.#roundcube(id));
     }
   }
 

@@ -5,7 +5,7 @@
   import { t } from "../i18n.svelte";
   import { ask, askText, tell } from "../dialogs.svelte";
   import { closesMenu } from "../menu";
-  import { session } from "../session.svelte";
+  import { ROOT_SCRIPT, session } from "../session.svelte";
 
   let { onaccount }: { onaccount: (account: Account | null) => void } = $props();
 
@@ -155,6 +155,17 @@
           <button class="btn btn-xs self-start" onclick={() => session.connect(account.id)}>{t("accounts.retry")}</button>
         </div>
       {:else if server.info}
+        {@const displaced = session.displaced[account.id]}
+        {#if displaced}
+          <div role="alert" class="grid gap-1.5 rounded-box border border-warning/40 bg-warning/10 px-2 py-1.5 text-xs">
+            <p>
+              {displaced.active ? t("root.displaced", { name: displaced.active }) : t("root.displacedNone")}
+            </p>
+            <button class="btn btn-xs justify-self-start" onclick={() => session.reactivateRoot(account.id)}>
+              {t("root.reactivate", { name: ROOT_SCRIPT })}
+            </button>
+          </div>
+        {/if}
         <!-- The root script follows the account settings; it isn't listed. -->
         {@const order = session.scriptOrder(account.id)}
         {@const arrangeable = session.multipleActive(account.id)}

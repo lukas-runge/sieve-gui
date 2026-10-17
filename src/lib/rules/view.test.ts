@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import type { Condition } from "#tauri/types";
 import {
   addCondition,
+  addGroup,
+  groupMode,
+  removeFromGroup,
+  setGroupMode,
   buildCondition,
   newRule,
   operatorsFor,
@@ -147,4 +151,44 @@ test("switching to and from MIME parts", () => {
   assert.deepEqual(operatorsFor("parts", "header", ["body"]), ["hasType", "notHasType"]);
   assert.deepEqual(partsFor("parts", [], "header"), []);
   assert.deepEqual(withField(parts, "subject"), { field: "subject", header: "", part: "header", operator: "contains", values: [""] });
+});
+
+test("a new group starts with one condition and the other join", () => {
+  const conditions = newRule("x").conditions;
+  addGroup(conditions, true);
+  assert.equal(conditions.join, "all");
+  const group = conditions.items[1];
+  assert.equal(group.test.type, "group");
+  if (group.test.type !== "group") return;
+  assert.deepEqual([group.test.join, group.test.items.length], ["any", 1]);
+
+  addGroup(group.test, false);
+  const inner = group.test.items[1];
+  assert.ok(inner.test.type === "group" && inner.test.join === "all");
+  assert.equal(group.test.join, "any", "a nested group keeps its join");
+});
+
+test("group modes cover negation", () => {
+  const group: Condition = { negate: false, test: { type: "group", join: "all", items: [] } };
+  for (const mode of ["any", "none", "notAll", "all"] as const) {
+    setGroupMode(group, mode);
+    assert.ok(group.test.type === "group");
+    assert.equal(groupMode(group), mode);
+  }
+  setGroupMode(group, "none");
+  assert.deepEqual([group.negate, group.test.type === "group" && group.test.join], [true, "any"]);
+});
+
+test("removing the last condition of a nested group removes the group", () => {
+  const conditions = newRule("x").conditions;
+  addGroup(conditions, true);
+  const holder = conditions.items[1];
+  if (holder.test.type !== "group") throw new Error("no group");
+  addGroup(holder.test, false);
+  removeFromGroup(holder.test, 0, false);
+  assert.equal(holder.test.items.length, 1);
+  const inner = holder.test.items[0];
+  if (inner.test.type !== "group") throw new Error("no inner group");
+  assert.equal(removeFromGroup(inner.test, 0, false), true, "now empty");
+  assert.equal(removeFromGroup(conditions, 0, true), false, "the rule's own conditions may be empty");
 });

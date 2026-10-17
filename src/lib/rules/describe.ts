@@ -44,6 +44,13 @@ export function print(c: Condition): string {
     case "currentDate":
       out = `currentdate ${t.zone ? `:zone ${str(t.zone)} ` : ""}${matcher(t.matcher)} ${str(t.datePart)} ${list(t.keys)}`;
       break;
+    case "group":
+      out = t.items.length
+        ? `${t.join === "all" ? "allof" : "anyof"} (${t.items.map(print).join(", ")})`
+        : t.join === "all"
+          ? "true"
+          : "false";
+      break;
     case "date": {
       const zone = t.zone.type === "zone" ? `:zone ${str(t.zone.value)} ` : t.zone.type === "original" ? ":originalzone " : "";
       out = `date ${zone}${matcher(t.matcher)} ${str(t.header)} ${str(t.datePart)} ${list(t.keys)}`;

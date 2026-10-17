@@ -34,18 +34,17 @@ pub fn export(set: &RuleSet, options: &PrintOptions) -> String {
     }
 
     for item in &set.items {
-        match item {
-            RuleItem::Rule(rule) => {
-                out.push_str(&print_command(&rule_command(rule, set.single_folder, options), 0, options))
-            }
-            RuleItem::Raw(raw) => {
-                let code = raw.code.trim_end_matches(['\r', '\n']);
-                if !code.is_empty() {
-                    out.push_str(code);
-                    out.push_str(eol);
-                }
-            }
+        let text = match item {
+            RuleItem::Rule(rule) => print_command(&rule_command(rule, set.single_folder, options), 0, options),
+            RuleItem::Raw(raw) => match raw.code.trim_end_matches(['\r', '\n']) {
+                "" => continue,
+                code => format!("{code}{eol}"),
+            },
+        };
+        if options.separate_rules && !out.is_empty() {
+            out.push_str(eol);
         }
+        out.push_str(&text);
     }
     out
 }
@@ -122,6 +121,19 @@ fn conditions_test(conditions: &Conditions) -> Test {
     }
 }
 
+/// A nested group keeps its `allof`/`anyof` even with a single test, so it
+/// reads back as a group.
+fn group_test(join: Join, items: &[Condition]) -> Test {
+    let name = match (join, items.is_empty()) {
+        (Join::All, true) => return bare_test("true"),
+        (Join::Any, true) => return bare_test("false"),
+        (Join::All, false) => "allof",
+        (Join::Any, false) => "anyof",
+    };
+    let tests = items.iter().map(condition_test).collect();
+    test(name, Vec::new(), Some(Tests::List(TestList { tests, span: Span::default() })))
+}
+
 fn condition_test(condition: &Condition) -> Test {
     let inner = basic_test(&condition.test);
     if condition.negate {
@@ -134,6 +146,7 @@ fn condition_test(condition: &Condition) -> Test {
 fn basic_test(t: &ConditionTest) -> Test {
     let mut args = Vec::new();
     let name = match t {
+        ConditionTest::Group { join, items } => return group_test(*join, items),
         ConditionTest::Header { headers, matcher, keys } => {
             push_matcher(&mut args, matcher);
             args.push(string_or_list(headers.clone()));

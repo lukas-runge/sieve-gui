@@ -397,6 +397,20 @@ fn single_string_list(arguments: &crate::ast::Arguments) -> Option<Vec<String>> 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 fn condition_test(test: &Test) -> Option<ConditionTest> {
+    // Nested groups; `true`/`false` are the empty ones.
+    if test.is("allof") || test.is("anyof") {
+        let join = if test.is("allof") { Join::All } else { Join::Any };
+        let Some(Tests::List(list)) = &test.arguments.tests else { return None };
+        if !test.arguments.args.is_empty() {
+            return None;
+        }
+        let items = list.tests.iter().map(condition).collect::<Option<Vec<_>>>()?;
+        return Some(ConditionTest::Group { join, items });
+    }
+    if (test.is("true") || test.is("false")) && test.arguments == Default::default() {
+        let join = if test.is("true") { Join::All } else { Join::Any };
+        return Some(ConditionTest::Group { join, items: Vec::new() });
+    }
     if test.arguments.tests.is_some() {
         return None;
     }

@@ -2,7 +2,7 @@
 // values per condition, and a kind plus parameters per action. Anything the
 // editor can't express is shown read-only and left untouched.
 
-import type { Action, AddressPart, Condition, Conditions, ConditionTest, Matcher, Rule } from "#tauri/types";
+import type { Action, AddressPart, Condition, Conditions, ConditionTest, Join, Matcher, Rule } from "#tauri/types";
 
 // ── Conditions ────────────────────────────────────────────────────────────────
 
@@ -497,8 +497,8 @@ export function newRule(name: string): Rule {
 // starts with "all". Rules nobody adds or removes conditions in keep their
 // join, so imported scripts stay byte-exact.
 
-export function addCondition(conditions: Conditions) {
-  conditions.items.push(newCondition());
+export function addCondition(conditions: Conditions, condition: Condition = newCondition()) {
+  conditions.items.push(condition);
   if (conditions.items.length === 2) conditions.join = "all";
   else if (conditions.items.length === 1) conditions.join = "any";
 }
@@ -506,4 +506,56 @@ export function addCondition(conditions: Conditions) {
 export function removeCondition(conditions: Conditions, index: number) {
   conditions.items.splice(index, 1);
   if (conditions.items.length <= 1) conditions.join = "any";
+}
+
+// ── Condition groups ──────────────────────────────────────────────────────────
+
+/** A rule's own conditions, or a group (`allof`/`anyof`) nested in them. */
+export interface ConditionGroup {
+  join: Join;
+  items: Condition[];
+}
+
+/**
+ * Adds a group with one condition. It starts with the other join than its
+ * parent: a group with the same join would just extend the parent's list.
+ * `top`: the parent is the rule's own conditions.
+ */
+export function addGroup(parent: ConditionGroup, top: boolean) {
+  // The rule's own join changes with its second item (see addCondition).
+  const count = parent.items.length;
+  const parentJoin = top && count <= 1 ? (count === 1 ? "all" : "any") : parent.join;
+  const join = parentJoin === "any" ? "all" : "any";
+  const group: Condition = { negate: false, test: { type: "group", join, items: [newCondition()] } };
+  if (top) addCondition(parent, group);
+  else parent.items.push(group);
+}
+
+/**
+ * Removes an item. Returns whether a nested group is empty now; the caller
+ * then removes the group itself (an empty group would always or never match).
+ */
+export function removeFromGroup(group: ConditionGroup, index: number, top: boolean): boolean {
+  if (top) {
+    removeCondition(group, index);
+    return false;
+  }
+  group.items.splice(index, 1);
+  return group.items.length === 0;
+}
+
+/** How a nested group combines its items, including negation. */
+export type GroupMode = "all" | "any" | "none" | "notAll";
+export const GROUP_MODES: readonly GroupMode[] = ["all", "any", "none", "notAll"];
+
+export function groupMode(holder: Condition): GroupMode {
+  const join = holder.test.type === "group" ? holder.test.join : "all";
+  if (!holder.negate) return join;
+  return join === "any" ? "none" : "notAll";
+}
+
+export function setGroupMode(holder: Condition, mode: GroupMode) {
+  if (holder.test.type !== "group") return;
+  holder.negate = mode === "none" || mode === "notAll";
+  holder.test.join = mode === "any" || mode === "none" ? "any" : "all";
 }

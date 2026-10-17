@@ -30,6 +30,7 @@ const account = {
   imap: { host: "mail.example.com", port: 993, security: "implicitTls" },
   multipleScripts: true,
   lastMoveWins: true,
+  roundcube: false,
 };
 
 // Modified UTF-7 names, as IMAP sends them.
@@ -90,13 +91,11 @@ export function installMock() {
         Object.assign(account, input, { id: account.id });
         return account;
       }
-      case "is_roundcube_format":
-        return /^#\s*rule:\[/m.test(a.source);
       case "roundcube_risks": {
         // Rough stand-in for sieve-core's check: every raw block counts.
         const items = a.rules.items as { type: string; code?: string }[];
         const raw = items.flatMap((item, i) => (item.type === "raw" ? [i] : []));
-        return { rawBlocks: raw, bracketComments: raw.some((i) => items[i].code?.includes("/*")) };
+        return { rawBlocks: raw, rules: [], bracketComments: raw.some((i) => items[i].code?.includes("/*")) };
       }
       case "export_rules": {
         // Unchanged rules give the original text; real generation needs Rust.

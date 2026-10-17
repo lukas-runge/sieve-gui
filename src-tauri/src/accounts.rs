@@ -34,6 +34,10 @@ pub struct Account {
     /// rules, the last one that runs wins (if the server supports it).
     #[serde(default = "enabled")]
     pub last_move_wins: bool,
+    /// The scripts are also edited in Roundcube: warn about anything it would
+    /// drop when it saves them.
+    #[serde(default)]
+    pub roundcube: bool,
 }
 
 fn enabled() -> bool {
@@ -83,6 +87,7 @@ pub struct AccountInput {
     pub imap: Option<ImapSettings>,
     pub multiple_scripts: bool,
     pub last_move_wins: bool,
+    pub roundcube: bool,
     /// `None` keeps the stored password.
     pub password: Option<String>,
 }
@@ -177,6 +182,7 @@ pub async fn save_account(
         imap: input.imap.map(|imap| ImapSettings { host: imap.host.trim().to_owned(), ..imap }),
         multiple_scripts: input.multiple_scripts,
         last_move_wins: input.last_move_wins,
+        roundcube: input.roundcube,
     };
     if let Some(pw) = &input.password {
         keychain_entry(&account.id)?.set_password(pw).map_err(keychain_error)?;

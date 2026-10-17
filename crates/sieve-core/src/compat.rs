@@ -3,14 +3,14 @@
 //! Roundcube's *managesieve* plugin regenerates the whole script from its own
 //! model whenever it saves, and silently drops what it cannot represent (see
 //! `tests/fixtures/roundcube/README.md`). sieve-gui writes the same format
-//! (decisions D4, D8), so a script in that format may be edited in Roundcube
-//! too. These checks tell what would be lost there.
+//! (decisions D4, D8). For accounts whose filters are also edited in
+//! Roundcube (an account setting), these checks tell what would be lost there.
 
 use serde::Serialize;
 
 use crate::ast::{Command, Comment, CommentKind};
 use crate::metadata::parse_rule_name;
-use crate::model::{RuleItem, RuleSet};
+use crate::model::{ConditionTest, Rule, RuleItem, RuleSet};
 
 /// Tests Roundcube's filter form can represent, as seen in its output.
 const ROUNDCUBE_TESTS: &[&str] = &[
@@ -33,6 +33,9 @@ pub struct RoundcubeRisks {
     /// free comments. Roundcube drops or rewrites them. (Raw blocks for
     /// features only sieve-gui's cards lack, such as `notify`, are fine.)
     pub raw_blocks: Vec<usize>,
+    /// Indices of rule cards with nested condition groups. Roundcube's form
+    /// has a single level of "all of" / "any of".
+    pub rules: Vec<usize>,
     /// A `/* … */` comment anywhere. Roundcube then shows no rules at all and
     /// replaces every rule on its next save.
     pub bracket_comments: bool,
@@ -40,15 +43,8 @@ pub struct RoundcubeRisks {
 
 impl RoundcubeRisks {
     pub fn is_empty(&self) -> bool {
-        self.raw_blocks.is_empty() && !self.bracket_comments
+        self.raw_blocks.is_empty() && self.rules.is_empty() && !self.bracket_comments
     }
-}
-
-/// Whether a script carries Roundcube's `# rule:[…]` names, i.e. was written
-/// by Roundcube or in its format.
-pub fn is_roundcube_format(source: &str) -> bool {
-    let Ok(script) = crate::parse(source) else { return false };
-    script.commands.iter().any(|cmd| cmd.leading_comments.iter().any(|c| parse_rule_name(c).is_some()))
 }
 
 /// What Roundcube would lose of `set`.
@@ -64,7 +60,17 @@ pub fn roundcube_risks(set: &RuleSet) -> RoundcubeRisks {
     let bracket_comments =
         set.preamble.iter().map(String::as_str).chain(raw.iter().map(|(_, code)| *code)).any(has_bracket_comment);
     let raw_blocks = raw.iter().filter(|(_, code)| !roundcube_understands(code)).map(|(i, _)| *i).collect();
-    RoundcubeRisks { raw_blocks, bracket_comments }
+    let rules = set
+        .items
+        .iter()
+        .enumerate()
+        .filter_map(|(i, item)| matches!(item, RuleItem::Rule(rule) if has_groups(rule)).then_some(i))
+        .collect();
+    RoundcubeRisks { raw_blocks, rules, bracket_comments }
+}
+
+fn has_groups(rule: &Rule) -> bool {
+    rule.conditions.items.iter().any(|c| matches!(c.test, ConditionTest::Group { .. }))
 }
 
 /// Whether Roundcube reads a raw block as rules and writes it back intact.
@@ -90,16 +96,20 @@ fn top_level_understood(cmd: &Command) -> bool {
     let block_ok = cmd.block.as_ref().is_some_and(|block| {
         block.trailing_comments.is_empty() && block.commands.iter().all(|c| !has_comments(c) && action_understood(c))
     });
-    comments_ok && block_ok && tests.iter().all(test_understood)
+    comments_ok && block_ok && tests.iter().all(|t| test_understood(t, false))
 }
 
 fn action_understood(cmd: &Command) -> bool {
     cmd.block.is_none() && ROUNDCUBE_ACTIONS.iter().any(|name| cmd.is(name))
 }
 
-fn test_understood(test: &crate::ast::Test) -> bool {
+/// `nested`: inside a test list or `not`, where Roundcube can't take
+/// another group.
+fn test_understood(test: &crate::ast::Test, nested: bool) -> bool {
+    let group = test.is("allof") || test.is("anyof");
     ROUNDCUBE_TESTS.iter().any(|name| test.is(name))
-        && test.arguments.tests.as_ref().is_none_or(|tests| tests.as_slice().iter().all(test_understood))
+        && !(group && nested)
+        && test.arguments.tests.as_ref().is_none_or(|tests| tests.as_slice().iter().all(|t| test_understood(t, true)))
 }
 
 fn has_comments(cmd: &Command) -> bool {
@@ -135,19 +145,12 @@ mod tests {
     }
 
     #[test]
-    fn detects_rule_names() {
-        assert!(is_roundcube_format("require \"fileinto\";\n# rule:[Taxes]\nif true { fileinto \"Taxes\"; }\n"));
-        assert!(!is_roundcube_format("# just a comment\nif true { keep; }\n"));
-        assert!(!is_roundcube_format("if true {"));
-    }
-
-    #[test]
     fn counts_raw_blocks_and_finds_bracket_comments() {
         let mut set = RuleSet { items: vec![raw("if true { keep; } elsif false { stop; }")], ..Default::default() };
-        assert_eq!(roundcube_risks(&set), RoundcubeRisks { raw_blocks: vec![0], bracket_comments: false });
+        assert_eq!(roundcube_risks(&set), RoundcubeRisks { raw_blocks: vec![0], rules: vec![], bracket_comments: false });
 
         set.items.push(raw("if true {\n  /* note */\n  keep;\n}"));
-        assert_eq!(roundcube_risks(&set), RoundcubeRisks { raw_blocks: vec![0, 1], bracket_comments: true });
+        assert_eq!(roundcube_risks(&set), RoundcubeRisks { raw_blocks: vec![0, 1], rules: vec![], bracket_comments: true });
     }
 
     #[test]
@@ -170,10 +173,21 @@ mod tests {
             "if true { keep; } # same line",
             "if true {\n  # inside\n  keep;\n}",
             "if true # not disabled\n{ keep; }",
+            "if anyof (exists \"a\", allof (exists \"b\", exists \"c\")) { keep; }",
+            "if not anyof (exists \"a\", exists \"b\") { keep; }",
         ];
         for code in lost {
             assert!(!roundcube_understands(code), "{code}");
         }
+    }
+
+    #[test]
+    fn nested_groups_in_rules() {
+        let set = crate::import(
+            "if anyof (exists \"a\", exists \"b\") { keep; }\nif anyof (exists \"a\", allof (exists \"b\")) { keep; }\n",
+        )
+        .unwrap();
+        assert_eq!(roundcube_risks(&set).rules, vec![1]);
     }
 
     #[test]

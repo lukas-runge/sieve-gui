@@ -1,12 +1,12 @@
 <script lang="ts">
-  import type { Action, Condition, Rule } from "#tauri/types";
+  import type { Action, Rule } from "#tauri/types";
   import type { ScriptEditor } from "../editor.svelte";
   import { t } from "../i18n.svelte";
   import { closesMenu } from "../menu";
   import type { ScriptFolders } from "../rules/mailbox";
-  import { addCondition, buildAction, removeCondition } from "../rules/view";
+  import { buildAction } from "../rules/view";
   import ActionRow from "./ActionRow.svelte";
-  import ConditionRow from "./ConditionRow.svelte";
+  import ConditionGroup from "./ConditionGroup.svelte";
   import RuleSentence from "./RuleSentence.svelte";
 
   let {
@@ -43,14 +43,12 @@
     }, merge);
   }
 
-  function setCondition(i: number, c: Condition, merge: boolean) {
-    change((r) => (r.conditions.items[i] = c), merge);
-  }
   function setAction(i: number, a: Action, merge: boolean) {
     change((r) => (r.actions[i] = a), merge);
   }
 
   const headingId = `rule-${Math.random().toString(36).slice(2)}`;
+  const lostInRoundcube = $derived(editor.roundcubeRisks?.rules.includes(index) ?? false);
 </script>
 
 <article
@@ -71,6 +69,10 @@
       <h3 id={headingId} class="grow truncate font-semibold {rule.name ? '' : 'text-base-content/50 italic'}">
         {rule.name || t("rule.untitled")}
       </h3>
+    {/if}
+    {#if lostInRoundcube}
+      <!-- Roundcube's form has one level of "all of" / "any of". -->
+      <span class="badge badge-sm badge-soft badge-warning whitespace-nowrap">{t("roundcube.badge")}</span>
     {/if}
     <label class="flex items-center gap-1.5 text-sm text-base-content/70">
       <input
@@ -101,37 +103,11 @@
         <RuleSentence {rule} singleFolder={editor.rules.singleFolder} />
       </button>
     {:else}
-      <section class="mt-1 grid gap-2" aria-label={t("conditions.heading")}>
-        <div class="flex items-center gap-2">
-          <h4 class="font-semibold">{t("conditions.heading")}</h4>
-          {#if rule.conditions.items.length > 1}
-            <select
-              class="select select-sm w-auto"
-              value={rule.conditions.join}
-              onchange={(e) => change((r) => (r.conditions.join = e.currentTarget.value as "all" | "any"))}
-            >
-              <option value="all">{t("conditions.all")}</option>
-              <option value="any">{t("conditions.any")}</option>
-            </select>
-          {:else if rule.conditions.items.length === 0}
-            <span class="text-base-content/70">{t("conditions.always")}</span>
-          {/if}
-        </div>
-        {#each rule.conditions.items as condition, i}
-          <ConditionRow
-            {condition}
-            {extensions}
-            onchange={(c, merge) => setCondition(i, c, merge)}
-            onremove={() => change((r) => removeCondition(r.conditions, i))}
-          />
-        {/each}
-        <button
-          class="btn btn-ghost btn-sm justify-self-start w-fit"
-          onclick={() => change((r) => addCondition(r.conditions))}
-        >
-          + {t("conditions.add")}
-        </button>
-      </section>
+      <ConditionGroup
+        group={rule.conditions}
+        {extensions}
+        mutate={(fn, merge) => change((r) => fn(r.conditions, null), merge)}
+      />
 
       <section class="mt-3 grid gap-2" aria-label={t("actions.heading")}>
         <h4 class="font-semibold">{t("actions.heading")}</h4>

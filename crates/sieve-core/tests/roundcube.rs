@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use sieve_core::compat::{is_roundcube_format, roundcube_risks};
+use sieve_core::compat::roundcube_risks;
 use sieve_core::model::{Join, RuleItem};
 use sieve_core::{export, import, PrintOptions};
 
@@ -122,7 +122,5 @@ fn roundcube_risks_match_what_roundcube_did() {
             "22a" => {}
             _ => assert!(risks.is_empty(), "{name}: {risks:?}"),
         }
-        let unnamed = ["16a", "16c"].iter().any(|n| name.starts_with(n));
-        assert_eq!(is_roundcube_format(&src), !unnamed, "{name}");
     }
 }

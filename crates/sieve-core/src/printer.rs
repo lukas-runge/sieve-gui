@@ -16,6 +16,12 @@ pub struct PrintOptions {
     pub brace_style: BraceStyle,
     /// Write string lists as `["a","b"]` instead of `["a", "b"]`.
     pub compact_string_lists: bool,
+    /// One entry per line for test lists with several tests and for the
+    /// values a test compares with (its last argument) when there are several.
+    pub break_lists: bool,
+    /// An empty line before each rule and code block of a generated script
+    /// (see [`crate::export`]).
+    pub separate_rules: bool,
 }
 
 impl Default for PrintOptions {
@@ -26,6 +32,8 @@ impl Default for PrintOptions {
             max_width: 100,
             brace_style: BraceStyle::SameLine,
             compact_string_lists: false,
+            break_lists: false,
+            separate_rules: false,
         }
     }
 }
@@ -40,6 +48,22 @@ impl PrintOptions {
             max_width: usize::MAX,
             brace_style: BraceStyle::NextLine,
             compact_string_lists: true,
+            break_lists: false,
+            separate_rules: false,
+        }
+    }
+
+    /// sieve-gui's own layout: conditions and their values one per line where
+    /// there are several, `{` on the same line, an empty line before each rule.
+    pub fn readable() -> Self {
+        Self {
+            indent: "\t".into(),
+            line_ending: LineEnding::CrLf,
+            max_width: usize::MAX,
+            brace_style: BraceStyle::SameLine,
+            compact_string_lists: true,
+            break_lists: true,
+            separate_rules: true,
         }
     }
 
@@ -135,7 +159,7 @@ impl Printer<'_> {
 
     fn command(&mut self, cmd: &Command, depth: usize) {
         self.out.push_str(&cmd.name.name);
-        self.arguments(&cmd.arguments, depth);
+        self.arguments(&cmd.arguments, depth, false, false);
 
         // Comments inside the header stay before the terminator so that they
         // are inner comments again when the output is parsed.
@@ -190,35 +214,78 @@ impl Printer<'_> {
         }
     }
 
-    fn arguments(&mut self, arguments: &Arguments, depth: usize) {
-        for arg in &arguments.args {
+    /// `nested`: inside a test list that is broken into lines. `test`: these
+    /// are a test's arguments.
+    fn arguments(&mut self, arguments: &Arguments, depth: usize, nested: bool, test: bool) {
+        for (i, arg) in arguments.args.iter().enumerate() {
             self.out.push(' ');
-            write_argument(&mut self.out, arg, self.options.compact_string_lists);
+            match arg {
+                Argument::StringList(list) if test && i + 1 == arguments.args.len() && self.breaks_values(list) => {
+                    self.string_list_lines(list, depth)
+                }
+                _ => write_argument(&mut self.out, arg, self.options.compact_string_lists),
+            }
         }
         match &arguments.tests {
             None => {}
             Some(Tests::Single(test)) => {
                 self.out.push(' ');
-                self.test(test, depth);
+                self.test(test, depth, nested);
             }
             Some(Tests::List(list)) => {
                 self.out.push(' ');
-                self.test_list(list, depth);
+                self.test_list(list, depth, nested);
             }
         }
     }
 
-    fn test(&mut self, test: &Test, depth: usize) {
+    fn test(&mut self, test: &Test, depth: usize, nested: bool) {
         self.out.push_str(&test.name.name);
-        self.arguments(&test.arguments, depth);
+        self.arguments(&test.arguments, depth, nested, true);
     }
 
-    fn test_list(&mut self, list: &TestList, depth: usize) {
+    fn breaks_values(&self, list: &StringList) -> bool {
+        self.options.break_lists && list.items.len() >= 2
+    }
+
+    /// Whether a test's own values are written one per line (also behind `not`).
+    fn test_breaks_values(&self, test: &Test) -> bool {
+        match (test.arguments.args.last(), &test.arguments.tests) {
+            (Some(Argument::StringList(list)), _) => self.breaks_values(list),
+            (_, Some(Tests::Single(inner))) => self.test_breaks_values(inner),
+            _ => false,
+        }
+    }
+
+    fn string_list_lines(&mut self, list: &StringList, depth: usize) {
+        self.out.push('[');
+        self.nl();
+        for (i, s) in list.items.iter().enumerate() {
+            self.indent(depth + 1);
+            write_string(&mut self.out, s);
+            if i + 1 < list.items.len() {
+                self.out.push(',');
+            }
+            self.nl();
+        }
+        self.indent(depth);
+        self.out.push(']');
+    }
+
+    /// One test per line if the list is too long, holds another list, or is
+    /// itself inside a broken list (`nested`); with `break_lists` also if it
+    /// has several tests or values written one per line. Otherwise flat lists
+    /// stay on one line, as Roundcube writes them.
+    fn test_list(&mut self, list: &TestList, depth: usize, nested: bool) {
         let mut inline = String::new();
         inline_test_list(&mut inline, list, self.options.compact_string_lists);
         let line_start = self.out.rfind('\n').map_or(0, |i| i + 1);
         let width = self.out[line_start..].chars().count() + inline.chars().count();
-        if width <= self.options.max_width || inline.contains('\n') || list.tests.len() < 2 {
+        let too_long = width > self.options.max_width && list.tests.len() >= 2;
+        let holds_list = list.tests.iter().any(has_test_list);
+        let several = self.options.break_lists
+            && (list.tests.len() >= 2 || list.tests.iter().any(|t| self.test_breaks_values(t)));
+        if !(too_long || holds_list || nested || several) || inline.contains('\n') {
             self.out.push_str(&inline);
             return;
         }
@@ -226,7 +293,7 @@ impl Printer<'_> {
         self.nl();
         for (i, test) in list.tests.iter().enumerate() {
             self.indent(depth + 1);
-            self.test(test, depth + 1);
+            self.test(test, depth + 1, true);
             if i + 1 < list.tests.len() {
                 self.out.push(',');
             }
@@ -234,6 +301,15 @@ impl Printer<'_> {
         }
         self.indent(depth);
         self.out.push(')');
+    }
+}
+
+/// Whether a test is or contains a test list, e.g. `anyof (…)` or `not allof (…)`.
+fn has_test_list(test: &Test) -> bool {
+    match &test.arguments.tests {
+        Some(Tests::List(_)) => true,
+        Some(Tests::Single(inner)) => has_test_list(inner),
+        None => false,
     }
 }
 
@@ -421,6 +497,66 @@ if header :contains "from" "@tax-office.example" {
         assert_eq!(
             print_script(&s, &PrintOptions::roundcube()),
             "if anyof (true, header :is [\"a\",\"b\"] \"c\")\r\n{\r\n\tkeep;\r\n}\r\nelse\r\n{\r\n\tstop;\r\n}\r\n"
+        );
+    }
+
+    /// A list holding a group gets one test per line, and so does every list
+    /// inside it, even a single test. Flat lists stay on one line.
+    #[test]
+    fn nested_test_lists_break() {
+        let src = "if allof (anyof (exists \"a\", body :contains \"b\"), not anyof (exists \"c\")) { keep; }\n\
+                   if allof (exists \"a\", exists \"b\") { keep; }";
+        let s = parse(src).unwrap();
+        assert_eq!(
+            print_script(&s, &PrintOptions::roundcube()).replace("\r\n", "\n"),
+            "if allof (\n\
+             \tanyof (\n\
+             \t\texists \"a\",\n\
+             \t\tbody :contains \"b\"\n\
+             \t),\n\
+             \tnot anyof (\n\
+             \t\texists \"c\"\n\
+             \t)\n\
+             )\n\
+             {\n\tkeep;\n}\n\
+             if allof (exists \"a\", exists \"b\")\n\
+             {\n\tkeep;\n}\n"
+        );
+        // Shown on one line where it must be, e.g. for a disabled rule.
+        let Some(Tests::Single(test)) = &s.commands[0].arguments.tests else { panic!() };
+        assert!(!print_test(test, &PrintOptions::roundcube()).contains('\n'));
+    }
+
+    /// The readable layout: test lists with several tests and value lists
+    /// with several values get one entry per line, `{` stays on the line.
+    #[test]
+    fn readable_layout() {
+        let before = "require [\"body\",\"include\",\"variables\"];\r\n\
+            global \"move_to_folder\";\r\n\
+            # rule:[Instagram]\r\n\
+            if address :domain :matches \"from\" [\"instagram.com\",\"*.instagram.com\"]\r\n{\r\n\tset \"move_to_folder\" \"Accounts/Instagram\";\r\n}\r\n\
+            # rule:[Mailcow / SOGo]\r\n\
+            if anyof (body :content \"application/x-sogo-notification\" :contains \"\", exists \"X-Sogo-Message-Type\")\r\n{\r\n\tset \"move_to_folder\" \"Accounts/Mailcow\";\r\n}\r\n\
+            # rule:[Kopie]\r\n\
+            if header :contains [\"to\",\"cc\"] \"me\"\r\n{\r\n\taddflag [\"\\\\Seen\",\"\\\\Flagged\"];\r\n}\r\n";
+        let after = "require [\"body\",\"include\",\"variables\"];\n\
+            global \"move_to_folder\";\n\
+            # rule:[Instagram]\n\
+            if address :domain :matches \"from\" [\n\t\"instagram.com\",\n\t\"*.instagram.com\"\n] {\n\tset \"move_to_folder\" \"Accounts/Instagram\";\n}\n\
+            # rule:[Mailcow / SOGo]\n\
+            if anyof (\n\tbody :content \"application/x-sogo-notification\" :contains \"\",\n\texists \"X-Sogo-Message-Type\"\n) {\n\tset \"move_to_folder\" \"Accounts/Mailcow\";\n}\n\
+            # rule:[Kopie]\n\
+            if header :contains [\"to\",\"cc\"] \"me\" {\n\taddflag [\"\\\\Seen\",\"\\\\Flagged\"];\n}\n";
+        let out = print_script(&parse(before).unwrap(), &PrintOptions::readable());
+        assert_eq!(out.replace("\r\n", "\n"), after);
+        assert!(out.contains("\r\n"));
+
+        // Values inside a broken test list, and a single test whose values break.
+        let s = parse("if anyof (header :is \"s\" [\"a\", \"b\"], exists \"x\") { keep; }\nif allof (header :is \"s\" [\"a\", \"b\"]) { keep; }").unwrap();
+        assert_eq!(
+            print_script(&s, &PrintOptions::readable()).replace("\r\n", "\n"),
+            "if anyof (\n\theader :is \"s\" [\n\t\t\"a\",\n\t\t\"b\"\n\t],\n\texists \"x\"\n) {\n\tkeep;\n}\n\
+             if allof (\n\theader :is \"s\" [\n\t\t\"a\",\n\t\t\"b\"\n\t]\n) {\n\tkeep;\n}\n"
         );
     }
 

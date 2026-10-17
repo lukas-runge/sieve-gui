@@ -33,7 +33,8 @@
 
   const view = $derived(viewCondition(condition));
   const size = $derived(view?.field === "size" ? splitSize(Number(view.values[0])) : null);
-  const parts = $derived(view ? partsFor(view.field, extensions, view.part) : []);
+  // "exists" asks for the header, not a part of its addresses.
+  const parts = $derived(view && hasValues(view.operator) ? partsFor(view.field, extensions, view.part) : []);
 
   function update(patch: Partial<ConditionView>, merge = false) {
     if (!view) return;

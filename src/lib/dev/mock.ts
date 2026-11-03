@@ -164,8 +164,8 @@ export function installMock() {
         return {
           dir: `~/Library/Application Support/sieve-gui/copies/${a.id}`,
           differences: [
-            { name: "Steuern", server: null, local: "# rule:[Taxes]\nif true { keep; }\n", changed: ["server"] },
-            { name: "Gemischt", server: source(server, "Gemischt"), local: "# older version\n" + source(server, "Gemischt"), changed: ["server"] },
+            { name: "Steuern", server: null, local: "# rule:[Taxes]\nif true { keep; }\n", changed: ["server"], sameRules: false, serverRules: null, localRules: null },
+            { name: "Gemischt", server: source(server, "Gemischt"), local: "# older version\n" + source(server, "Gemischt"), changed: ["local"], sameRules: true, serverRules: null, localRules: null },
           ],
           active: { server: "Allgemein", local: "sieve-gui" },
         };

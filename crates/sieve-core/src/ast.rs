@@ -39,6 +39,20 @@ pub struct Command {
 }
 
 impl Command {
+    /// Drops all comments and blank lines, also in nested blocks.
+    pub fn strip_comments(&mut self) {
+        self.leading_comments.clear();
+        self.inner_comments.clear();
+        self.trailing_comment = None;
+        self.blank_line_before = false;
+        if let Some(block) = &mut self.block {
+            block.trailing_comments.clear();
+            block.commands.iter_mut().for_each(Command::strip_comments);
+        }
+    }
+}
+
+impl Command {
     /// Whether the command name matches `name` (case-insensitively).
     pub fn is(&self, name: &str) -> bool {
         self.name.is(name)

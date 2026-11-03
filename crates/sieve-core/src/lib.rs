@@ -24,3 +24,13 @@ pub use import::import;
 pub use parser::parse;
 pub use printer::{print_script, PrintOptions};
 pub use span::{LineIndex, ParseError, Span};
+
+/// The script without comments and in a fixed layout, or `None` if it
+/// doesn't parse. Scripts with the same canonical form only differ in
+/// comments and formatting, so they filter the same.
+pub fn canonical(source: &str) -> Option<String> {
+    let mut script = parse(source).ok()?;
+    script.trailing_comments.clear();
+    script.commands.iter_mut().for_each(ast::Command::strip_comments);
+    Some(print_script(&script, &PrintOptions::readable()))
+}

@@ -44,6 +44,13 @@ pub struct Difference {
     pub local: Option<String>,
     /// The sides that changed since the last sync.
     pub changed: Vec<Side>,
+    /// Both sides only differ in comments and formatting, so they filter
+    /// the same.
+    pub same_rules: bool,
+    /// Both sides without comments and in a fixed layout (if they parse),
+    /// to compare the rules only.
+    pub server_rules: Option<String>,
+    pub local_rules: Option<String>,
 }
 
 /// The active script differs: on the server now, and at the last sync.
@@ -91,7 +98,18 @@ pub fn compare(
             if differs_from_base(l) {
                 changed.push(Side::Local);
             }
-            Some(Difference { name: name.clone(), server: s.cloned(), local: l.cloned(), changed })
+            let server_rules = s.and_then(|s| sieve_core::canonical(s));
+            let local_rules = l.and_then(|l| sieve_core::canonical(l));
+            let same_rules = server_rules.is_some() && server_rules == local_rules;
+            Some(Difference {
+                name: name.clone(),
+                server: s.cloned(),
+                local: l.cloned(),
+                changed,
+                same_rules,
+                server_rules,
+                local_rules,
+            })
         })
         .collect();
     let active = (server_active != manifest.active.as_deref()).then(|| ActiveDifference {
@@ -282,6 +300,17 @@ mod tests {
         assert_eq!(active, Some(ActiveDifference { server: Some("synomc".into()), local: Some("root".into()) }));
         let (_, active) = compare(&server, Some("root"), &local, &base);
         assert_eq!(active, None);
+    }
+
+    #[test]
+    fn tells_comment_changes_from_rule_changes() {
+        let base = manifest(&[("a", "if true { keep; } # old"), ("b", "if true { keep; }")], None);
+        let server = map(&[("a", "if true {\n  keep;\n}\n"), ("b", "if true { stop; }")]);
+        let local = map(&[("a", "if true { keep; } # old"), ("b", "if true { keep; }")]);
+        let (diffs, _) = compare(&server, None, &local, &base);
+        assert!(diffs[0].same_rules, "{:?}", diffs[0]);
+        assert!(!diffs[1].same_rules);
+        assert!(diffs[1].server_rules.as_deref().unwrap().contains("stop"));
     }
 
     #[test]

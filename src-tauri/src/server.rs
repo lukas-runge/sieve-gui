@@ -271,8 +271,17 @@ pub async fn copy_status(
         return Ok(CopyStatus { dir, ..CopyStatus::default() });
     };
     let local = copy.scripts().map_err(copy_error)?;
-    let (differences, active) = copy::compare(&server, active.as_deref(), &local, &manifest);
-    Ok(CopyStatus { dir, differences, active })
+    let (mut differences, active) = copy::compare(&server, active.as_deref(), &local, &manifest);
+    // Only comments or formatting changed on the server: nothing to decide,
+    // the copy just follows.
+    let mut kept = Vec::new();
+    for d in differences.drain(..) {
+        match (&d.server, d.same_rules && d.changed == [Side::Server]) {
+            (Some(content), true) => copy.put(&d.name, content).map_err(copy_error)?,
+            _ => kept.push(d),
+        }
+    }
+    Ok(CopyStatus { dir, differences: kept, active })
 }
 
 /// Which side wins for a script that differs.

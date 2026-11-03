@@ -203,14 +203,7 @@ fn dispatch_command() -> Command {
 /// Drops spans, comments and blank lines so that commands compare by content.
 fn normalize(cmd: &mut Command) {
     cmd.clear_spans();
-    cmd.leading_comments.clear();
-    cmd.inner_comments.clear();
-    cmd.trailing_comment = None;
-    cmd.blank_line_before = false;
-    if let Some(block) = &mut cmd.block {
-        block.trailing_comments.clear();
-        block.commands.iter_mut().for_each(normalize);
-    }
+    cmd.strip_comments();
 }
 
 #[cfg(test)]

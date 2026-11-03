@@ -667,3 +667,13 @@ fn address_regex_round_trips_with_escapes() {
     let text = export(&fresh, &PrintOptions::readable());
     assert!(text.starts_with("require [\"fileinto\",\"regex\"];"), "{text}");
 }
+
+#[test]
+fn canonical_ignores_comments_and_layout() {
+    let a = "# top\nrequire \"fileinto\";\nif header :contains \"subject\" \"x\" { fileinto \"A\"; # move\n}\n";
+    let b = "require \"fileinto\";\n\n\nif header :contains \"subject\" \"x\"\n{\n    fileinto \"A\";\n}\n# end\n";
+    assert_eq!(sieve_core::canonical(a), sieve_core::canonical(b));
+    let c = "require \"fileinto\";\nif header :contains \"subject\" \"y\" { fileinto \"A\"; }\n";
+    assert_ne!(sieve_core::canonical(a), sieve_core::canonical(c));
+    assert_eq!(sieve_core::canonical("if {"), None);
+}

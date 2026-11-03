@@ -24,6 +24,7 @@
 
   /** What happened to a script, e.g. "deleted on the server". */
   function what(d: Difference): MessageKey {
+    if (d.sameRules) return "copy.commentsOnly";
     const server = d.changed.includes("server");
     const local = d.changed.includes("local");
     if (d.server === null) return server ? "copy.deletedOnServer" : "copy.onlyLocal";
@@ -45,6 +46,14 @@
   let choices = $state<Record<string, Side>>(Object.fromEntries(initial.differences.map((d) => [d.name, proposal(d)])));
   let active = $state<Side | null>(initial.active ? "local" : null);
   let open = $state<Record<string, boolean>>({});
+  /** Compare comments and layout too, not only the rules. */
+  let fullText = $state(false);
+
+  /** The two sides to compare: the rules only unless `fullText` (or unparsable). */
+  function compared(d: Difference): [string, string] {
+    if (!fullText && d.localRules !== null && d.serverRules !== null) return [d.localRules, d.serverRules];
+    return [d.local ?? "", d.server ?? ""];
+  }
   let busy = $state(false);
 
   function all(side: Side) {
@@ -133,7 +142,7 @@
           </div>
           {#if open[d.name]}
             <!-- From the copy to the server: + is only on the server. -->
-            <pre class="max-h-64 overflow-auto rounded-field bg-base-200 p-2 font-mono text-xs leading-relaxed">{#each diffLines(d.local ?? "", d.server ?? "") as line}<span
+            <pre class="max-h-64 overflow-auto rounded-field bg-base-200 p-2 font-mono text-xs leading-relaxed">{#each diffLines(...compared(d)) as line}<span
                   class="block {line.kind === 'add'
                     ? 'bg-success/15 text-success'
                     : line.kind === 'remove'
@@ -142,7 +151,13 @@
                     >{line.kind === "add" ? "+ " : line.kind === "remove" ? "− " : "  "}</span
                   >{line.text || " "}</span
                 >{/each}</pre>
-            <p class="text-xs text-base-content/60">{t("copy.diffLegend")}</p>
+            <div class="flex flex-wrap items-center gap-3 text-xs text-base-content/60">
+              <span class="grow">{t("copy.diffLegend")}</span>
+              <label class="flex items-center gap-1.5">
+                <input type="checkbox" class="checkbox checkbox-xs" bind:checked={fullText} />
+                {t("copy.fullText")}
+              </label>
+            </div>
           {/if}
         </li>
       {/each}

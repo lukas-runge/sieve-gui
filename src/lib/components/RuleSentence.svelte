@@ -2,7 +2,7 @@
   // A rule read as a sentence: "If Sender contains @tax… then move to Taxes".
   import type { Action, Condition, Join, Rule } from "#tauri/types";
   import { i18n, t, type MessageKey } from "../i18n.svelte";
-  import { actionKind, hasValues, headerNames, viewCondition } from "../rules/view";
+  import { actionKind, hasValues, headerNames, viewCondition, type Branches } from "../rules/view";
   import { formatDate, formatSize } from "../rules/format";
   import { mailboxLabel } from "../rules/mailbox";
 
@@ -67,24 +67,53 @@
 {/snippet}
 
 <!-- Spaces are explicit ({" "}) so they survive between inline elements. -->
-<p class="leading-relaxed text-[0.95rem]">
-  {#if rule.conditions.items.length === 0}
-    <span>{t("sentence.allMessages")}</span>
-  {:else}
-    <span class="font-semibold">{t("sentence.if")}</span>
-    {@render conditions(rule.conditions.items, rule.conditions.join, false)}
-  {/if}
-  {" "}<span class="font-semibold">{t("sentence.then")}</span>
-  {#if rule.actions.length === 0}
+{#snippet actionList(actions: Action[])}
+  {#if actions.length === 0}
     {" "}<span>{t("sentence.noActions")}</span>
   {/if}
-  {#each rule.actions as action, i}
-    {@const param = actionParam(action)}
-    {@const kind = actionKind(action)}
-    {#if i > 0}<span>,</span>{/if}
-    {" "}<span>{t(kind === "stop" && singleFolder ? "sentence.stopScript" : (`sentence.${kind}` as MessageKey))}</span>
-    {#if param !== null}
-      {" "}<span class="slot slot-code">{param || "…"}</span>
+  {#each actions as action, i}
+    {#if action.type === "if"}
+      <!-- "Also check" reads as its own indented sentence. -->
+      <div class="my-1 ml-1 border-l-2 border-base-300 pl-3">{@render branches(action, true)}</div>
+    {:else}
+      {@const param = actionParam(action)}
+      {@const kind = actionKind(action)}
+      {#if i > 0 && actions[i - 1].type !== "if"}<span>,</span>{/if}
+      {" "}<span>{t(kind === "stop" && singleFolder ? "sentence.stopScript" : (`sentence.${kind}` as MessageKey))}</span>
+      {#if param !== null}
+        {" "}<span class="slot slot-code">{param || "…"}</span>
+      {/if}
     {/if}
   {/each}
-</p>
+{/snippet}
+
+{#snippet branches(block: Branches, nested: boolean)}
+  <div>
+    {#if block.conditions.items.length === 0 && !nested}
+      <span>{t("sentence.allMessages")}</span>
+    {:else}
+      <span class="font-semibold">{t(nested ? "sentence.alsoIf" : "sentence.if")}</span>
+      {@render conditions(block.conditions.items, block.conditions.join, false)}
+    {/if}
+    {" "}<span class="font-semibold">{t("sentence.then")}</span>
+    {@render actionList(block.actions)}
+  </div>
+  {#each block.elsif as branch}
+    <div class="mt-1">
+      <span class="font-semibold">{t("sentence.elsif")}</span>
+      {@render conditions(branch.conditions.items, branch.conditions.join, false)}
+      {" "}<span class="font-semibold">{t("sentence.then")}</span>
+      {@render actionList(branch.actions)}
+    </div>
+  {/each}
+  {#if block.otherwise}
+    <div class="mt-1">
+      <span class="font-semibold">{t("sentence.else")}</span>
+      {@render actionList(block.otherwise)}
+    </div>
+  {/if}
+{/snippet}
+
+<div class="leading-relaxed text-[0.95rem]">
+  {@render branches(rule, false)}
+</div>

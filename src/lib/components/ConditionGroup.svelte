@@ -20,6 +20,7 @@
   let {
     group,
     holder = null,
+    heading,
     extensions,
     mutate,
     onremove,
@@ -27,6 +28,8 @@
     group: ConditionGroup;
     /** The condition holding a nested group; null for the rule's own conditions. */
     holder?: Condition | null;
+    /** Heading of the top-level conditions ("When" by default). */
+    heading?: string;
     extensions: string[];
     /** Applies an edit (with an undo step) to this group and its holder. */
     mutate: (fn: (group: ConditionGroup, holder: Condition | null) => void, merge?: boolean) => void;
@@ -108,9 +111,9 @@
 {/snippet}
 
 {#if top}
-  <section class="mt-1 grid gap-2" aria-label={t("conditions.heading")}>
+  <section class="mt-1 grid gap-2" aria-label={heading ?? t("conditions.heading")}>
     <div class="flex items-center gap-2">
-      <h4 class="font-semibold">{t("conditions.heading")}</h4>
+      <h4 class="font-semibold">{heading ?? t("conditions.heading")}</h4>
       {@render joinSelect()}
     </div>
     {@render body()}

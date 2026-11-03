@@ -127,7 +127,7 @@ fn unknown_constructs_become_raw_blocks_verbatim() {
 if header :contains "subject" "a" { fileinto "A"; }
 # my own comment
 if header :matches "subject" "*" { set "s" "${1}"; }
-if true { keep; } else { discard; }
+if true { keep; } else { debug_log "no"; }
 # rule:[comment inside]
 if exists "x" {
     # explain
@@ -141,7 +141,7 @@ if header :index 2 :is "received" "x" { stop; }
     assert_eq!(set.items.len(), 7);
     assert_eq!(rule(&set, 0).name, "ok");
     assert_eq!(raw(&set, 1), "# my own comment\nif header :matches \"subject\" \"*\" { set \"s\" \"${1}\"; }");
-    assert_eq!(raw(&set, 2), "if true { keep; } else { discard; }");
+    assert_eq!(raw(&set, 2), "if true { keep; } else { debug_log \"no\"; }");
     assert!(raw(&set, 3).starts_with("# rule:[comment inside]\nif exists"));
     assert_eq!(raw(&set, 4), "debug_log \"hi\";");
     assert!(raw(&set, 5).contains(":index 2"));
@@ -162,6 +162,8 @@ fn requires_follow_the_rules() {
     assert!(export(&set, &opts()).starts_with("require [\"fileinto\", \"x-unknown\"];"));
     set.items.push(RuleItem::Rule(Rule {
         name: "copy".into(),
+        elsif: vec![],
+        otherwise: None,
         enabled: true,
         conditions: Conditions {
             join: Join::All,
@@ -317,6 +319,8 @@ fn json_shape_matches_the_generated_typescript() {
                 "type": "rule",
                 "name": "d",
                 "enabled": true,
+                "elsif": [],
+                "otherwise": null,
                 "conditions": { "join": "any", "items": [{
                     "negate": false,
                     "test": {
@@ -352,6 +356,8 @@ fn address_parts_roundtrip() {
     let set = RuleSet {
         items: vec![RuleItem::Rule(Rule {
             name: "Instagram".into(),
+            elsif: vec![],
+            otherwise: None,
             enabled: true,
             conditions: Conditions { join: Join::All, items: vec![Condition { negate: false, test }] },
             actions: vec![Action::FileInto { mailbox: "Accounts/Instagram".into(), copy: false, create: false, flags: None }],
@@ -423,6 +429,8 @@ fn single_folder_mode_without_moves_needs_no_fileinto() {
         single_folder: true,
         items: vec![RuleItem::Rule(Rule {
             name: "Lists".into(),
+            elsif: vec![],
+            otherwise: None,
             enabled: false,
             conditions: Conditions::default(),
             actions: vec![Action::FileInto { mailbox: "Lists".into(), copy: false, create: false, flags: None }],
@@ -499,6 +507,8 @@ fn nested_condition_groups() {
     let empty = |join| RuleSet {
         items: vec![RuleItem::Rule(Rule {
             name: String::new(),
+            elsif: vec![],
+            otherwise: None,
             enabled: true,
             conditions: Conditions {
                 join: Join::All,
@@ -530,7 +540,7 @@ fn readable_layout_separates_rules() {
     assert_eq!(
         text,
         "require [\"fileinto\"];\n\n# rule:[A]\nif exists \"a\" {\n\tfileinto \"A\";\n}\n\n# rule:[B]\nif exists \"b\" {\n\tkeep;\n}\n\n\
-         if exists \"c\" { keep; } else { stop; }\n"
+         if exists \"c\" {\n\tkeep;\n} else {\n\tstop;\n}\n"
     );
     let again = import(&text).unwrap();
     assert_eq!(again.items, set.items);
@@ -564,4 +574,69 @@ fn several_comments_in_front_of_a_rule_keep_it_raw() {
     let src = "require \"fileinto\";\n# one\n# two\nif true { stop; }\n";
     let set = import(src).unwrap();
     assert!(matches!(set.items.as_slice(), [RuleItem::Raw(_)]), "{:?}", set.items);
+}
+
+#[test]
+fn branches_and_nested_ifs_are_rules() {
+    let src = r#"require ["fileinto", "imap4flags"];
+# rule:[Mail accounts]
+if header :contains "to" "a@example.org" {
+	if header :contains "x-from" "uni" {
+		addflag "$uni";
+	} elsif header :contains "x-to" "club" {
+		addflag "$club";
+	} else {
+		fileinto "Accounts";
+	}
+} elsif header :contains "to" "info@example.org" {
+	addflag "$work";
+	if header :contains "to" "invoice@example.org" {
+		addflag "$invoice";
+	}
+} else {
+	keep;
+}
+"#;
+    let set = import(src).unwrap();
+    let r = rule(&set, 0);
+    assert_eq!(r.name, "Mail accounts");
+    assert!(r.enabled);
+    assert_eq!(r.elsif.len(), 1);
+    assert_eq!(r.otherwise, Some(vec![Action::Keep { flags: None }]));
+    let Action::If(inner) = &r.actions[0] else { panic!("{:?}", r.actions) };
+    assert_eq!(inner.elsif.len(), 1);
+    assert!(inner.otherwise.is_some());
+    let Action::If(nested) = &r.elsif[0].actions[1] else { panic!("{:?}", r.elsif[0].actions) };
+    assert!(nested.elsif.is_empty() && nested.otherwise.is_none());
+    let text = assert_stable(&set);
+    assert!(text.contains("} elsif header"), "{text}");
+
+    // Disabled: wrapped in `if false { … }`, read back as disabled.
+    let mut disabled = set.clone();
+    let RuleItem::Rule(r) = &mut disabled.items[0] else { unreachable!() };
+    r.enabled = false;
+    let text = assert_stable(&disabled);
+    assert!(text.contains("if false {"), "{text}");
+
+    // Deep nesting.
+    let mut deep = String::from("keep;");
+    for i in 0..6 {
+        deep = format!("if exists \"h{i}\" {{ {deep} }}");
+    }
+    let set = import(&deep).unwrap();
+    assert!(matches!(set.items.as_slice(), [RuleItem::Rule(_)]), "{:?}", set.items);
+    assert_stable(&set);
+}
+
+#[test]
+fn branches_in_single_folder_mode() {
+    let src = "require [\"include\", \"variables\"];\nglobal \"move_to_folder\";\nif exists \"a\" { set \"move_to_folder\" \"A\"; return; } else { if exists \"b\" { set \"move_to_folder\" \"B\"; } }\n";
+    let set = import(src).unwrap();
+    let r = rule(&set, 0);
+    assert_eq!(r.actions[0], Action::FileInto { mailbox: "A".into(), copy: false, create: false, flags: None });
+    assert_eq!(r.actions[1], Action::Stop);
+    let Some(otherwise) = &r.otherwise else { panic!() };
+    let Action::If(inner) = &otherwise[0] else { panic!() };
+    assert_eq!(inner.actions[0], Action::FileInto { mailbox: "B".into(), copy: false, create: false, flags: None });
+    assert_stable(&set);
 }

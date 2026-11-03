@@ -7,6 +7,8 @@ import {
   groupMode,
   removeFromGroup,
   setGroupMode,
+  actionKind,
+  buildAction,
   buildCondition,
   headerNames,
   newRule,
@@ -209,4 +211,15 @@ test("several headers in the header field", () => {
   // A name with a comma can't be told apart from two names.
   const comma = { ...c, test: { ...c.test, headers: ["a,b"] } } as Condition;
   assert.equal(viewCondition(comma), null);
+});
+
+test("new rules and nested checks have branches", () => {
+  const rule = newRule("x");
+  assert.deepEqual(rule.elsif, []);
+  assert.equal(rule.otherwise, null);
+  const check = buildAction("check");
+  assert.equal(check.type, "if");
+  assert.equal(actionKind(check), "check");
+  // Switching back to "check" keeps the nested branches.
+  assert.equal(buildAction("check", check), check);
 });

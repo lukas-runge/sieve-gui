@@ -75,13 +75,10 @@ pub fn import_script(script: &Script, src: &str) -> RuleSet {
     while i < commands.len() {
         let cmd = &commands[i];
         if cmd.is("if") {
-            // An if/elsif/else chain is one unit.
-            let mut end = i + 1;
-            while end < commands.len() && (commands[end].is("elsif") || commands[end].is("else")) {
-                end += 1;
-            }
+            // An if/elsif/else chain is one rule.
+            let end = chain_end(commands, i);
             let skip = if i == 0 { first_leading } else { 0 };
-            let rule = (end == i + 1).then(|| rule_from_if(cmd, skip, single_folder)).flatten();
+            let rule = rule_from_chain(&commands[i..end], skip, single_folder);
             push(&mut set, rule, &commands[i..end], skip, src);
             i = end;
         } else if let Some(actions) = action_run(&commands[i..], single_folder) {
@@ -103,7 +100,7 @@ pub fn import_script(script: &Script, src: &str) -> RuleSet {
                 }
                 None
             } else {
-                name.map(|name| Rule { name, enabled: true, conditions: Conditions::default(), actions: actions.1 })
+                name.map(|name| Rule { name, enabled: true, actions: actions.1, ..Rule::default() })
             };
             push(&mut set, rule, &commands[i..end], skip, src);
             i = end;
@@ -165,7 +162,10 @@ fn action_run(commands: &[Command], single_folder: bool) -> Option<(usize, Vec<A
     (!actions.is_empty()).then_some((actions.len(), actions))
 }
 
-fn rule_from_if(cmd: &Command, skip_comments: usize, single_folder: bool) -> Option<Rule> {
+/// A rule from an `if` with its `elsif`/`else` branches (`chain`). `skip`
+/// leading comments of the `if` belong to the preamble.
+fn rule_from_chain(chain: &[Command], skip_comments: usize, single_folder: bool) -> Option<Rule> {
+    let (cmd, _) = chain.split_first()?;
     if cmd.trailing_comment.is_some() || !cmd.arguments.args.is_empty() {
         return None;
     }
@@ -176,34 +176,116 @@ fn rule_from_if(cmd: &Command, skip_comments: usize, single_folder: bool) -> Opt
     };
     let Some(Tests::Single(test)) = &cmd.arguments.tests else { return None };
 
-    let (enabled, conditions) = match cmd.inner_comments.as_slice() {
+    let block = match cmd.inner_comments.as_slice() {
+        // `if false { <chain> }`: a disabled rule with branches.
+        [] if test.is("false") && test.arguments == Default::default() && chain.len() == 1 => {
+            let inner = cmd.block.as_ref()?;
+            if !inner.trailing_comments.is_empty() || !inner.commands.first().is_some_and(|c| c.is("if")) {
+                return None;
+            }
+            if chain_end(&inner.commands, 0) != inner.commands.len() {
+                return None;
+            }
+            let block = if_block(&inner.commands, single_folder)?;
+            return Some(rule(name, false, block));
+        }
         // Roundcube treats a plain `if false` as an enabled rule with the
         // test `false`, which the model cannot represent.
         [] if test.is("false") => return None,
-        [] => (true, conditions(test)?),
+        [] => if_block(chain, single_folder)?,
         // A disabled rule keeps its test in a comment: `if false # <test>`.
-        [c] if c.kind == CommentKind::Hash && test.is("false") && test.arguments == Default::default() => {
+        // Branches can't be disabled that way (they would run instead).
+        [c] if c.kind == CommentKind::Hash && test.is("false") && test.arguments == Default::default() && chain.len() == 1 => {
             let disabled = parse(&format!("if {} {{}}", c.text.trim())).ok()?;
             let [inner] = disabled.commands.as_slice() else { return None };
             let Some(Tests::Single(inner_test)) = &inner.arguments.tests else { return None };
             if has_comments(inner) || !inner.arguments.args.is_empty() {
                 return None;
             }
-            (false, conditions(inner_test)?)
+            let block = cmd.block.as_ref()?;
+            if !block.trailing_comments.is_empty() {
+                return None;
+            }
+            let actions = actions(&block.commands, single_folder)?;
+            return Some(Rule { name, enabled: false, conditions: conditions(inner_test)?, actions, ..Rule::default() });
         }
         _ => return None,
     };
+    Some(rule(name, true, block))
+}
 
-    let block = cmd.block.as_ref()?;
-    if !block.trailing_comments.is_empty() {
-        return None;
+fn rule(name: String, enabled: bool, block: NestedIf) -> Rule {
+    let NestedIf { conditions, actions, elsif, otherwise } = block;
+    Rule { name, enabled, conditions, actions, elsif, otherwise }
+}
+
+/// The end (exclusive) of the `if`/`elsif`/`else` chain starting at `start`.
+fn chain_end(commands: &[Command], start: usize) -> usize {
+    let mut end = start + 1;
+    while end < commands.len() && (commands[end].is("elsif") || commands[end].is("else")) {
+        let is_else = commands[end].is("else");
+        end += 1;
+        if is_else {
+            break;
+        }
     }
-    let actions = block
-        .commands
-        .iter()
-        .map(|c| if has_comments(c) { None } else { action(c, single_folder) })
-        .collect::<Option<Vec<_>>>()?;
-    Some(Rule { name, enabled, conditions, actions })
+    end
+}
+
+/// An `if` chain without comments (other than leading ones on the `if`,
+/// which the caller handles): the conditions and actions of each branch.
+fn if_block(chain: &[Command], single_folder: bool) -> Option<NestedIf> {
+    let mut block = NestedIf::default();
+    for (n, cmd) in chain.iter().enumerate() {
+        let comments = if n == 0 {
+            !cmd.inner_comments.is_empty() || cmd.trailing_comment.is_some()
+        } else {
+            has_comments(cmd)
+        };
+        if comments || !cmd.arguments.args.is_empty() || block.otherwise.is_some() {
+            return None;
+        }
+        let body = cmd.block.as_ref()?;
+        if !body.trailing_comments.is_empty() {
+            return None;
+        }
+        let actions = actions(&body.commands, single_folder)?;
+        let conditions = || match &cmd.arguments.tests {
+            Some(Tests::Single(test)) => conditions(test),
+            _ => None,
+        };
+        match (n, cmd.name.name.to_ascii_lowercase().as_str()) {
+            (0, "if") => {
+                block.conditions = conditions()?;
+                block.actions = actions;
+            }
+            (1.., "elsif") => block.elsif.push(Branch { conditions: conditions()?, actions }),
+            (1.., "else") if cmd.arguments.tests.is_none() => block.otherwise = Some(actions),
+            _ => return None,
+        }
+    }
+    Some(block)
+}
+
+/// The actions of a block; an `if` chain among them is a nested `if`.
+fn actions(commands: &[Command], single_folder: bool) -> Option<Vec<Action>> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < commands.len() {
+        let cmd = &commands[i];
+        if has_comments(cmd) {
+            return None;
+        }
+        if cmd.is("if") {
+            let end = chain_end(commands, i);
+            out.push(Action::If(if_block(&commands[i..end], single_folder)?));
+            i = end;
+        } else {
+            out.push(action(cmd, single_folder)?);
+            i += 1;
+        }
+    }
+    Some(out)
 }
 
 fn conditions(test: &Test) -> Option<Conditions> {

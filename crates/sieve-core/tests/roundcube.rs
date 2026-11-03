@@ -117,7 +117,8 @@ fn roundcube_risks_match_what_roundcube_did() {
             // lost. Unknown test and action, nested if and elsif chain
             // dropped or rewritten (18b).
             "17a" => assert!(risks.is_empty(), "{name}: {risks:?}"),
-            "18a" => assert_eq!(risks.raw_blocks.len(), 4, "{name}"),
+            // (the nested if and the elsif chain are rules now, at risk)
+            "18a" => assert_eq!(risks.raw_blocks.len() + risks.rules.len(), 4, "{name}: {risks:?}"),
             // bracket comment: Roundcube showed no rules and replaced them (19b)
             "19a" => assert!(risks.bracket_comments, "{name}"),
             // edge-case names that Roundcube dropped (22b), see README

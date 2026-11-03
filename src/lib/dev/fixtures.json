@@ -55,7 +55,9 @@
           },
           "enabled": true,
           "name": "allof two",
-          "type": "rule"
+          "type": "rule",
+          "elsif": [],
+          "otherwise": null
         },
         {
           "actions": [
@@ -110,7 +112,9 @@
           },
           "enabled": true,
           "name": "anyof two",
-          "type": "rule"
+          "type": "rule",
+          "elsif": [],
+          "otherwise": null
         },
         {
           "actions": [
@@ -171,7 +175,9 @@
           },
           "enabled": true,
           "name": "negated",
-          "type": "rule"
+          "type": "rule",
+          "elsif": [],
+          "otherwise": null
         },
         {
           "actions": [
@@ -222,7 +228,9 @@
           },
           "enabled": true,
           "name": "anyof negated",
-          "type": "rule"
+          "type": "rule",
+          "elsif": [],
+          "otherwise": null
         },
         {
           "actions": [
@@ -256,7 +264,9 @@
           },
           "enabled": true,
           "name": "single test anyof",
-          "type": "rule"
+          "type": "rule",
+          "elsif": [],
+          "otherwise": null
         }
       ],
       "preamble": null,
@@ -328,7 +338,9 @@
           },
           "enabled": true,
           "name": "Newsletter",
-          "type": "rule"
+          "type": "rule",
+          "elsif": [],
+          "otherwise": null
         },
         {
           "code": "if header :matches \"subject\" \"*\" { set \"subject\" \"${1}\"; }",
@@ -413,7 +425,9 @@
           },
           "enabled": true,
           "name": "Out of Office",
-          "type": "rule"
+          "type": "rule",
+          "elsif": [],
+          "otherwise": null
         },
         {
           "actions": [
@@ -450,7 +464,9 @@
           },
           "enabled": true,
           "name": "Existing rule",
-          "type": "rule"
+          "type": "rule",
+          "elsif": [],
+          "otherwise": null
         }
       ],
       "preamble": null,
@@ -463,5 +479,212 @@
       "singleFolder": false
     },
     "source": "require [\"date\",\"fileinto\",\"relational\",\"vacation\"];\r\n# rule:[Out of Office]\r\nif allof (currentdate :zone \"+0100\" :value \"ge\" \"iso8601\" \"2026-12-20T08:00:00+01:00\", currentdate :zone \"+0100\" :value \"le\" \"iso8601\" \"2027-01-04T18:30:00+01:00\")\r\n{\r\n\tvacation :days 7 :addresses [\"lukas@example.com\",\"l.runge@example.com\"] :subject \"Abwesenheit: Urlaub 🌴\" :from \"lukas@example.com\" text:\r\nHallo,\r\n\r\nich bin bis zum 4. Januar nicht im Büro.\r\nIn dringenden Fällen: \"Notfall\" an info@example.com.\r\n..\r\nViele Grüße\r\nLukas\r\n.\r\n;\r\n}\r\n# rule:[Existing rule]\r\nif allof (header :contains \"from\" \"@tax-office.example\")\r\n{\r\n\tfileinto \"Steuern/Gesch&AOQ-ftlich\";\r\n}\r\n"
+  },
+  "Verzweigt": {
+    "rules": {
+      "items": [
+        {
+          "actions": [
+            {
+              "actions": [
+                {
+                  "flags": [
+                    "$uni"
+                  ],
+                  "op": "add",
+                  "type": "flags"
+                }
+              ],
+              "conditions": {
+                "items": [
+                  {
+                    "negate": false,
+                    "test": {
+                      "headers": [
+                        "x-redirected-from"
+                      ],
+                      "keys": [
+                        "uni@example.org"
+                      ],
+                      "matcher": {
+                        "comparator": null,
+                        "matchType": {
+                          "type": "contains"
+                        }
+                      },
+                      "type": "header"
+                    }
+                  }
+                ],
+                "join": "any"
+              },
+              "elsif": [
+                {
+                  "actions": [
+                    {
+                      "flags": [
+                        "$verein"
+                      ],
+                      "op": "add",
+                      "type": "flags"
+                    }
+                  ],
+                  "conditions": {
+                    "items": [
+                      {
+                        "negate": false,
+                        "test": {
+                          "headers": [
+                            "x-original-to",
+                            "delivered-to"
+                          ],
+                          "keys": [
+                            "verein@example.org"
+                          ],
+                          "matcher": {
+                            "comparator": null,
+                            "matchType": {
+                              "type": "contains"
+                            }
+                          },
+                          "type": "header"
+                        }
+                      }
+                    ],
+                    "join": "any"
+                  }
+                }
+              ],
+              "otherwise": [
+                {
+                  "copy": false,
+                  "create": false,
+                  "flags": null,
+                  "mailbox": "Konten",
+                  "type": "fileInto"
+                }
+              ],
+              "type": "if"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "to",
+                    "cc"
+                  ],
+                  "keys": [
+                    "privat@example.org"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "contains"
+                    }
+                  },
+                  "type": "header"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [
+            {
+              "actions": [
+                {
+                  "flags": [
+                    "$arbeit"
+                  ],
+                  "op": "add",
+                  "type": "flags"
+                },
+                {
+                  "actions": [
+                    {
+                      "flags": [
+                        "$rechnung"
+                      ],
+                      "op": "add",
+                      "type": "flags"
+                    }
+                  ],
+                  "conditions": {
+                    "items": [
+                      {
+                        "negate": false,
+                        "test": {
+                          "headers": [
+                            "to",
+                            "cc"
+                          ],
+                          "keys": [
+                            "rechnung@example.org"
+                          ],
+                          "matcher": {
+                            "comparator": null,
+                            "matchType": {
+                              "type": "contains"
+                            }
+                          },
+                          "type": "header"
+                        }
+                      }
+                    ],
+                    "join": "any"
+                  },
+                  "elsif": [],
+                  "otherwise": null,
+                  "type": "if"
+                }
+              ],
+              "conditions": {
+                "items": [
+                  {
+                    "negate": false,
+                    "test": {
+                      "headers": [
+                        "to",
+                        "cc"
+                      ],
+                      "keys": [
+                        "info@example.org",
+                        "rechnung@example.org"
+                      ],
+                      "matcher": {
+                        "comparator": null,
+                        "matchType": {
+                          "type": "contains"
+                        }
+                      },
+                      "type": "header"
+                    }
+                  }
+                ],
+                "join": "any"
+              }
+            }
+          ],
+          "enabled": true,
+          "name": "Postfächer",
+          "otherwise": [
+            {
+              "flags": null,
+              "type": "keep"
+            }
+          ],
+          "type": "rule"
+        }
+      ],
+      "preamble": null,
+      "requires": [
+        "fileinto",
+        "imap4flags"
+      ],
+      "singleFolder": false
+    },
+    "source": "require [\"fileinto\", \"imap4flags\"];\n\n# rule:[Postfächer]\nif header :contains [\"to\", \"cc\"] \"privat@example.org\" {\n\tif header :contains \"x-redirected-from\" \"uni@example.org\" {\n\t\taddflag \"$uni\";\n\t} elsif header :contains [\"x-original-to\", \"delivered-to\"] \"verein@example.org\" {\n\t\taddflag \"$verein\";\n\t} else {\n\t\tfileinto \"Konten\";\n\t}\n} elsif header :contains [\"to\", \"cc\"] [\"info@example.org\", \"rechnung@example.org\"] {\n\taddflag \"$arbeit\";\n\tif header :contains [\"to\", \"cc\"] \"rechnung@example.org\" {\n\t\taddflag \"$rechnung\";\n\t}\n} else {\n\tkeep;\n}\n"
   }
 }

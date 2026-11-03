@@ -38,3 +38,13 @@ test("code cards match their code", () => {
   assert.ok(matches(raw, queryWords("banken")));
   assert.ok(!matches(raw, queryWords("thomann")));
 });
+
+test("branches and nested ifs are searched", () => {
+  const branched = {
+    ...rule,
+    elsif: [{ conditions: { join: "any", items: [] }, actions: [{ type: "fileInto", mailbox: "Rechnungen", copy: false, create: false, flags: null }] }],
+    otherwise: [{ type: "if", conditions: { join: "any", items: [] }, actions: [{ type: "redirect", address: "boss@example.org", copy: false }], elsif: [], otherwise: null }],
+  } as unknown as RuleItem;
+  assert.ok(matches(branched, queryWords("rechnungen")));
+  assert.ok(matches(branched, queryWords("boss")));
+});

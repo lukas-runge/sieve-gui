@@ -398,8 +398,22 @@ export const ACTION_KINDS = [
   "keep",
   "discard",
   "stop",
+  "check",
 ] as const;
 export type ActionKind = (typeof ACTION_KINDS)[number];
+
+/** What has branches: a rule, or a nested `if` ("also check"). */
+export interface Branches {
+  conditions: Conditions;
+  actions: Action[];
+  elsif: { conditions: Conditions; actions: Action[] }[];
+  otherwise?: Action[] | null;
+}
+
+/** A new `elsif` branch. */
+export function newBranch(): { conditions: Conditions; actions: Action[] } {
+  return { conditions: { join: "any", items: [newCondition()] }, actions: [buildAction("move")] };
+}
 
 export function actionKind(a: Action): ActionKind {
   switch (a.type) {
@@ -421,6 +435,8 @@ export function actionKind(a: Action): ActionKind {
       return "stop";
     case "vacation":
       return "vacation";
+    case "if":
+      return "check";
   }
 }
 
@@ -484,6 +500,8 @@ export function buildAction(kind: ActionKind, from?: Action): Action {
       return { type: "discard" };
     case "stop":
       return { type: "stop" };
+    case "check":
+      return from?.type === "if" ? from : { type: "if", ...newBranch(), elsif: [], otherwise: null };
     case "vacation":
       return from?.type === "vacation"
         ? from
@@ -501,7 +519,7 @@ export function buildAction(kind: ActionKind, from?: Action): Action {
 }
 
 export function newRule(name: string): Rule {
-  return { name, enabled: true, conditions: { join: "any", items: [newCondition()] }, actions: [buildAction("move")] };
+  return { name, enabled: true, ...newBranch(), elsif: [], otherwise: null };
 }
 
 // A single condition is written bare (`if <test>`), which needs "any": a bare

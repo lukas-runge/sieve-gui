@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use crate::ast::{Command, Comment, CommentKind};
 use crate::metadata::parse_rule_name;
-use crate::model::{ConditionTest, Rule, RuleItem, RuleSet};
+use crate::model::{Action, ConditionTest, Rule, RuleItem, RuleSet};
 
 /// Tests Roundcube's filter form can represent, as seen in its output.
 const ROUNDCUBE_TESTS: &[&str] = &[
@@ -33,8 +33,9 @@ pub struct RoundcubeRisks {
     /// free comments. Roundcube drops or rewrites them. (Raw blocks for
     /// features only sieve-gui's cards lack, such as `notify`, are fine.)
     pub raw_blocks: Vec<usize>,
-    /// Indices of rule cards with nested condition groups. Roundcube's form
-    /// has a single level of "all of" / "any of".
+    /// Indices of rule cards with nested condition groups (Roundcube's form
+    /// has a single level of "all of" / "any of"), `elsif`/`else` branches or
+    /// nested `if`s.
     pub rules: Vec<usize>,
     /// A `/* … */` comment anywhere. Roundcube then shows no rules at all and
     /// replaces every rule on its next save.
@@ -71,6 +72,8 @@ pub fn roundcube_risks(set: &RuleSet) -> RoundcubeRisks {
 
 fn has_groups(rule: &Rule) -> bool {
     rule.conditions.items.iter().any(|c| matches!(c.test, ConditionTest::Group { .. }))
+        || rule.has_branches()
+        || rule.actions.iter().any(|a| matches!(a, Action::If(_)))
 }
 
 /// Whether Roundcube reads a raw block as rules and writes it back intact.

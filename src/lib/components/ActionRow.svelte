@@ -3,6 +3,7 @@
   import { t, type MessageKey } from "../i18n.svelte";
   import { ACTION_KINDS, actionExtension, actionKind, buildAction, type ActionKind } from "../rules/view";
   import { folderExists, mailboxLabel, mailboxRaw, type ScriptFolders } from "../rules/mailbox";
+  import BranchesEditor from "./BranchesEditor.svelte";
 
   let {
     action,
@@ -159,4 +160,22 @@
     title={t("actions.remove")}
     onclick={onremove}>✕</button
   >
+
+  {#if action.type === "if"}
+    {@const nested = action}
+    <!-- "Also check": an if with its own branches, nested to any depth. -->
+    <div class="basis-full border-l-2 border-base-300 pl-3">
+      <BranchesEditor
+        block={nested}
+        {extensions}
+        {folders}
+        {singleFolder}
+        mutate={(fn, merge) => {
+          const copy = $state.snapshot(nested);
+          fn(copy);
+          onchange(copy, merge ?? false);
+        }}
+      />
+    </div>
+  {/if}
 </div>

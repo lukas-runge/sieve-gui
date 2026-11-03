@@ -1,12 +1,10 @@
 <script lang="ts">
-  import type { Action, Rule } from "#tauri/types";
+  import type { Rule } from "#tauri/types";
   import type { ScriptEditor } from "../editor.svelte";
   import { t } from "../i18n.svelte";
   import { closesMenu } from "../menu";
   import type { ScriptFolders } from "../rules/mailbox";
-  import { buildAction } from "../rules/view";
-  import ActionRow from "./ActionRow.svelte";
-  import ConditionGroup from "./ConditionGroup.svelte";
+  import BranchesEditor from "./BranchesEditor.svelte";
   import RuleSentence from "./RuleSentence.svelte";
 
   let {
@@ -43,9 +41,6 @@
     }, merge);
   }
 
-  function setAction(i: number, a: Action, merge: boolean) {
-    change((r) => (r.actions[i] = a), merge);
-  }
 
   const headingId = `rule-${Math.random().toString(36).slice(2)}`;
   const lostInRoundcube = $derived(editor.roundcubeRisks?.rules.includes(index) ?? false);
@@ -103,31 +98,13 @@
         <RuleSentence {rule} singleFolder={editor.rules.singleFolder} />
       </button>
     {:else}
-      <ConditionGroup
-        group={rule.conditions}
+      <BranchesEditor
+        block={rule}
         {extensions}
-        mutate={(fn, merge) => change((r) => fn(r.conditions, null), merge)}
+        {folders}
+        singleFolder={editor.rules.singleFolder}
+        mutate={(fn, merge) => change((r) => fn(r), merge)}
       />
-
-      <section class="mt-3 grid gap-2" aria-label={t("actions.heading")}>
-        <h4 class="font-semibold">{t("actions.heading")}</h4>
-        {#each rule.actions as action, i}
-          <ActionRow
-            {action}
-            {extensions}
-            {folders}
-            singleFolder={editor.rules.singleFolder}
-            onchange={(a, merge) => setAction(i, a, merge)}
-            onremove={() => change((r) => r.actions.splice(i, 1))}
-          />
-        {/each}
-        <button
-          class="btn btn-ghost btn-sm justify-self-start w-fit"
-          onclick={() => change((r) => r.actions.push(buildAction("move")))}
-        >
-          + {t("actions.add")}
-        </button>
-      </section>
     {/if}
   </div>
 </article>

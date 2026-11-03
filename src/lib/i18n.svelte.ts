@@ -304,6 +304,16 @@ const en = {
   "search.count": "{shown} of {total}",
   "search.none": "No rule matches the search.",
 
+  "branch.elsif": "Otherwise if",
+  "branch.else": "Otherwise",
+  "branch.addElsif": "Otherwise if",
+  "branch.addElse": "Otherwise",
+  "branch.remove": "Remove branch",
+  "action.check": "Also check …",
+  "sentence.elsif": "Otherwise if",
+  "sentence.else": "Otherwise",
+  "sentence.alsoIf": "Also, if",
+
   "theme.toggle": "Switch light/dark",
   "language": "Language",
 } as const;
@@ -612,6 +622,16 @@ const de: Record<MessageKey, string> = {
   "search.placeholder": "Regeln durchsuchen (⌘F)",
   "search.count": "{shown} von {total}",
   "search.none": "Keine Regel passt zur Suche.",
+
+  "branch.elsif": "Sonst wenn",
+  "branch.else": "Sonst",
+  "branch.addElsif": "Sonst wenn",
+  "branch.addElse": "Sonst",
+  "branch.remove": "Zweig entfernen",
+  "action.check": "Zusätzlich prüfen …",
+  "sentence.elsif": "Sonst wenn",
+  "sentence.else": "Sonst",
+  "sentence.alsoIf": "Zusätzlich, wenn",
 
   "theme.toggle": "Hell/Dunkel wechseln",
   "language": "Sprache",

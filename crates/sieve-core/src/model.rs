@@ -41,13 +41,49 @@ pub struct RawBlock {
     pub code: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// A rule: `if <conditions> { <actions> }`, optionally followed by
+/// `elsif` branches and an `else`. Only the first matching branch runs.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Rule {
     pub name: String,
     pub enabled: bool,
     pub conditions: Conditions,
     pub actions: Vec<Action>,
+    /// `elsif` branches, tried in order if the conditions above don't match.
+    #[serde(default)]
+    pub elsif: Vec<Branch>,
+    /// `else`: the actions if no branch matched.
+    #[serde(default)]
+    pub otherwise: Option<Vec<Action>>,
+}
+
+impl Rule {
+    /// Whether the rule has `elsif` or `else` branches.
+    pub fn has_branches(&self) -> bool {
+        !self.elsif.is_empty() || self.otherwise.is_some()
+    }
+}
+
+/// An `elsif` branch.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Branch {
+    pub conditions: Conditions,
+    pub actions: Vec<Action>,
+}
+
+/// An `if` among the actions of a rule ("also check"), with its own
+/// branches. Nests to any depth.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NestedIf {
+    pub conditions: Conditions,
+    pub actions: Vec<Action>,
+    #[serde(default)]
+    pub elsif: Vec<Branch>,
+    #[serde(default)]
+    pub otherwise: Option<Vec<Action>>,
 }
 
 /// The tests of a rule. An empty list means "all messages".
@@ -234,6 +270,8 @@ pub enum Action {
     /// `addflag` / `setflag` / `removeflag` (RFC 5232)
     Flags { op: FlagOp, flags: Vec<String> },
     Vacation(Vacation),
+    /// A nested `if` ("also check").
+    If(NestedIf),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -315,12 +353,25 @@ impl RuleSet {
 
 impl Rule {
     pub(crate) fn collect_extensions(&self, out: &mut Vec<&'static str>, single_folder: bool) {
-        for c in &self.conditions.items {
-            c.test.collect_extensions(out);
-        }
-        for a in &self.actions {
-            a.collect_extensions(out, single_folder);
-        }
+        collect_block(&self.conditions, &self.actions, &self.elsif, &self.otherwise, out, single_folder);
+    }
+}
+
+fn collect_block(
+    conditions: &Conditions,
+    actions: &[Action],
+    elsif: &[Branch],
+    otherwise: &Option<Vec<Action>>,
+    out: &mut Vec<&'static str>,
+    single_folder: bool,
+) {
+    let branches = std::iter::once((conditions, actions)).chain(elsif.iter().map(|b| (&b.conditions, &b.actions[..])));
+    for (conditions, actions) in branches {
+        conditions.items.iter().for_each(|c| c.test.collect_extensions(out));
+        actions.iter().for_each(|a| a.collect_extensions(out, single_folder));
+    }
+    for a in otherwise.iter().flatten() {
+        a.collect_extensions(out, single_folder);
     }
 }
 
@@ -405,6 +456,7 @@ impl Action {
                     out.push("vacation-seconds");
                 }
             }
+            Action::If(n) => collect_block(&n.conditions, &n.actions, &n.elsif, &n.otherwise, out, single_folder),
             Action::Discard | Action::Stop => {}
         }
     }

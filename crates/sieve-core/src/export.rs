@@ -3,7 +3,7 @@
 use crate::ast::*;
 use crate::metadata::format_rule_name;
 use crate::model::*;
-use crate::printer::{print_command, print_test, PrintOptions};
+use crate::printer::{print_command, print_commands, print_test, PrintOptions};
 use crate::root::FOLDER_VARIABLE;
 use crate::span::Span;
 
@@ -35,7 +35,7 @@ pub fn export(set: &RuleSet, options: &PrintOptions) -> String {
 
     for item in &set.items {
         let text = match item {
-            RuleItem::Rule(rule) => print_command(&rule_command(rule, set.single_folder, options), 0, options),
+            RuleItem::Rule(rule) => print_commands(&rule_commands(rule, set.single_folder, options), 0, options),
             RuleItem::Raw(raw) => match raw.code.trim_end_matches(['\r', '\n']) {
                 "" => continue,
                 code => format!("{code}{eol}"),
@@ -86,7 +86,7 @@ fn requires(set: &RuleSet) -> Vec<String> {
 /// A disabled rule becomes `if false # <test>`. In single-folder mode, plain
 /// moves become `set` on the folder variable and "stop" becomes `return`.
 pub fn rule_command(rule: &Rule, single_folder: bool, options: &PrintOptions) -> Command {
-    let actions: Vec<Command> = rule.actions.iter().map(|a| action_command(a, single_folder)).collect();
+    let actions = action_commands(&rule.actions, single_folder);
     let test = conditions_test(&rule.conditions);
     let (test, inner_comments) = if rule.enabled {
         (test, Vec::new())
@@ -251,6 +251,62 @@ fn push_address_part(args: &mut Vec<Argument>, part: AddressPart) {
     args.push(tag(name));
 }
 
+/// The commands for a rule: [`rule_command`], or for a rule with branches
+/// its `if`/`elsif`/`else` chain. A disabled rule with branches is wrapped
+/// in `if false { … }`: the `if false # <test>` form would let the `elsif`
+/// branches run.
+pub fn rule_commands(rule: &Rule, single_folder: bool, options: &PrintOptions) -> Vec<Command> {
+    if !rule.has_branches() {
+        return vec![rule_command(rule, single_folder, options)];
+    }
+    let chain = if_chain(&rule.conditions, &rule.actions, &rule.elsif, &rule.otherwise, single_folder);
+    let mut commands = if rule.enabled {
+        chain
+    } else {
+        let mut wrapper = command("if", Vec::new(), Some(Tests::Single(Box::new(bare_test("false")))));
+        wrapper.block = Some(Block { commands: chain, trailing_comments: Vec::new(), span: Span::default() });
+        vec![wrapper]
+    };
+    if !rule.name.trim().is_empty() {
+        commands[0].leading_comments.push(hash_comment(format_rule_name(rule.name.trim())));
+    }
+    commands
+}
+
+/// `if <conditions> { … } elsif … { … } else { … }`
+fn if_chain(
+    conditions: &Conditions,
+    actions: &[Action],
+    elsif: &[Branch],
+    otherwise: &Option<Vec<Action>>,
+    single_folder: bool,
+) -> Vec<Command> {
+    let branch = |name: &str, conditions: Option<&Conditions>, actions: &[Action]| {
+        let tests = conditions.map(|c| Tests::Single(Box::new(conditions_test(c))));
+        let mut cmd = command(name, Vec::new(), tests);
+        cmd.block =
+            Some(Block { commands: action_commands(actions, single_folder), trailing_comments: Vec::new(), span: Span::default() });
+        cmd
+    };
+    let mut out = vec![branch("if", Some(conditions), actions)];
+    out.extend(elsif.iter().map(|b| branch("elsif", Some(&b.conditions), &b.actions)));
+    if let Some(actions) = otherwise {
+        out.push(branch("else", None, actions));
+    }
+    out
+}
+
+/// The commands for actions; a nested `if` becomes its chain.
+fn action_commands(actions: &[Action], single_folder: bool) -> Vec<Command> {
+    actions
+        .iter()
+        .flat_map(|a| match a {
+            Action::If(n) => if_chain(&n.conditions, &n.actions, &n.elsif, &n.otherwise, single_folder),
+            a => vec![action_command(a, single_folder)],
+        })
+        .collect()
+}
+
 fn action_command(action: &Action, single_folder: bool) -> Command {
     if single_folder {
         match action {
@@ -335,6 +391,7 @@ fn action_command(action: &Action, single_folder: bool) -> Command {
             args.push(text(&v.reason));
             "vacation"
         }
+        Action::If(_) => unreachable!("nested ifs are written by action_commands"),
     };
     command(name, args, None)
 }

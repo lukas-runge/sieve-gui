@@ -24,8 +24,11 @@ export function searchText(item: RuleItem): string {
       for (const [k, v] of Object.entries(value)) walk(v, k);
     }
   };
+  // Branches and nested ifs ("also check") are searched too.
   walk(item.conditions);
   walk(item.actions);
+  walk(item.elsif);
+  walk(item.otherwise);
   return texts.join("\n").toLowerCase();
 }
 

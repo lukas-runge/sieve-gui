@@ -105,8 +105,13 @@ pub fn print_script(script: &Script, options: &PrintOptions) -> String {
 
 /// Prints a single command (including its comments) at indentation `depth`.
 pub fn print_command(command: &Command, depth: usize, options: &PrintOptions) -> String {
+    print_commands(std::slice::from_ref(command), depth, options)
+}
+
+/// Prints consecutive commands, e.g. an `if`/`elsif`/`else` chain.
+pub fn print_commands(commands: &[Command], depth: usize, options: &PrintOptions) -> String {
     let mut p = Printer { out: String::new(), options };
-    p.commands(std::slice::from_ref(command), depth);
+    p.commands(commands, depth);
     p.out
 }
 

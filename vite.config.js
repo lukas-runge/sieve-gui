@@ -45,8 +45,10 @@ export default defineConfig(async () => ({
       }
       : undefined,
     watch: {
-      // 3. tell Vite to ignore watching `src-tauri` and `src/generated`
-      ignored: ["**/src-tauri/**", "**/src/generated/**"],
+      // 3. tell Vite to ignore watching `src-tauri`. `src/generated` is
+      //    watched: new bindings (written by the Rust build) must reach the
+      //    frontend, or it imports commands that aren't there yet.
+      ignored: ["**/src-tauri/**"],
     },
   },
 }));

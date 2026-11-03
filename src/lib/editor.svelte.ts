@@ -44,7 +44,13 @@ export class ScriptEditor {
   canUndo = $state(false);
   canRedo = $state(false);
 
-  dirty = $derived(this.original === null || this.code !== this.original);
+  /**
+   * The code as generated when the script was opened or last saved. Edits
+   * are measured against it rather than `original`: a script written by
+   * another tool comes out in sieve-gui's layout without any edit.
+   */
+  #baseline = $state<string | null>(null);
+  dirty = $derived(this.original === null || this.code !== this.#baseline);
 
   private constructor(accountId: string, name: string, original: string | null, rules: RuleSet) {
     this.accountId = accountId;
@@ -59,6 +65,7 @@ export class ScriptEditor {
     const editor = new ScriptEditor(accountId, name, source, rules);
     editor.roundcube = roundcube;
     await editor.regenerate();
+    editor.#baseline = editor.code;
     return editor;
   }
 
@@ -122,8 +129,9 @@ export class ScriptEditor {
     }
   }
 
-  /** After a successful save, the current code is what the server has. */
-  markSaved() {
-    this.original = this.code;
+  /** After a successful save, `code` is what the server has. */
+  markSaved(code = this.code) {
+    this.original = code;
+    this.#baseline = code;
   }
 }

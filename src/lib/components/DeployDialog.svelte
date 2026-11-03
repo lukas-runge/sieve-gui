@@ -21,7 +21,7 @@
   const { code, diff, active } = untrack(() => ({
     code: editor.code,
     diff: diffLines(editor.original ?? "", editor.code),
-    active: session.isActive(editor.accountId, editor.name),
+    active: session.runs(editor.accountId, editor.name),
   }));
   const changed = diff.some((l) => l.kind !== "same");
 

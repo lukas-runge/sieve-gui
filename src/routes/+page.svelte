@@ -22,7 +22,7 @@
   const wide = new MediaQuery("min-width: 1280px");
 
   const editor = $derived(session.editor);
-  const active = $derived(editor ? session.isActive(editor.accountId, editor.name) : false);
+  const active = $derived(editor ? session.runs(editor.accountId, editor.name) : false);
   const root = $derived(editor ? session.roots[editor.accountId] : null);
   /**
    * The open script runs with "last move wins", so it should record moves.

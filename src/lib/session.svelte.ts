@@ -684,6 +684,11 @@ class Session {
     if (root) return root.scripts.includes(name);
     return this.servers[id]?.info?.scripts.some((s) => s.name === name && s.active) ?? false;
   }
+
+  /** Whether a script's rules run: it is active, or a running script includes it. */
+  runs(id: string, name: string): boolean {
+    return this.isActive(id, name) || this.scriptTree(id).running.some((n) => n.name === name);
+  }
 }
 
 export const session = new Session();

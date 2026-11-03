@@ -137,6 +137,7 @@ Roundcube writes no marker of its own, and sieve-gui deliberately uses the same 
 - Result table: message → matching rule → resulting actions
 - Summary, e.g. "37 messages would be moved to *Taxes*", "rule X never matches"
 - **Explain view:** for each message, which condition matched which header/value
+- **Tests:** sample messages (`.eml`, or picked from a folder via IMAP) with expectations: the folder a message must or must not land in, flags it must or must not get. Set up and run in the app, stored per account alongside the local copy (§3), so they can be versioned with it. Run automatically before saving: a change that breaks a test is shown in the deploy dialog before it reaches the server, so the tests guard deployment instead of reporting afterwards. Existing test suites (e.g. `.eml` files with expected `sieve-test` output) can be imported
 
 ### v0.3 — apply retroactively
 
@@ -298,3 +299,4 @@ The project is **MIT-licensed**. To keep it that way:
 | D15 | Existing setups | No recognition of particular products. Before the root script takes over from an active script it didn't create, the app asks; by default that script runs first inside the root, unchanged. The root marks such includes with `# unchanged`; sieve-gui never rewrites them unless the user takes them over (§3) | 2026-11-03 |
 | D16 | General-purpose | Behavior never depends on the conventions of a particular user's scripts (comment style, variable names, include structure). Moving a personal setup to sieve-gui is a one-off migration outside the app; the app only has to import its result | 2026-11-03 |
 | D17 | Control structures | `if`/`elsif`/`else` as branches of one card, nested `if` as indented "also check" within actions (any depth), everything else (e.g. `include` inside a script) stays a code card | 2026-11-03 |
+| D18 | Tests | Sample messages with expected folders and flags are part of the app (v0.2): set up and run in it, checked before saving, stored with the local copy. Tests in a separate repository can only report after a change is live | 2026-11-03 |

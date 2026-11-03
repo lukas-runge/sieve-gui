@@ -77,6 +77,10 @@ class Session {
    * runs unchanged inside the root or is taken over (see `adopt`).
    */
   adoption = $state<Record<string, { active: string }>>({});
+  /** Rejected server certificates to show, one after the other. */
+  certificatePrompts = $state<{ accountId: string; untrusted: UntrustedCertificate }[]>([]);
+  /** Accounts set up or changed just now: their rejected certificates are shown right away. */
+  #promptCertificates = new Set<string>();
   /** Per account and script: what it includes and whether it files messages. */
   links = $state<Record<string, Record<string, ScriptLinks>>>({});
   /** The account whose root script is shown (read-only) instead of an editor. */
@@ -100,14 +104,17 @@ class Session {
     }
   }
 
-  async connect(id: string) {
+  async connect(id: string): Promise<void> {
     this.servers[id] = { status: "connecting", info: this.servers[id]?.info ?? null, error: null, certificate: null };
     try {
       const info = await connectAccount(id);
       await this.#loadRoot(id, info);
       this.servers[id] = { status: "ready", info, error: null, certificate: null };
     } catch (e) {
-      this.servers[id] = { status: "error", info: null, error: describeError(e), certificate: untrustedCertificate(e) };
+      const certificate = untrustedCertificate(e);
+      if (certificate && (await this.#trustKnown(id, certificate))) return this.connect(id);
+      this.servers[id] = { status: "error", info: null, error: describeError(e), certificate };
+      if (certificate && this.#promptCertificates.has(id)) this.showCertificate(id, certificate);
       return;
     }
     void this.loadFolders(id);
@@ -115,7 +122,7 @@ class Session {
     await this.#applySettings(id);
   }
 
-  async loadFolders(id: string) {
+  async loadFolders(id: string): Promise<void> {
     if (!this.accounts.find((a) => a.id === id)?.imap) {
       delete this.folders[id];
       return;
@@ -124,7 +131,42 @@ class Session {
     try {
       this.folders[id] = { status: "ready", folders: await listFolders(id), error: null, certificate: null };
     } catch (e) {
-      this.folders[id] = { status: "error", folders: [], error: describeError(e), certificate: untrustedCertificate(e) };
+      const certificate = untrustedCertificate(e);
+      if (certificate && (await this.#trustKnown(id, certificate))) return this.loadFolders(id);
+      this.folders[id] = { status: "error", folders: [], error: describeError(e), certificate };
+      if (certificate && this.#promptCertificates.has(id)) this.showCertificate(id, certificate);
+    }
+  }
+
+  /** Shows a rejected certificate (after those already waiting). */
+  showCertificate(accountId: string, untrusted: UntrustedCertificate) {
+    const waiting = this.certificatePrompts.some(
+      (p) => p.accountId === accountId && p.untrusted.service === untrusted.service,
+    );
+    if (!waiting) this.certificatePrompts = [...this.certificatePrompts, { accountId, untrusted }];
+  }
+
+  /** Done with the certificate shown first. */
+  closeCertificate() {
+    this.certificatePrompts = this.certificatePrompts.slice(1);
+  }
+
+  /**
+   * Trusts a certificate for one of the account's servers if the user already
+   * trusts exactly this certificate for the other one (often the same server).
+   * A certificate replacing a trusted one is always shown instead.
+   */
+  async #trustKnown(id: string, untrusted: UntrustedCertificate): Promise<boolean> {
+    const account = this.accounts.find((a) => a.id === id);
+    if (!account || untrusted.pinned) return false;
+    const other = untrusted.service === "manageSieve" ? account.imap?.certificate : account.certificate;
+    if (other !== untrusted.certificate.sha256) return false;
+    try {
+      await trustCertificate(id, untrusted.service, other);
+      await this.loadAccounts();
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -303,6 +345,8 @@ class Session {
       this.editor.roundcube = account.roundcube;
       void this.editor.regenerate();
     }
+    // Certificates of a server set up just now are asked about right away.
+    this.#promptCertificates.add(account.id);
     void this.connect(account.id);
     return account;
   }

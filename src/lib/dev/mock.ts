@@ -113,6 +113,15 @@ export function installMock() {
         };
       case "list_folders":
         await new Promise((r) => setTimeout(r, 200));
+        // The NAS shows the same certificate for IMAP.
+        if (a.id === nas.id && nas.imap.certificate !== NAS_CERTIFICATE.sha256) {
+          throw {
+            kind: "untrustedCertificate",
+            message: "invalid peer certificate: UnknownIssuer",
+            diagnostics: [],
+            certificate: { service: "imap", certificate: NAS_CERTIFICATE, pinned: nas.imap.certificate },
+          };
+        }
         return folders;
       case "list_scripts":
         return scriptList(server);

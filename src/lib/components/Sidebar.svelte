@@ -1,7 +1,7 @@
 <script lang="ts">
   import { flip } from "svelte/animate";
   import { SvelteSet } from "svelte/reactivity";
-  import type { Account, UntrustedCertificate } from "#tauri/types";
+  import type { Account } from "#tauri/types";
   import { t } from "../i18n.svelte";
   import CertificateDialog from "./CertificateDialog.svelte";
   import { ask, askText, tell } from "../dialogs.svelte";
@@ -10,8 +10,6 @@
 
   let { onaccount }: { onaccount: (account: Account | null) => void } = $props();
 
-  /** A rejected server certificate being shown. */
-  let certificate = $state<{ account: Account; untrusted: UntrustedCertificate } | null>(null);
 
   async function open(id: string, name: string) {
     if (session.editor?.accountId === id && session.editor.name === name) return;
@@ -203,7 +201,7 @@
           <p class="text-error">{server.error}</p>
           {#if server.certificate}
             {@const untrusted = server.certificate}
-            <button class="btn btn-xs self-start" onclick={() => (certificate = { account, untrusted })}>{t("certificate.show")}</button>
+            <button class="btn btn-xs self-start" onclick={() => session.showCertificate(account.id, untrusted)}>{t("certificate.show")}</button>
           {:else}
             <button class="btn btn-xs self-start" onclick={() => session.connect(account.id)}>{t("accounts.retry")}</button>
           {/if}
@@ -277,7 +275,7 @@
             <p class="text-base-content/70">{t("folders.error", { message: folders.error ?? "" })}</p>
             {#if folders.certificate}
               {@const untrusted = folders.certificate}
-              <button class="btn btn-xs self-start" onclick={() => (certificate = { account, untrusted })}>{t("certificate.show")}</button>
+              <button class="btn btn-xs self-start" onclick={() => session.showCertificate(account.id, untrusted)}>{t("certificate.show")}</button>
             {:else}
               <button class="btn btn-xs self-start" onclick={() => session.loadFolders(account.id)}>{t("accounts.retry")}</button>
             {/if}
@@ -292,12 +290,15 @@
   <button class="btn btn-sm mt-auto" onclick={() => onaccount(null)}>+ {t("accounts.add")}</button>
 </nav>
 
-{#if certificate}
-  {@const { account, untrusted } = certificate}
-  <CertificateDialog
-    {untrusted}
-    host={untrusted.service === "imap" ? (account.imap?.host ?? account.host) : account.host}
-    ontrust={() => session.trustCertificate(account.id, untrusted)}
-    onclose={() => (certificate = null)}
-  />
+{#if session.certificatePrompts[0]}
+  {@const { accountId, untrusted } = session.certificatePrompts[0]}
+  {@const account = session.accounts.find((a) => a.id === accountId)}
+  {#key session.certificatePrompts[0]}
+    <CertificateDialog
+      {untrusted}
+      host={untrusted.service === "imap" ? (account?.imap?.host ?? account?.host ?? "") : (account?.host ?? "")}
+      ontrust={() => session.trustCertificate(accountId, untrusted)}
+      onclose={() => session.closeCertificate()}
+    />
+  {/key}
 {/if}

@@ -102,22 +102,11 @@
   {@const key = `${id}:${name}`}
   {@const root = session.roots[id]}
   {@const included = !!root?.scripts.includes(name)}
-  <!-- Whether sieve-gui leaving the script alone makes a difference. -->
-  {@const unchanged = !!root?.lastMoveWins && !!root?.unchanged.includes(name)}
-  {@const movesItself = unchanged && !!session.links[id]?.[name]?.filesMessages}
   {@const parents = session.includedBy(id, name)}
-  {@const notes = [
-    ...(unchanged ? [t("scripts.unchanged")] : []),
-    ...(movesItself ? [t("scripts.filesMessages")] : []),
-    // Listed under the script including it; other including scripts are named.
-    ...(parents.some((p) => p !== node.via)
-      ? [t("scripts.includedBy", { names: quoted(parents.filter((p) => p !== node.via)) })]
-      : []),
-  ]}
-  {@const hints = [
-    ...(unchanged ? [t("scripts.unchangedHint")] : []),
-    ...(movesItself ? [t("scripts.filesMessagesHint")] : []),
-  ]}
+  <!-- Listed under the script including it; other including scripts are named. -->
+  {@const notes = parents.some((p) => p !== node.via)
+    ? [t("scripts.includedBy", { names: quoted(parents.filter((p) => p !== node.via)) })]
+    : []}
   <div
     class="group flex items-center rounded-field {current ? 'bg-base-100 shadow-[inset_3px_0_0_var(--color-primary)]' : 'hover:bg-base-100/60'}"
     style:margin-left="{node.depth * 1.25}rem"
@@ -149,7 +138,6 @@
     <button
       class="min-w-0 grow px-2 py-1 text-left text-sm [contain:inline-size]"
       aria-current={current ? "page" : undefined}
-      title={hints.join(" ") || undefined}
       onclick={() => open(id, name)}
     >
       <span class="block truncate {current ? 'font-semibold' : ''}">{name}</span>

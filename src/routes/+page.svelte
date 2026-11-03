@@ -33,6 +33,12 @@
     !!editor && !!root?.lastMoveWins && root.scripts.includes(editor.name) && !root.unchanged.includes(editor.name),
   );
 
+  /** The root includes the open script unchanged (e.g. a webmail's own root script). */
+  const unchanged = $derived(!!editor && !!root?.unchanged.includes(editor.name));
+  const movesItself = $derived(
+    unchanged && !!root?.lastMoveWins && !!editor && !!session.links[editor.accountId]?.[editor.name]?.filesMessages,
+  );
+
   $effect(() => {
     document.documentElement.lang = i18n.locale;
   });
@@ -114,6 +120,11 @@
           <div class="mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-4 px-5 py-5">
             {#if !active}
               <p class="rounded-box border border-warning/40 bg-warning/10 px-3 py-2 text-sm">{t("editor.inactive")}</p>
+          {/if}
+          {#if unchanged}
+            <p role="note" class="rounded-box border border-base-300 bg-base-100 px-3 py-2 text-sm text-base-content/80">
+              {t("editor.unchanged")}{#if movesItself}{" "}{t("editor.unchangedMoves")}{/if}
+            </p>
           {/if}
           <!-- Only when the script doesn't match the account's "last move wins". -->
           {#if lastMoveWins ? !editor.rules.singleFolder : editor.rules.singleFolder && !root?.lastMoveWins}

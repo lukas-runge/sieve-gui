@@ -547,3 +547,21 @@ fn readable_layout_separates_rules() {
     // Roundcube's layout has no empty lines.
     assert!(!export(&set, &PrintOptions::roundcube()).contains("\r\n\r\n"));
 }
+
+#[test]
+fn a_comment_in_front_of_a_rule_names_it() {
+    let src = "require \"fileinto\";\n\n# Online shops\nif address :domain :is \"from\" \"shop.example\" {\n\tfileinto \"Shops\";\n}\n\n# Archive\nfileinto \"Archive\";\n";
+    let set = import(src).unwrap();
+    assert_eq!(rule(&set, 0).name, "Online shops");
+    assert_eq!(rule(&set, 1).name, "Archive");
+    let out = export(&set, &PrintOptions::readable());
+    assert!(out.contains("# rule:[Online shops]"), "{out}");
+    assert_eq!(import(&out).unwrap(), set);
+}
+
+#[test]
+fn several_comments_in_front_of_a_rule_keep_it_raw() {
+    let src = "require \"fileinto\";\n# one\n# two\nif true { stop; }\n";
+    let set = import(src).unwrap();
+    assert!(matches!(set.items.as_slice(), [RuleItem::Raw(_)]), "{:?}", set.items);
+}

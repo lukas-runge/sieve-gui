@@ -25,6 +25,18 @@ pub fn parse_rule_name(comment: &Comment) -> Option<String> {
     Some(name.trim().to_owned())
 }
 
+/// The name of a rule from the single comment in front of it: a
+/// `# rule:[Name]` comment, or else any other `#` comment as it reads
+/// (`# Online shops` names the rule "Online shops"). Saving writes the name
+/// as `# rule:[…]` again.
+pub fn rule_name(comment: &Comment) -> Option<String> {
+    if let Some(name) = parse_rule_name(comment) {
+        return Some(name);
+    }
+    let text = comment.text.trim();
+    (comment.kind == CommentKind::Hash && !text.is_empty()).then(|| text.to_owned())
+}
+
 /// The comment text (without `#`) for a rule name.
 pub fn format_rule_name(name: &str) -> String {
     // A line break would end the comment and turn the rest into code.

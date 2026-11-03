@@ -6,7 +6,7 @@
 //! exporting never drops anything.
 
 use crate::ast::{Argument, Command, CommentKind, Script, Test, Tests};
-use crate::metadata::parse_rule_name;
+use crate::metadata::{parse_rule_name, rule_name};
 use crate::model::*;
 use crate::parser::parse;
 use crate::root::FOLDER_VARIABLE;
@@ -90,7 +90,7 @@ pub fn import_script(script: &Script, src: &str) -> RuleSet {
             let skip = if i == 0 { first_leading } else { 0 };
             let name = match &commands[i].leading_comments[skip..] {
                 [] => Some(String::new()),
-                [c] => parse_rule_name(c),
+                [c] => rule_name(c),
                 _ => None,
             };
             let mut end = i + actions.0;
@@ -171,7 +171,7 @@ fn rule_from_if(cmd: &Command, skip_comments: usize, single_folder: bool) -> Opt
     }
     let name = match &cmd.leading_comments[skip_comments..] {
         [] => String::new(),
-        [c] => parse_rule_name(c)?,
+        [c] => rule_name(c)?,
         _ => return None,
     };
     let Some(Tests::Single(test)) = &cmd.arguments.tests else { return None };

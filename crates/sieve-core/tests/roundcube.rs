@@ -112,9 +112,11 @@ fn roundcube_risks_match_what_roundcube_did() {
     for (name, src) in fixtures() {
         let risks = roundcube_risks(&import(&src).unwrap());
         match name.split('-').next().unwrap() {
-            // free-standing comment dropped (17b); unknown test and action,
-            // nested if and elsif chain dropped or rewritten (18b)
-            "17a" => assert_eq!(risks.raw_blocks.len(), 1, "{name}"),
+            // A free-standing comment Roundcube dropped (17b) names the rule
+            // in sieve-gui, which writes it as `# rule:[…]`, so nothing is
+            // lost. Unknown test and action, nested if and elsif chain
+            // dropped or rewritten (18b).
+            "17a" => assert!(risks.is_empty(), "{name}: {risks:?}"),
             "18a" => assert_eq!(risks.raw_blocks.len(), 4, "{name}"),
             // bracket comment: Roundcube showed no rules and replaced them (19b)
             "19a" => assert!(risks.bracket_comments, "{name}"),

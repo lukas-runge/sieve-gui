@@ -18,6 +18,7 @@
   } from "../rules/view";
   import { SIZE_UNITS, splitSize } from "../rules/format";
   import ValueList from "./ValueList.svelte";
+  import { checkRegex, regexMatches, type RegexProblem } from "../rules/regex";
 
   let {
     condition,
@@ -35,6 +36,44 @@
   const size = $derived(view?.field === "size" ? splitSize(Number(view.values[0])) : null);
   // "exists" asks for the header, not a part of its addresses.
   const parts = $derived(view && hasValues(view.operator) ? partsFor(view.field, extensions, view.part) : []);
+
+  const regex = $derived(view?.operator === "regex" || view?.operator === "notRegex");
+  // The current operator stays selectable, e.g. a regex on a server without `regex`.
+  const operators = $derived(
+    view ? [...new Set([...operatorsFor(view.field, view.part, extensions), view.operator])] : [],
+  );
+  const regexUnsupported = $derived(regex && extensions.length > 0 && !extensions.includes("regex"));
+  let sample = $state("");
+  /** Whether the condition holds for the sample, or null if an expression is invalid. */
+  const sampleResult = $derived.by(() => {
+    if (!view || !regex || sample === "") return undefined;
+    const matched = regexMatches(view.values, sample);
+    return matched === null ? null : matched !== (view.operator === "notRegex");
+  });
+
+  function problemText(p: RegexProblem): string {
+    switch (p.kind) {
+      case "perlClass":
+        return t("regex.perlClass", { escape: p.escape, instead: p.instead });
+      case "groupSyntax":
+        return t("regex.groupSyntax");
+      case "lazy":
+        return t("regex.lazy");
+      case "escape":
+        return t("regex.escape", { escape: p.escape });
+      case "unknownClass":
+        return t("regex.unknownClass", { name: p.name });
+      case "syntax":
+        return t("regex.syntax", { message: p.message });
+    }
+  }
+
+  function samplePlaceholder(v: ConditionView): string {
+    if (v.part === "domain") return "example.org";
+    if (v.part === "localPart" || v.part === "user" || v.part === "detail") return "name";
+    if (v.part === "all") return "name@example.org";
+    return t("regex.sampleValue");
+  }
 
   function update(patch: Partial<ConditionView>, merge = false) {
     if (!view) return;
@@ -82,7 +121,7 @@
       value={view.operator}
       onchange={(e) => update({ operator: e.currentTarget.value as Operator })}
     >
-      {#each operatorsFor(view.field, view.part, extensions) as op}
+      {#each operators as op}
         <option value={op}>{t(`op.${op}` as MessageKey)}</option>
       {/each}
     </select>
@@ -133,7 +172,36 @@
           label={t(`op.${view.operator}` as MessageKey)}
           onchange={(values, merge) => update({ values }, merge)}
         />
-        {#if view.operator.toLowerCase().includes("matches")}
+        {#if regex}
+          <!-- POSIX ERE as the server evaluates it, see rules/regex.ts. -->
+          {#each view.values as value, i}
+            {@const problem = value ? checkRegex(value) : null}
+            {#if problem}
+              <p class="mt-1 text-xs text-error" role="alert">
+                {view.values.length > 1 ? t("regex.which", { n: i + 1 }) : ""}{problemText(problem)}
+              </p>
+            {/if}
+          {/each}
+          {#if regexUnsupported}
+            <p class="mt-1 text-xs text-warning" role="alert">{t("regex.unsupported")}</p>
+          {/if}
+          <p class="mt-1 text-xs text-base-content/60">{t("op.regexHint")}</p>
+          <label class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span class="text-base-content/70">{t("regex.try")}</span>
+            <input
+              class="input input-xs min-w-48 grow font-mono"
+              placeholder={samplePlaceholder(view)}
+              bind:value={sample}
+              spellcheck="false"
+              autocapitalize="off"
+            />
+            {#if sampleResult === true}
+              <span class="badge badge-sm badge-success">{t("regex.holds")}</span>
+            {:else if sampleResult === false}
+              <span class="badge badge-sm badge-ghost">{t("regex.doesNotHold")}</span>
+            {/if}
+          </label>
+        {:else if view.operator.toLowerCase().includes("matches")}
           <p class="mt-1 text-xs text-base-content/60">{t("op.patternHint")}</p>
         {:else if view.operator.endsWith("WithSubdomains")}
           <p class="mt-1 text-xs text-base-content/60">{t("op.subdomainHint")}</p>

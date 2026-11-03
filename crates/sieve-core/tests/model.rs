@@ -640,3 +640,30 @@ fn branches_in_single_folder_mode() {
     assert_eq!(inner.actions[0], Action::FileInto { mailbox: "B".into(), copy: false, create: false, flags: None });
     assert_stable(&set);
 }
+
+/// The spam case from a real campaign: an address regex with escaped dots.
+#[test]
+fn address_regex_round_trips_with_escapes() {
+    let src = "require [\"fileinto\", \"regex\"];\nif address :regex \"from\" \"^(info|support|kontakt|suite)[0-9]{4,}@([a-z0-9-]+\\\\.)+[a-z0-9-]+\\\\.shop$\" {\n  fileinto \"Junk\";\n  stop;\n}\n";
+    let set = import(src).unwrap();
+    let r = rule(&set, 0);
+    let Some(ConditionTest::Address { headers, part, matcher, keys }) = r.conditions.items.first().map(|c| &c.test) else {
+        panic!("{:?}", r.conditions)
+    };
+    assert_eq!(headers, &["from"]);
+    assert_eq!(*part, AddressPart::All);
+    assert_eq!(matcher.match_type, MatchType::Regex);
+    // The model holds the regex as written, with single backslashes.
+    assert_eq!(keys, &["^(info|support|kontakt|suite)[0-9]{4,}@([a-z0-9-]+\\.)+[a-z0-9-]+\\.shop$"]);
+    assert_eq!(r.actions, [Action::FileInto { mailbox: "Junk".into(), copy: false, create: false, flags: None }, Action::Stop]);
+
+    let text = assert_stable(&set);
+    // Backslashes are doubled again in the Sieve string.
+    assert!(text.contains(r#""^(info|support|kontakt|suite)[0-9]{4,}@([a-z0-9-]+\\.)+[a-z0-9-]+\\.shop$""#), "{text}");
+
+    // `require "regex"` is added when a rule needs it.
+    let mut fresh = set.clone();
+    fresh.requires.clear();
+    let text = export(&fresh, &PrintOptions::readable());
+    assert!(text.starts_with("require [\"fileinto\",\"regex\"];"), "{text}");
+}

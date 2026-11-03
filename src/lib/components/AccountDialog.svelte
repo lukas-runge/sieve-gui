@@ -49,7 +49,7 @@
         certificate,
         username,
         imap: imapEnabled
-          ? { host: imapHost.trim() || host, port: imapPort, security: imapSecurity, certificate: imapCertificate ?? undefined }
+          ? { host: imapHost.trim() || host, port: imapPort, security: imapSecurity, certificate: imapCertificate }
           : null,
         multipleScripts,
         lastMoveWins,

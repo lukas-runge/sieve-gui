@@ -53,7 +53,7 @@ const ADDRESS_FIELDS: readonly Field[] = ["from", "to", "cc", "toOrCc", "header"
 
 export interface ConditionView {
   field: Field;
-  /** Header name for the `header` field. */
+  /** Header name(s) for the `header` field, several separated by commas. */
   header: string;
   part: Part;
   operator: Operator;
@@ -79,7 +79,18 @@ function fieldOf(headers: string[]): { field: Field; header: string } | null {
       return { field: field as Field, header: "" };
     }
   }
-  return headers.length === 1 ? { field: "header", header: headers[0] } : null;
+  // Any other headers, several as a comma-separated list. A name with a comma
+  // (allowed, but unheard of) couldn't be told apart, so it stays code.
+  if (headers.length === 0 || headers.some((h) => h.includes(","))) return null;
+  return { field: "header", header: headers.join(", ") };
+}
+
+/** The header names typed into the header field. */
+export function headerNames(text: string): string[] {
+  return text
+    .split(",")
+    .map((h) => h.trim())
+    .filter((h) => h !== "");
 }
 
 /** Escapes `*`, `?` and `\` for a literal part of a `:matches` pattern. */
@@ -239,7 +250,8 @@ function textOperator(
 
 /** Builds the model condition for an editor view. */
 export function buildCondition(v: ConditionView): Condition {
-  const headers = v.field === "header" ? [v.header || "x-header"] : (FIELD_HEADERS[v.field] ?? ["subject"]);
+  const typed = headerNames(v.header);
+  const headers = v.field === "header" ? (typed.length ? typed : ["x-header"]) : (FIELD_HEADERS[v.field] ?? ["subject"]);
   if (v.field === "size") {
     const limit = Math.max(0, Math.round(Number(v.values[0]) || 0));
     return { negate: false, test: { type: "size", over: v.operator !== "under", limit } };

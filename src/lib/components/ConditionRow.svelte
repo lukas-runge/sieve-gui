@@ -56,9 +56,10 @@
     </select>
     {#if view.field === "header"}
       <input
-        class="input input-sm w-40 font-mono"
+        class="input input-sm w-56 font-mono"
         aria-label={t("field.headerName")}
         placeholder={t("field.headerName")}
+        title={t("field.headerNameHint")}
         value={view.header}
         oninput={(e) => update({ header: e.currentTarget.value }, true)}
       />

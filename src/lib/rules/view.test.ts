@@ -8,6 +8,7 @@ import {
   removeFromGroup,
   setGroupMode,
   buildCondition,
+  headerNames,
   newRule,
   operatorsFor,
   partsFor,
@@ -191,4 +192,21 @@ test("removing the last condition of a nested group removes the group", () => {
   if (inner.test.type !== "group") throw new Error("no inner group");
   assert.equal(removeFromGroup(inner.test, 0, false), true, "now empty");
   assert.equal(removeFromGroup(conditions, 0, true), false, "the rule's own conditions may be empty");
+});
+
+test("several headers in the header field", () => {
+  const c = {
+    negate: false,
+    test: { type: "header", headers: ["X-Original-To", "Delivered-To"], matcher: { matchType: { type: "contains" }, comparator: null }, keys: ["list@example.org"] },
+  } as Condition;
+  const view = viewCondition(c);
+  assert.deepEqual(view, { field: "header", header: "X-Original-To, Delivered-To", part: "header", operator: "contains", values: ["list@example.org"] });
+  assert.deepEqual(buildCondition(view!), c);
+  assert.deepEqual(headerNames(" a ,, b,"), ["a", "b"]);
+  // Known pairs keep their own field.
+  const toCc = { ...c, test: { ...c.test, headers: ["Cc", "To"] } } as Condition;
+  assert.equal(viewCondition(toCc)?.field, "toOrCc");
+  // A name with a comma can't be told apart from two names.
+  const comma = { ...c, test: { ...c.test, headers: ["a,b"] } } as Condition;
+  assert.equal(viewCondition(comma), null);
 });

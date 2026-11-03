@@ -2,7 +2,7 @@
   // A rule read as a sentence: "If Sender contains @tax… then move to Taxes".
   import type { Action, Condition, Join, Rule } from "#tauri/types";
   import { i18n, t, type MessageKey } from "../i18n.svelte";
-  import { actionKind, hasValues, viewCondition } from "../rules/view";
+  import { actionKind, hasValues, headerNames, viewCondition } from "../rules/view";
   import { formatDate, formatSize } from "../rules/format";
   import { mailboxLabel } from "../rules/mailbox";
 
@@ -43,7 +43,9 @@
 {#snippet single(condition: Condition)}
   {@const view = viewCondition(condition)}
   {#if view}<span class="slot"
-      >{view.field === "header" ? view.header : t(`field.${view.field}` as MessageKey)}{#if view.part !== "header"}{" "}({t(
+      >{view.field === "header"
+        ? headerNames(view.header).join(` ${t("sentence.or")} `)
+        : t(`field.${view.field}` as MessageKey)}{#if view.part !== "header"}{" "}({t(
           `part.${view.part}` as MessageKey,
         )}){/if}</span
     >{" "}<span>{t(`op.${view.operator}` as MessageKey)}</span>

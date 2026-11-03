@@ -148,6 +148,12 @@ Roundcube writes no marker of its own, and sieve-gui deliberately uses the same 
 
 ### Later
 
+- **Readable complex rules:** the sentence layout reads well for one condition and one action, but not for real scripts. Every value is highlighted the same way, so a card with branches is a wall of highlights. Long `elsif` chains and nested checks read as one paragraph, and long header lists ("to or cc or bcc or Received") push the values out of sight. Rework the card layout so that a script stays easy to scan:
+  - a clear structure for branches (one row per branch, its condition and its outcome aligned) instead of running text
+  - fewer, calmer highlights (e.g. only the values; folders and flags with an icon of their own)
+  - short names for common header lists ("recipients" for to/cc/bcc), with the full list on demand
+  - compact rows for simple rules ("`fktg.org` → Accounts › Bildung › FKTG"), collapsible branches for long ones
+  - check the result against real scripts with many branches and nested checks
 - Test a rule against a pasted/selected sample message
 - "Create rule from this message"
 - Rule templates (newsletters, invoices, mailing lists)

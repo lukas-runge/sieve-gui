@@ -1,4 +1,5 @@
 mod accounts;
+mod copy;
 mod error;
 mod folders;
 mod rules;
@@ -51,6 +52,8 @@ pub fn run() {
             server::activate_script,
             server::rename_script,
             server::delete_script,
+            server::copy_status,
+            server::resolve_copy,
             folders::list_folders,
         ])
         .run(tauri::generate_context!())

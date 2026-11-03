@@ -30,6 +30,7 @@
   let multipleScripts = $state(initial?.multipleScripts ?? true);
   let roundcube = $state(initial?.roundcube ?? false);
   let keywordText = $state(formatKeywordNames(initial?.keywordNames ?? {}));
+  let copyDir = $state(initial?.copyDir ?? "");
   // Unknown (all allowed) until the account has connected.
   const supported = untrack(() => (initial ? session.supported(initial.id) : null));
   let saving = $state(false);
@@ -57,6 +58,7 @@
         lastMoveWins,
         roundcube,
         keywordNames: parseKeywordNames(keywordText),
+        copyDir: copyDir.trim() || null,
         password: password || (initial ? null : ""),
       });
       dialog.close();
@@ -194,6 +196,12 @@
         </label>
         <p class="label whitespace-normal">{t("account.roundcubeHint")}</p>
       </div>
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="acc-copy">{t("copy.dirLabel")}</label>
+      <input id="acc-copy" class="input w-full font-mono text-sm" bind:value={copyDir} placeholder={t("copy.dirDefault")} spellcheck="false" autocapitalize="off" />
+      <p class="label whitespace-normal">{t("copy.dirHint")}</p>
     </fieldset>
 
     <fieldset class="fieldset">

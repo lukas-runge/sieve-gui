@@ -47,6 +47,10 @@ pub struct Account {
     /// `$synolabel_…`), shown instead of the keyword.
     #[serde(default)]
     pub keyword_names: HashMap<String, String>,
+    /// Folder for the local copy of the scripts; `None` uses the app's data
+    /// folder (see `copy`).
+    #[serde(default)]
+    pub copy_dir: Option<String>,
 }
 
 fn enabled() -> bool {
@@ -110,6 +114,7 @@ pub struct AccountInput {
     pub last_move_wins: bool,
     pub roundcube: bool,
     pub keyword_names: HashMap<String, String>,
+    pub copy_dir: Option<String>,
     /// `None` keeps the stored password.
     pub password: Option<String>,
 }
@@ -234,6 +239,7 @@ pub async fn save_account(
         last_move_wins: input.last_move_wins,
         roundcube: input.roundcube,
         keyword_names: input.keyword_names,
+        copy_dir: input.copy_dir.map(|d| d.trim().to_owned()).filter(|d| !d.is_empty()),
     };
     if let Some(pw) = &input.password {
         keychain_entry(&account.id)?.set_password(pw).map_err(keychain_error)?;

@@ -3468,6 +3468,7 @@ dependencies = [
  "managesieve",
  "serde",
  "serde_json",
+ "sha2",
  "sieve-core",
  "tauri",
  "tauri-build",

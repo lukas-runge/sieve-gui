@@ -3,6 +3,8 @@
 import {
   activateScript,
   connectAccount,
+  copyStatus,
+  resolveCopy,
   deleteAccount,
   deleteScript,
   deployScript,
@@ -20,7 +22,17 @@ import {
   setKeywordNames,
   trustCertificate,
 } from "#tauri/commands";
-import type { Account, AccountInput, Folder, Root, ScriptLinks, ServerInfo, UntrustedCertificate } from "#tauri/types";
+import type {
+  Account,
+  AccountInput,
+  CopyStatus,
+  Folder,
+  Root,
+  ScriptLinks,
+  ServerInfo,
+  Side,
+  UntrustedCertificate,
+} from "#tauri/types";
 import { describeError, untrustedCertificate } from "./api";
 import { ask, tell } from "./dialogs.svelte";
 import { t } from "./i18n.svelte";
@@ -78,6 +90,10 @@ class Session {
    * runs unchanged inside the root or is taken over (see `adopt`).
    */
   adoption = $state<Record<string, { active: string }>>({});
+  /** Per account: differences between the server and the local copy, until resolved. */
+  copies = $state<Record<string, CopyStatus>>({});
+  /** The account whose copy differences are shown. */
+  copyPrompt = $state<string | null>(null);
   /** Rejected server certificates to show, one after the other. */
   certificatePrompts = $state<{ accountId: string; untrusted: UntrustedCertificate }[]>([]);
   /** Accounts set up or changed just now: their rejected certificates are shown right away. */
@@ -120,6 +136,10 @@ class Session {
     }
     void this.loadFolders(id);
     void this.#loadLinks(id);
+    // Before the root is brought in line with the settings, which would
+    // otherwise cover up what changed on the server (e.g. a webmail taking
+    // over the active script).
+    if (await this.#checkCopy(id)) return;
     await this.#applySettings(id);
   }
 
@@ -137,6 +157,46 @@ class Session {
       this.folders[id] = { status: "error", folders: [], error: describeError(e), certificate };
       if (certificate && this.#promptCertificates.has(id)) this.showCertificate(id, certificate);
     }
+  }
+
+  /**
+   * Compares the server with the local copy. Returns whether they differ;
+   * the settings are then applied once the user resolved the differences.
+   */
+  async #checkCopy(id: string): Promise<boolean> {
+    try {
+      const status = await copyStatus(id);
+      if (status.differences.length === 0 && !status.active) {
+        delete this.copies[id];
+        return false;
+      }
+      this.copies[id] = status;
+      this.copyPrompt ??= id;
+      return true;
+    } catch (e) {
+      this.error = describeError(e);
+      return false;
+    }
+  }
+
+  /** Applies the user's decisions on the copy differences of an account. */
+  async resolveCopy(id: string, choices: { name: string; keep: Side }[], active: Side | null) {
+    try {
+      await resolveCopy(id, choices, active);
+    } catch (e) {
+      this.error = describeError(e);
+      return;
+    }
+    delete this.copies[id];
+    if (this.copyPrompt === id) this.copyPrompt = null;
+    this.links[id] = {};
+    await this.refreshScripts(id);
+    // An open script may have been replaced.
+    const editor = this.editor;
+    if (editor?.accountId === id && !editor.dirty && choices.some((c) => c.name === editor.name)) {
+      await this.openScript(id, editor.name);
+    }
+    await this.#applySettings(id);
   }
 
   /** Names of the account's custom keywords. */
@@ -379,6 +439,7 @@ class Session {
     delete this.rootSources[id];
     delete this.adoption[id];
     delete this.links[id];
+    delete this.copies[id];
     if (this.rootView === id) this.rootView = null;
     await this.loadAccounts();
   }

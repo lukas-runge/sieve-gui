@@ -1,13 +1,14 @@
 //! ManageSieve sessions and the commands that use them.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use managesieve::{Capabilities, Client, ConnectOptions, Credentials, Diagnostic, ScriptInfo};
-use serde::Serialize;
-use tauri::{AppHandle, State};
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Manager, State};
 use tokio::sync::Mutex;
 
 use crate::accounts::{self, Account, AccountStore};
+use crate::copy::{self, CopyStatus, LocalCopy, Side};
 use crate::error::{AppError, AppResult, ErrorKind};
 
 /// One open connection per account, reused across commands.
@@ -153,8 +154,10 @@ pub async fn deploy_script(
         }
     }
     with_client!(app, store, sessions, id, |client| client.check_script(&content).await)?;
-    with_client!(app, store, sessions, id, |client| client.put_script(&name, &content).await)
-        .map(|outcome| outcome.diagnostics())
+    let diagnostics = with_client!(app, store, sessions, id, |client| client.put_script(&name, &content).await)
+        .map(|outcome| outcome.diagnostics())?;
+    record(&app, &store, &id, |c| c.put(&name, &content));
+    Ok(diagnostics)
 }
 
 /// Makes a script the active one, or deactivates all scripts for `None`.
@@ -166,10 +169,12 @@ pub async fn activate_script(
     id: String,
     name: Option<String>,
 ) -> AppResult<()> {
-    match name {
-        Some(name) => with_client!(app, store, sessions, id, |client| client.set_active(&name).await),
-        None => with_client!(app, store, sessions, id, |client| client.deactivate().await),
+    match &name {
+        Some(name) => with_client!(app, store, sessions, id, |client| client.set_active(name).await)?,
+        None => with_client!(app, store, sessions, id, |client| client.deactivate().await)?,
     }
+    record(&app, &store, &id, |c| c.set_active(name.as_deref()));
+    Ok(())
 }
 
 #[tauri::command]
@@ -181,7 +186,9 @@ pub async fn rename_script(
     name: String,
     new_name: String,
 ) -> AppResult<()> {
-    with_client!(app, store, sessions, id, |client| client.rename_script(&name, &new_name).await)
+    with_client!(app, store, sessions, id, |client| client.rename_script(&name, &new_name).await)?;
+    record(&app, &store, &id, |c| c.rename(&name, &new_name));
+    Ok(())
 }
 
 #[tauri::command]
@@ -192,5 +199,135 @@ pub async fn delete_script(
     id: String,
     name: String,
 ) -> AppResult<()> {
-    with_client!(app, store, sessions, id, |client| client.delete_script(&name).await)
+    with_client!(app, store, sessions, id, |client| client.delete_script(&name).await)?;
+    record(&app, &store, &id, |c| c.remove(&name));
+    Ok(())
+}
+
+// ── Local copy ────────────────────────────────────────────────────────────────
+
+fn local_copy(app: &AppHandle, account: &Account) -> AppResult<LocalCopy> {
+    let dir = match &account.copy_dir {
+        Some(dir) => std::path::PathBuf::from(dir),
+        None => app
+            .path()
+            .app_data_dir()
+            .map_err(|e| AppError::new(ErrorKind::Config, e.to_string()))?
+            .join("copies")
+            .join(&account.id),
+    };
+    Ok(LocalCopy::new(dir))
+}
+
+fn copy_error(e: std::io::Error) -> AppError {
+    AppError::new(ErrorKind::Config, format!("local copy: {e}"))
+}
+
+/// Records a change the app made on the server in the local copy, once the
+/// copy exists. The change on the server stands either way, so a failure
+/// here is only logged.
+fn record(app: &AppHandle, store: &AccountStore, id: &str, f: impl FnOnce(&LocalCopy) -> std::io::Result<()>) {
+    let Ok(account) = store.get(app, id) else { return };
+    let Ok(copy) = local_copy(app, &account) else { return };
+    if !matches!(copy.manifest(), Ok(Some(_))) {
+        return;
+    }
+    if let Err(e) = f(&copy) {
+        eprintln!("local copy of {id}: {e}");
+    }
+}
+
+/// All scripts on the server with their content, and the active one.
+async fn server_state(
+    app: &AppHandle,
+    store: &State<'_, AccountStore>,
+    sessions: &State<'_, Sessions>,
+    id: &str,
+) -> AppResult<(BTreeMap<String, String>, Option<String>)> {
+    let scripts = with_client!(app, store, sessions, id, |client| client.list_scripts().await)?;
+    let mut contents = BTreeMap::new();
+    for script in &scripts {
+        let content = with_client!(app, store, sessions, id, |client| client.get_script(&script.name).await)?;
+        contents.insert(script.name.clone(), content);
+    }
+    Ok((contents, scripts.iter().find(|s| s.active).map(|s| s.name.clone())))
+}
+
+/// Compares the server with the account's local copy. Without a copy yet,
+/// creates it from the server and reports no differences.
+#[tauri::command]
+pub async fn copy_status(
+    app: AppHandle,
+    store: State<'_, AccountStore>,
+    sessions: State<'_, Sessions>,
+    id: String,
+) -> AppResult<CopyStatus> {
+    let account = store.get(&app, &id)?;
+    let copy = local_copy(&app, &account)?;
+    let (server, active) = server_state(&app, &store, &sessions, &id).await?;
+    let dir = copy.dir().display().to_string();
+    let Some(manifest) = copy.manifest().map_err(copy_error)? else {
+        copy.take_over(&server, active.as_deref()).map_err(copy_error)?;
+        return Ok(CopyStatus { dir, ..CopyStatus::default() });
+    };
+    let local = copy.scripts().map_err(copy_error)?;
+    let (differences, active) = copy::compare(&server, active.as_deref(), &local, &manifest);
+    Ok(CopyStatus { dir, differences, active })
+}
+
+/// Which side wins for a script that differs.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CopyChoice {
+    pub name: String,
+    pub keep: Side,
+}
+
+/// Resolves differences between server and local copy: `Local` uploads the
+/// copy's version (or deletes the script on the server if the copy has
+/// none), `Server` takes the server's version into the copy. `active` does
+/// the same for the active script.
+#[tauri::command]
+pub async fn resolve_copy(
+    app: AppHandle,
+    store: State<'_, AccountStore>,
+    sessions: State<'_, Sessions>,
+    id: String,
+    choices: Vec<CopyChoice>,
+    active: Option<Side>,
+) -> AppResult<()> {
+    let account = store.get(&app, &id)?;
+    let copy = local_copy(&app, &account)?;
+    let (server, server_active) = server_state(&app, &store, &sessions, &id).await?;
+    let local = copy.scripts().map_err(copy_error)?;
+    // Uploads first, so that a script to activate exists.
+    for choice in &choices {
+        let name = &choice.name;
+        match (choice.keep, local.get(name), server.get(name)) {
+            (Side::Local, Some(content), _) => {
+                with_client!(app, store, sessions, id, |client| client.check_script(content).await)?;
+                with_client!(app, store, sessions, id, |client| client.put_script(name, content).await)?;
+                copy.put(name, content).map_err(copy_error)?;
+            }
+            (Side::Local, None, Some(_)) => {
+                with_client!(app, store, sessions, id, |client| client.delete_script(name).await)?;
+                copy.remove(name).map_err(copy_error)?;
+            }
+            (Side::Server, _, Some(content)) => copy.put(name, content).map_err(copy_error)?,
+            (Side::Server, _, None) => copy.remove(name).map_err(copy_error)?,
+            (Side::Local, None, None) => {}
+        }
+    }
+    match active {
+        Some(Side::Local) => {
+            let manifest = copy.manifest().map_err(copy_error)?.unwrap_or_default();
+            match &manifest.active {
+                Some(name) => with_client!(app, store, sessions, id, |client| client.set_active(name).await)?,
+                None => with_client!(app, store, sessions, id, |client| client.deactivate().await)?,
+            }
+        }
+        Some(Side::Server) => copy.set_active(server_active.as_deref()).map_err(copy_error)?,
+        None => {}
+    }
+    Ok(())
 }

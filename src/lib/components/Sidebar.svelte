@@ -4,6 +4,7 @@
   import type { Account } from "#tauri/types";
   import { t } from "../i18n.svelte";
   import CertificateDialog from "./CertificateDialog.svelte";
+  import CopyDialog from "./CopyDialog.svelte";
   import { ask, askText, tell } from "../dialogs.svelte";
   import { closesMenu } from "../menu";
   import { ROOT_SCRIPT, session } from "../session.svelte";
@@ -207,6 +208,15 @@
           {/if}
         </div>
       {:else if server.info}
+        {@const copy = session.copies[account.id]}
+        {#if copy}
+          <div role="alert" class="grid gap-1.5 rounded-box border border-warning/40 bg-warning/10 px-2 py-1.5 text-xs">
+            <p>{t("copy.notice", { count: copy.differences.length + (copy.active ? 1 : 0) })}</p>
+            <button class="btn btn-xs justify-self-start" onclick={() => (session.copyPrompt = account.id)}>
+              {t("copy.show")}
+            </button>
+          </div>
+        {/if}
         {@const adoption = session.adoption[account.id]}
         {#if adoption}
           <div role="alert" class="grid gap-1.5 rounded-box border border-info/40 bg-info/10 px-2 py-1.5 text-xs">
@@ -289,6 +299,18 @@
 
   <button class="btn btn-sm mt-auto" onclick={() => onaccount(null)}>+ {t("accounts.add")}</button>
 </nav>
+
+{#if session.copyPrompt && session.copies[session.copyPrompt]}
+  {@const id = session.copyPrompt}
+  {#key id}
+    <CopyDialog
+      status={session.copies[id]}
+      label={session.accounts.find((a) => a.id === id)?.label ?? ""}
+      onresolve={(choices, active) => session.resolveCopy(id, choices, active)}
+      onclose={() => (session.copyPrompt = null)}
+    />
+  {/key}
+{/if}
 
 {#if session.certificatePrompts[0]}
   {@const { accountId, untrusted } = session.certificatePrompts[0]}

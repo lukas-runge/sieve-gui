@@ -69,6 +69,7 @@ const nas = {
 // `?nasChanged` starts with another certificate trusted, as after a new one.
 if (new URLSearchParams(location.search).has("nasChanged")) nas.certificate = "aa".repeat(32);
 const accounts = [account, nas];
+let copyResolved = false;
 
 // Modified UTF-7 names, as IMAP sends them.
 const folders = (
@@ -156,6 +157,22 @@ export function installMock() {
         Object.assign(target, input, { id: target.id });
         return target;
       }
+      case "copy_status": {
+        // `?copyDiff`: the preview server lost a script and its active script.
+        const differs = a.id === account.id && new URLSearchParams(location.search).has("copyDiff") && !copyResolved;
+        if (!differs) return { dir: `~/Library/Application Support/sieve-gui/copies/${a.id}`, differences: [], active: null };
+        return {
+          dir: `~/Library/Application Support/sieve-gui/copies/${a.id}`,
+          differences: [
+            { name: "Steuern", server: null, local: "# rule:[Taxes]\nif true { keep; }\n", changed: ["server"] },
+            { name: "Gemischt", server: source(server, "Gemischt"), local: "# older version\n" + source(server, "Gemischt"), changed: ["server"] },
+          ],
+          active: { server: "Allgemein", local: "sieve-gui" },
+        };
+      }
+      case "resolve_copy":
+        copyResolved = true;
+        return null;
       case "set_keyword_names": {
         const target = accounts.find((x) => x.id === a.id)!;
         target.keywordNames = a.names;

@@ -34,6 +34,7 @@ import type {
   UntrustedCertificate,
 } from "#tauri/types";
 import { describeError, untrustedCertificate } from "./api";
+import { scriptTree, type ScriptNode } from "./scripts";
 import { ask, tell } from "./dialogs.svelte";
 import { t } from "./i18n.svelte";
 import { ScriptEditor } from "./editor.svelte";
@@ -59,8 +60,8 @@ export interface RootSettings {
   lastMoveWins: boolean;
 }
 
-/** localStorage key of the sidebar order of scripts, per account. */
-const ORDER_KEY = "scriptOrder";
+
+export type { ScriptNode };
 
 export interface FolderState {
   status: "loading" | "ready" | "error";
@@ -102,8 +103,6 @@ class Session {
   links = $state<Record<string, Record<string, ScriptLinks>>>({});
   /** The account whose root script is shown (read-only) instead of an editor. */
   rootView = $state<string | null>(null);
-  /** Per account: script names in the order the user arranged them. */
-  #order = $state<Record<string, string[]>>(JSON.parse(localStorage.getItem(ORDER_KEY) ?? "{}"));
   editor = $state<ScriptEditor | null>(null);
   loadingScript = $state(false);
   error = $state<string | null>(null);
@@ -554,13 +553,9 @@ class Session {
       // mode just files messages directly.
       if (root && name !== null) {
         if (!root.scripts.includes(name)) {
-          let scripts = [name];
-          if (this.rootSettings(id).multipleScripts) {
-            const order = this.scriptOrder(id);
-            if (!order.includes(name)) order.push(name);
-            const running = order.filter((s) => s === name || root.scripts.includes(s));
-            scripts = [...running, ...root.scripts.filter((s) => !running.includes(s))];
-          }
+          // A script activated now runs last; the order can be changed in
+          // the sidebar.
+          const scripts = this.rootSettings(id).multipleScripts ? [...root.scripts, name] : [name];
           await this.#writeRoot(id, scripts, root.lastMoveWins);
           if (root.lastMoveWins) await this.#setSingleFolder(id, name, true);
         }
@@ -587,30 +582,23 @@ class Session {
   }
 
   /**
-   * The account's scripts (without the root script) in the order the user
-   * arranged them. Active scripts of a root appear in the order they run;
-   * inactive ones keep their place in between.
+   * The account's scripts as the sidebar shows them: first the running ones
+   * in the order they run, then the others alphabetically. Scripts included
+   * by another one follow it, indented (`depth`), unless they run on their
+   * own. The root script itself isn't listed.
    */
-  scriptOrder(id: string): string[] {
+  scriptTree(id: string): { running: ScriptNode[]; inactive: ScriptNode[] } {
     const root = this.roots[id];
     const managed = !!root || !!this.displaced[id];
     const names = (this.servers[id]?.info?.scripts ?? []).map((s) => s.name).filter((n) => !managed || n !== ROOT_SCRIPT);
-    const saved = (this.#order[id] ?? []).filter((n) => names.includes(n));
-    const list = [...saved, ...names.filter((n) => !saved.includes(n))];
-    if (!root) return list;
-    // The root decides the run order (it may have changed elsewhere), so the
-    // active scripts fill the places of active scripts in that order.
-    const running = root.scripts.filter((n) => list.includes(n));
-    let next = 0;
-    return list.map((n) => (root.scripts.includes(n) ? running[next++] : n));
+    const top = root ? root.scripts : names.filter((n) => this.isActive(id, n));
+    const includes = Object.fromEntries(Object.entries(this.links[id] ?? {}).map(([n, l]) => [n, l.includes]));
+    return scriptTree(names, top, includes);
   }
 
-  /** Arranges the scripts; with a root, the active ones then run in this order. */
-  async reorderScripts(id: string, names: string[]) {
-    this.#order[id] = names;
-    localStorage.setItem(ORDER_KEY, JSON.stringify(this.#order));
-    const root = this.roots[id];
-    if (root) await this.#reorderActive(id, names.filter((n) => root.scripts.includes(n)));
+  /** Sets the order in which the running scripts run. */
+  async reorderRunning(id: string, names: string[]) {
+    await this.#reorderActive(id, names);
   }
 
   /**
@@ -668,11 +656,6 @@ class Session {
   async rename(id: string, name: string, newName: string) {
     try {
       await renameScript(id, name, newName);
-      const order = this.#order[id];
-      if (order?.includes(name)) {
-        this.#order[id] = order.map((s) => (s === name ? newName : s));
-        localStorage.setItem(ORDER_KEY, JSON.stringify(this.#order));
-      }
       if (this.editor?.accountId === id && this.editor.name === name) this.editor.name = newName;
       const root = this.roots[id];
       if (root?.scripts.includes(name)) {

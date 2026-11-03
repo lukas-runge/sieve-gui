@@ -2,6 +2,7 @@
   import { flip } from "svelte/animate";
   import { SvelteSet } from "svelte/reactivity";
   import type { Account } from "#tauri/types";
+  import type { ScriptNode } from "../session.svelte";
   import { t } from "../i18n.svelte";
   import CertificateDialog from "./CertificateDialog.svelte";
   import CopyDialog from "./CopyDialog.svelte";
@@ -68,11 +69,12 @@
     }
   }
 
+  /** Moves a running script in the run order. */
   function moveTo(id: string, order: string[], from: number, to: number) {
     if (to < 0 || to >= order.length || from === to) return;
     const next = [...order];
     next.splice(to, 0, ...next.splice(from, 1));
-    void session.reorderScripts(id, next);
+    void session.reorderRunning(id, next);
   }
 
   function onhandlekey(e: KeyboardEvent, id: string, order: string[], index: number) {
@@ -91,8 +93,10 @@
   }
 </script>
 
-{#snippet row(id: string, name: string, active: boolean, index: number, order: string[])}
-  <!-- index: position in the list if it can be rearranged, -1 otherwise. -->
+{#snippet row(id: string, node: ScriptNode, active: boolean, running: boolean, index: number, order: string[])}
+  <!-- index: position in the run order if it can be rearranged, -1 otherwise.
+       running: the script runs, on its own or included by `node.via`. -->
+  {@const name = node.name}
   {@const current = session.editor?.accountId === id && session.editor.name === name}
   {@const arrangeable = session.multipleActive(id)}
   {@const key = `${id}:${name}`}
@@ -105,13 +109,22 @@
   {@const notes = [
     ...(unchanged ? [t("scripts.unchanged")] : []),
     ...(movesItself ? [t("scripts.filesMessages")] : []),
-    ...(parents.length ? [t("scripts.includedBy", { names: quoted(parents) })] : []),
+    // Listed under the script including it; other including scripts are named.
+    ...(parents.some((p) => p !== node.via)
+      ? [t("scripts.includedBy", { names: quoted(parents.filter((p) => p !== node.via)) })]
+      : []),
   ]}
   {@const hints = [
     ...(unchanged ? [t("scripts.unchangedHint")] : []),
     ...(movesItself ? [t("scripts.filesMessagesHint")] : []),
   ]}
-  <div class="group flex items-center rounded-field {current ? 'bg-base-100 shadow-[inset_3px_0_0_var(--color-primary)]' : 'hover:bg-base-100/60'}">
+  <div
+    class="group flex items-center rounded-field {current ? 'bg-base-100 shadow-[inset_3px_0_0_var(--color-primary)]' : 'hover:bg-base-100/60'}"
+    style:margin-left="{node.depth * 1.25}rem"
+  >
+    {#if node.depth > 0}
+      <span class="text-base-content/40" aria-hidden="true">↳</span>
+    {/if}
     {#if index >= 0 && order.length > 1}
       <button
         class="btn btn-ghost btn-xs btn-square ml-0.5 cursor-grab text-base-content/50"
@@ -128,7 +141,7 @@
       >
         ⠿
       </button>
-    {:else if arrangeable}
+    {:else if arrangeable && node.depth === 0}
       <!-- Lines the name up with those that have a handle. -->
       <span class="ml-0.5 w-6 shrink-0" aria-hidden="true"></span>
     {/if}
@@ -144,6 +157,12 @@
         <span class="block text-xs leading-snug break-words {movesItself ? 'text-warning' : 'text-base-content/60'}">{notes.join(" · ")}</span>
       {/if}
     </button>
+    {#if running && node.via}
+      <!-- Runs because the script above includes it. -->
+      <span class="badge badge-sm badge-soft badge-primary mr-1 whitespace-nowrap" title={t("scripts.viaHint", { name: node.via })}>
+        {t("scripts.via")}
+      </span>
+    {:else}
     <button
       class={[
         "badge badge-sm mr-1 cursor-pointer whitespace-nowrap",
@@ -158,6 +177,7 @@
       {#if toggling.has(key)}<span class="loading loading-spinner loading-xs"></span>{/if}
       {active ? t("scripts.active") : t("scripts.off")}
     </button>
+    {/if}
     <div class="dropdown dropdown-end">
       <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square opacity-60 group-hover:opacity-100 focus:opacity-100" aria-label="{name}: …">⋯</div>
       <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
@@ -241,42 +261,52 @@
           </div>
         {/if}
         <!-- The root script follows the account settings; it isn't listed. -->
-        {@const order = session.scriptOrder(account.id)}
+        {@const tree = session.scriptTree(account.id)}
         {@const arrangeable = session.multipleActive(account.id)}
+        <!-- Only the run order of the running scripts can be arranged. -->
+        {@const order = tree.running.filter((n) => n.depth === 0).map((n) => n.name)}
+        {@const dragging = drag?.account === account.id}
         <ul class="grid gap-0.5">
-          {#each order as name, index (name)}
-            {@const active = session.isActive(account.id, name)}
-            {@const dragging = drag?.account === account.id}
+          {#each tree.running as node (node.name)}
+            {@const index = node.depth === 0 ? order.indexOf(node.name) : -1}
             <li
               animate:flip={{ duration: 150 }}
-              class="relative {dragging && drag?.from === index ? 'opacity-50' : ''}"
+              class="relative {dragging && index >= 0 && drag?.from === index ? 'opacity-50' : ''}"
               ondragover={(e) => {
-                if (!dragging) return;
+                if (!dragging || index < 0) return;
                 e.preventDefault();
                 const rect = e.currentTarget.getBoundingClientRect();
                 dropAt = e.clientY < rect.top + rect.height / 2 ? index : index + 1;
               }}
               ondrop={(e) => {
                 e.preventDefault();
-                if (drag?.account === account.id) {
+                if (drag?.account === account.id && index >= 0) {
                   const at = dropAt ?? index;
                   moveTo(account.id, order, drag.from, drag.from < at ? at - 1 : at);
                 }
                 drag = dropAt = null;
               }}
             >
-              {#if dragging && dropAt === index}
+              {#if dragging && index >= 0 && dropAt === index}
                 <div class="absolute -top-0.5 left-0 right-0 h-0.5 rounded bg-primary"></div>
               {/if}
-              <!-- Only the run order of several scripts can be arranged. -->
-              {@render row(account.id, name, active, arrangeable ? index : -1, order)}
-              {#if dragging && dropAt === order.length && index === order.length - 1}
+              {@render row(account.id, node, node.depth === 0, true, arrangeable ? index : -1, order)}
+              {#if dragging && index === order.length - 1 && dropAt === order.length}
                 <div class="absolute -bottom-0.5 left-0 right-0 h-0.5 rounded bg-primary"></div>
               {/if}
             </li>
-          {:else}
-            <li class="px-2 text-sm text-base-content/60">{t("scripts.none")}</li>
           {/each}
+          {#if tree.running.length && tree.inactive.length}
+            <li class="mt-2 px-2 text-xs font-semibold text-base-content/50">{t("scripts.inactiveHeading")}</li>
+          {/if}
+          {#each tree.inactive as node (node.name)}
+            <li animate:flip={{ duration: 150 }}>
+              {@render row(account.id, node, false, false, -1, order)}
+            </li>
+          {/each}
+          {#if !tree.running.length && !tree.inactive.length}
+            <li class="px-2 text-sm text-base-content/60">{t("scripts.none")}</li>
+          {/if}
         </ul>
         <button class="btn btn-ghost btn-xs justify-self-start w-fit" onclick={() => create(account.id)}>+ {t("scripts.new")}</button>
         {@const folders = session.folders[account.id]}

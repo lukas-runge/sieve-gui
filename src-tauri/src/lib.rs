@@ -2,6 +2,7 @@ mod accounts;
 mod copy;
 mod error;
 mod folders;
+mod passwords;
 mod rules;
 mod server;
 

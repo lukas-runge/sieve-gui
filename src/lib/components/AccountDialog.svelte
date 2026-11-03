@@ -4,6 +4,7 @@
   import { describeError } from "../api";
   import { t, type MessageKey } from "../i18n.svelte";
   import { ROOT_SCRIPT, session } from "../session.svelte";
+  import Fingerprint from "./Fingerprint.svelte";
 
   let { account, onclose }: { account: Account | null; onclose: () => void } = $props();
 
@@ -15,6 +16,9 @@
   let security = $state<AccountSecurity>(initial?.security ?? "startTls");
   let port = $state(initial?.port ?? 4190);
   let username = $state(initial?.username ?? "");
+  // Certificates trusted although the OS doesn't (only removable here).
+  let certificate = $state(initial?.certificate ?? null);
+  let imapCertificate = $state(initial?.imap?.certificate ?? null);
   let password = $state("");
   // IMAP for the folder list: on by default for new accounts.
   let imapEnabled = $state(initial ? initial.imap !== null : true);
@@ -42,8 +46,11 @@
         host,
         port,
         security,
+        certificate,
         username,
-        imap: imapEnabled ? { host: imapHost.trim() || host, port: imapPort, security: imapSecurity } : null,
+        imap: imapEnabled
+          ? { host: imapHost.trim() || host, port: imapPort, security: imapSecurity, certificate: imapCertificate ?? undefined }
+          : null,
         multipleScripts,
         lastMoveWins,
         roundcube,
@@ -70,6 +77,14 @@
     imapSecurity = value;
   }
 </script>
+
+{#snippet trusted(sha256: string, untrust: () => void)}
+  <div class="grid gap-1 text-xs">
+    <span class="text-base-content/70">{t("certificate.trusted")}</span>
+    <Fingerprint {sha256} />
+    <button type="button" class="btn btn-ghost btn-xs justify-self-start" onclick={untrust}>{t("certificate.untrust")}</button>
+  </div>
+{/snippet}
 
 {#snippet setting(label: string, hint: string, available: boolean, get: () => boolean, set: (value: boolean) => void)}
   <div>
@@ -111,6 +126,7 @@
           <option value={s}>{t(`account.security.${s}` as MessageKey)}</option>
         {/each}
       </select>
+      {#if certificate}{@render trusted(certificate, () => (certificate = null))}{/if}
     </fieldset>
 
     <fieldset class="fieldset">
@@ -150,6 +166,7 @@
             <option value={s}>{t(`account.imapSecurity.${s}` as MessageKey)}</option>
           {/each}
         </select>
+        {#if imapCertificate}{@render trusted(imapCertificate, () => (imapCertificate = null))}{/if}
       </fieldset>
     {/if}
 

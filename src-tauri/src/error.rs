@@ -1,7 +1,10 @@
 //! Errors as seen by the frontend.
 
 use managesieve::Diagnostic;
+use managesieve::tls::CertificateInfo;
 use serde::Serialize;
+
+use crate::accounts::Service;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -10,6 +13,8 @@ pub enum ErrorKind {
     Connection,
     /// TLS handshake or certificate verification failed.
     Tls,
+    /// The server's certificate is not trusted; see [`AppError::certificate`].
+    UntrustedCertificate,
     /// The server rejected the credentials.
     Auth,
     /// The server rejected a command (`NO`), e.g. a script with errors.
@@ -32,16 +37,52 @@ pub struct AppError {
     pub message: String,
     /// Line-based messages from the server, e.g. for `CHECKSCRIPT`.
     pub diagnostics: Vec<Diagnostic>,
+    /// For [`ErrorKind::UntrustedCertificate`]: the certificate to offer
+    /// trusting.
+    pub certificate: Option<Box<UntrustedCertificate>>,
+}
+
+/// A server certificate the OS doesn't trust and that isn't pinned.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UntrustedCertificate {
+    pub service: Service,
+    pub certificate: CertificateInfo,
+    /// The fingerprint trusted so far, if any: then the server's certificate
+    /// changed.
+    pub pinned: Option<String>,
 }
 
 impl AppError {
     pub fn new(kind: ErrorKind, message: impl Into<String>) -> Self {
-        Self { kind, message: message.into(), diagnostics: Vec::new() }
+        Self { kind, message: message.into(), diagnostics: Vec::new(), certificate: None }
+    }
+
+    fn untrusted(service: Service, certificate: CertificateInfo, reason: String) -> Self {
+        Self {
+            certificate: Some(Box::new(UntrustedCertificate { service, certificate, pinned: None })),
+            ..Self::new(ErrorKind::UntrustedCertificate, reason)
+        }
+    }
+
+    /// Records the fingerprint that was trusted when the certificate was
+    /// rejected.
+    pub fn with_pinned(mut self, pinned: Option<&String>) -> Self {
+        if let Some(untrusted) = &mut self.certificate {
+            untrusted.pinned = pinned.cloned();
+        }
+        self
     }
 
     /// Maps a ManageSieve error. `during_auth` turns `NO` into [`ErrorKind::Auth`].
     pub fn from_sieve(err: managesieve::Error, during_auth: bool) -> Self {
         use managesieve::Error as E;
+        let err = match err {
+            E::UntrustedCertificate { certificate, reason } => {
+                return Self::untrusted(Service::ManageSieve, *certificate, reason);
+            }
+            err => err,
+        };
         let kind = match &err {
             E::Tls(_) | E::TlsConfig(_) | E::InvalidServerName(_) | E::StartTlsUnavailable => ErrorKind::Tls,
             E::No(_) | E::NoSupportedMechanism { .. } | E::Sasl(_) if during_auth => ErrorKind::Auth,
@@ -58,14 +99,17 @@ impl AppError {
             }
             _ => err.to_string(),
         };
-        Self { kind, message, diagnostics }
+        Self { kind, message, diagnostics, certificate: None }
     }
 }
 
 impl From<mailstore::Error> for AppError {
     fn from(err: mailstore::Error) -> Self {
         use mailstore::Error as E;
-        let kind = match &err {
+        let kind = match err {
+            E::UntrustedCertificate { certificate, reason } => {
+                return Self::untrusted(Service::Imap, *certificate, reason);
+            }
             E::Tls(_) | E::InvalidServerName(_) => ErrorKind::Tls,
             E::Auth(_) => ErrorKind::Auth,
             E::Io(_) | E::Timeout => ErrorKind::Connection,

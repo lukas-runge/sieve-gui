@@ -47,8 +47,13 @@ pub struct ConnectOptions {
     pub port: u16,
     /// Transport security.
     pub security: Security,
-    /// TLS configuration. `None` uses [`crate::tls::platform_config`].
+    /// TLS configuration. `None` uses the platform verifier plus
+    /// [`ConnectOptions::pinned_certificates`] (see
+    /// [`crate::tls::PinningVerifier`]).
     pub tls_config: Option<Arc<ClientConfig>>,
+    /// SHA-256 fingerprints of server certificates to accept even if the
+    /// platform doesn't trust them. Ignored with a custom `tls_config`.
+    pub pinned_certificates: Vec<String>,
     /// Timeout for connecting, the TLS handshake, and each read or write.
     /// `None` disables timeouts.
     pub timeout: Option<Duration>,
@@ -64,6 +69,7 @@ impl ConnectOptions {
             port: DEFAULT_PORT,
             security: Security::StartTls,
             tls_config: None,
+            pinned_certificates: Vec::new(),
             timeout: Some(Duration::from_secs(60)),
             max_literal_size: crate::DEFAULT_MAX_LITERAL_SIZE,
         }
@@ -84,6 +90,15 @@ impl ConnectOptions {
     /// Uses a custom TLS configuration (e.g. custom roots for testing).
     pub fn tls_config(mut self, config: Arc<ClientConfig>) -> Self {
         self.tls_config = Some(config);
+        self
+    }
+
+    /// Accepts the server certificates with these SHA-256 fingerprints.
+    pub fn pinned_certificates<S: Into<String>>(
+        mut self,
+        pins: impl IntoIterator<Item = S>,
+    ) -> Self {
+        self.pinned_certificates = pins.into_iter().map(Into::into).collect();
         self
     }
 
@@ -114,6 +129,7 @@ impl fmt::Debug for ConnectOptions {
             .field("port", &self.port)
             .field("security", &self.security)
             .field("tls_config", &self.tls_config.as_ref().map(|_| "custom"))
+            .field("pinned_certificates", &self.pinned_certificates)
             .field("timeout", &self.timeout)
             .field("max_literal_size", &self.max_literal_size)
             .finish()
@@ -669,9 +685,12 @@ async fn tls_handshake(io: Box<dyn Io>, opts: &ConnectOptions) -> Result<Box<dyn
     let host = opts.bare_host();
     let name = ServerName::try_from(host.to_owned())
         .map_err(|_| Error::InvalidServerName(host.to_owned()))?;
-    let config = match &opts.tls_config {
-        Some(c) => c.clone(),
-        None => crate::tls::platform_config()?,
+    let (config, verifier) = match &opts.tls_config {
+        Some(c) => (c.clone(), None),
+        None => {
+            let verifier = crate::tls::PinningVerifier::new(&opts.pinned_certificates)?;
+            (verifier.client_config()?, Some(verifier))
+        }
     };
     let connector = TlsConnector::from(config);
     let stream = match opts.timeout {
@@ -680,6 +699,12 @@ async fn tls_handshake(io: Box<dyn Io>, opts: &ConnectOptions) -> Result<Box<dyn
             .map_err(|_| Error::Timeout)?,
         None => connector.connect(name, io).await,
     }
-    .map_err(Error::Tls)?;
+    .map_err(|e| match verifier.and_then(|v| v.rejected_certificate()) {
+        Some(cert) => Error::UntrustedCertificate {
+            certificate: Box::new(crate::tls::CertificateInfo::from_der(&cert)),
+            reason: e.to_string(),
+        },
+        None => Error::Tls(e),
+    })?;
     Ok(Box::new(stream))
 }

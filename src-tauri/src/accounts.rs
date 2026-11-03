@@ -21,6 +21,10 @@ pub struct Account {
     pub host: String,
     pub port: u16,
     pub security: AccountSecurity,
+    /// SHA-256 fingerprint of a ManageSieve server certificate the user
+    /// trusts although the OS doesn't (see `managesieve::tls::PinningVerifier`).
+    #[serde(default)]
+    pub certificate: Option<String>,
     pub username: String,
     /// IMAP access for the folder list, with the same credentials.
     /// `None` disables it.
@@ -50,6 +54,17 @@ pub struct ImapSettings {
     pub host: String,
     pub port: u16,
     pub security: AccountSecurity,
+    /// Like [`Account::certificate`], for the IMAP server.
+    #[serde(default)]
+    pub certificate: Option<String>,
+}
+
+/// The servers of an account.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Service {
+    ManageSieve,
+    Imap,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -83,6 +98,7 @@ pub struct AccountInput {
     pub host: String,
     pub port: u16,
     pub security: AccountSecurity,
+    pub certificate: Option<String>,
     pub username: String,
     pub imap: Option<ImapSettings>,
     pub multiple_scripts: bool,
@@ -178,6 +194,7 @@ pub async fn save_account(
         host: input.host.trim().to_owned(),
         port: input.port,
         security: input.security,
+        certificate: input.certificate,
         username: input.username.trim().to_owned(),
         imap: input.imap.map(|imap| ImapSettings { host: imap.host.trim().to_owned(), ..imap }),
         multiple_scripts: input.multiple_scripts,
@@ -193,6 +210,32 @@ pub async fn save_account(
     })?;
     store.save(&app)?;
     // Settings may have changed; connect again on next use.
+    sessions.disconnect(&account.id).await;
+    Ok(account)
+}
+
+/// Trusts a server certificate of the account (by its SHA-256 fingerprint),
+/// replacing any certificate trusted before, and returns the account.
+#[tauri::command]
+pub async fn trust_certificate(
+    app: AppHandle,
+    store: State<'_, AccountStore>,
+    sessions: State<'_, Sessions>,
+    id: String,
+    service: Service,
+    sha256: String,
+) -> AppResult<Account> {
+    let account = store
+        .with(&app, |accounts| {
+            let account = accounts.iter_mut().find(|a| a.id == id)?;
+            match service {
+                Service::ManageSieve => account.certificate = Some(sha256),
+                Service::Imap => account.imap.as_mut()?.certificate = Some(sha256),
+            }
+            Some(account.clone())
+        })?
+        .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("no {service:?} server for account {id}")))?;
+    store.save(&app)?;
     sessions.disconnect(&account.id).await;
     Ok(account)
 }

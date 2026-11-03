@@ -3,7 +3,8 @@
 //!
 //! Connection security and TLS verification behave exactly like the
 //! ManageSieve client: STARTTLS never downgrades, certificates are verified
-//! with the platform verifier unless a [`ClientConfig`] is given.
+//! with the platform verifier (plus pinned certificates) unless a
+//! [`ClientConfig`] is given.
 
 use std::io;
 use std::pin::Pin;
@@ -14,6 +15,7 @@ use std::time::Duration;
 use async_imap::types::NameAttribute;
 use futures_util::TryStreamExt as _;
 use managesieve::rustls::ClientConfig;
+use managesieve::tls::{CertificateInfo, PinningVerifier};
 use rustls_pki_types::ServerName;
 use serde::Serialize;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -36,6 +38,13 @@ pub enum Error {
     Timeout,
     #[error("TLS: {0}")]
     Tls(String),
+    /// The server's certificate is neither trusted by the platform nor
+    /// pinned (see [`managesieve::tls::PinningVerifier`]).
+    #[error("untrusted server certificate: {reason}")]
+    UntrustedCertificate {
+        certificate: Box<managesieve::tls::CertificateInfo>,
+        reason: String,
+    },
     #[error("invalid server name: {0}")]
     InvalidServerName(String),
     /// The server rejected the credentials.
@@ -53,8 +62,11 @@ pub struct ConnectOptions {
     pub host: String,
     pub port: u16,
     pub security: Security,
-    /// `None` uses [`managesieve::tls::platform_config`].
+    /// `None` uses the platform verifier plus `pinned_certificates`.
     pub tls_config: Option<Arc<ClientConfig>>,
+    /// SHA-256 fingerprints of server certificates to accept even if the
+    /// platform doesn't trust them. Ignored with a custom `tls_config`.
+    pub pinned_certificates: Vec<String>,
     /// Timeout for the whole operation.
     pub timeout: Duration,
 }
@@ -67,6 +79,7 @@ impl ConnectOptions {
             port: IMAPS_PORT,
             security: Security::ImplicitTls,
             tls_config: None,
+            pinned_certificates: Vec::new(),
             timeout: Duration::from_secs(60),
         }
     }
@@ -83,6 +96,15 @@ impl ConnectOptions {
 
     pub fn tls_config(mut self, config: Arc<ClientConfig>) -> Self {
         self.tls_config = Some(config);
+        self
+    }
+
+    /// Accepts the server certificates with these SHA-256 fingerprints.
+    pub fn pinned_certificates<S: Into<String>>(
+        mut self,
+        pins: impl IntoIterator<Item = S>,
+    ) -> Self {
+        self.pinned_certificates = pins.into_iter().map(Into::into).collect();
         self
     }
 }
@@ -223,16 +245,26 @@ async fn read_greeting(client: &mut Client) -> Result<()> {
 }
 
 async fn tls(opts: &ConnectOptions, tcp: TcpStream) -> Result<TlsStream<TcpStream>> {
-    let config = match &opts.tls_config {
-        Some(config) => config.clone(),
-        None => managesieve::tls::platform_config().map_err(|e| Error::Tls(e.to_string()))?,
+    let (config, verifier) = match &opts.tls_config {
+        Some(config) => (config.clone(), None),
+        None => {
+            let tls_error = |e: managesieve::Error| Error::Tls(e.to_string());
+            let verifier = PinningVerifier::new(&opts.pinned_certificates).map_err(tls_error)?;
+            (verifier.client_config().map_err(tls_error)?, Some(verifier))
+        }
     };
     let name = ServerName::try_from(opts.host.clone())
         .map_err(|_| Error::InvalidServerName(opts.host.clone()))?;
     TlsConnector::from(config)
         .connect(name, tcp)
         .await
-        .map_err(|e| Error::Tls(e.to_string()))
+        .map_err(|e| match verifier.and_then(|v| v.rejected_certificate()) {
+            Some(cert) => Error::UntrustedCertificate {
+                certificate: Box::new(CertificateInfo::from_der(&cert)),
+                reason: e.to_string(),
+            },
+            None => Error::Tls(e.to_string()),
+        })
 }
 
 #[derive(Debug)]

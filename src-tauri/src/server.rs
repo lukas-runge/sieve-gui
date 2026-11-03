@@ -25,8 +25,13 @@ impl Sessions {
 }
 
 async fn connect(account: &Account) -> AppResult<Client> {
-    let opts = ConnectOptions::new(&account.host).port(account.port).security(account.security.into());
-    let mut client = Client::connect(&opts).await.map_err(|e| AppError::from_sieve(e, false))?;
+    let opts = ConnectOptions::new(&account.host)
+        .port(account.port)
+        .security(account.security.into())
+        .pinned_certificates(account.certificate.iter());
+    let mut client = Client::connect(&opts)
+        .await
+        .map_err(|e| AppError::from_sieve(e, false).with_pinned(account.certificate.as_ref()))?;
     let credentials = Credentials::new(&account.username, accounts::password(&account.id)?);
     client.authenticate(&credentials).await.map_err(|e| AppError::from_sieve(e, true))?;
     Ok(client)

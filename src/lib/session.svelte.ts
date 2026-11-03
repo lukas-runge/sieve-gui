@@ -16,9 +16,10 @@ import {
   renameScript,
   rootScript,
   saveAccount,
+  trustCertificate,
 } from "#tauri/commands";
-import type { Account, AccountInput, Folder, Root, ServerInfo } from "#tauri/types";
-import { describeError } from "./api";
+import type { Account, AccountInput, Folder, Root, ServerInfo, UntrustedCertificate } from "#tauri/types";
+import { describeError, untrustedCertificate } from "./api";
 import { ask, tell } from "./dialogs.svelte";
 import { t } from "./i18n.svelte";
 import { ScriptEditor } from "./editor.svelte";
@@ -27,6 +28,8 @@ export interface ServerState {
   status: "connecting" | "ready" | "error";
   info: ServerInfo | null;
   error: string | null;
+  /** The server's certificate, if it was rejected and can be trusted. */
+  certificate: UntrustedCertificate | null;
 }
 
 /**
@@ -49,6 +52,8 @@ export interface FolderState {
   status: "loading" | "ready" | "error";
   folders: Folder[];
   error: string | null;
+  /** The IMAP server's certificate, if it was rejected and can be trusted. */
+  certificate: UntrustedCertificate | null;
 }
 
 class Session {
@@ -87,13 +92,13 @@ class Session {
   }
 
   async connect(id: string) {
-    this.servers[id] = { status: "connecting", info: this.servers[id]?.info ?? null, error: null };
+    this.servers[id] = { status: "connecting", info: this.servers[id]?.info ?? null, error: null, certificate: null };
     try {
       const info = await connectAccount(id);
       await this.#loadRoot(id, info);
-      this.servers[id] = { status: "ready", info, error: null };
+      this.servers[id] = { status: "ready", info, error: null, certificate: null };
     } catch (e) {
-      this.servers[id] = { status: "error", info: null, error: describeError(e) };
+      this.servers[id] = { status: "error", info: null, error: describeError(e), certificate: untrustedCertificate(e) };
       return;
     }
     void this.loadFolders(id);
@@ -105,12 +110,25 @@ class Session {
       delete this.folders[id];
       return;
     }
-    this.folders[id] = { status: "loading", folders: this.folders[id]?.folders ?? [], error: null };
+    this.folders[id] = { status: "loading", folders: this.folders[id]?.folders ?? [], error: null, certificate: null };
     try {
-      this.folders[id] = { status: "ready", folders: await listFolders(id), error: null };
+      this.folders[id] = { status: "ready", folders: await listFolders(id), error: null, certificate: null };
     } catch (e) {
-      this.folders[id] = { status: "error", folders: [], error: describeError(e) };
+      this.folders[id] = { status: "error", folders: [], error: describeError(e), certificate: untrustedCertificate(e) };
     }
+  }
+
+  /** Trusts a rejected server certificate of the account and connects again. */
+  async trustCertificate(id: string, untrusted: UntrustedCertificate) {
+    try {
+      await trustCertificate(id, untrusted.service, untrusted.certificate.sha256);
+      await this.loadAccounts();
+    } catch (e) {
+      this.error = describeError(e);
+      return;
+    }
+    if (untrusted.service === "manageSieve") await this.connect(id);
+    else await this.loadFolders(id);
   }
 
   async refreshScripts(id: string) {

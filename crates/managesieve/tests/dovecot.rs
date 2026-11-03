@@ -336,10 +336,18 @@ async fn untrusted_certificate_rejected() {
     let opts = ConnectOptions::new(&env.host)
         .port(env.port)
         .security(Security::StartTls);
-    match Client::connect(&opts).await {
-        Err(Error::Tls(_)) => {}
-        other => panic!("expected TLS error, got {other:?}"),
-    }
+    let certificate = match Client::connect(&opts).await {
+        Err(Error::UntrustedCertificate { certificate, .. }) => certificate,
+        other => panic!("expected an untrusted certificate, got {other:?}"),
+    };
+    // Pinned, it is accepted.
+    let mut c = Client::connect(&opts.pinned_certificates([certificate.sha256.clone()]))
+        .await
+        .unwrap();
+    c.authenticate(&Credentials::new(user("pinned"), &env.password))
+        .await
+        .unwrap();
+    c.logout().await.unwrap();
 }
 
 #[tokio::test]

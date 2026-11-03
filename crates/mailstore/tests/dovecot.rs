@@ -161,5 +161,12 @@ async fn untrusted_certificate_rejected() {
     let err = list_folders(&opts, &unique_user("untrusted"), PASSWORD)
         .await
         .unwrap_err();
-    assert!(matches!(err, Error::Tls(_)), "{err:?}");
+    let Error::UntrustedCertificate { certificate, .. } = err else {
+        panic!("expected an untrusted certificate, got {err:?}");
+    };
+    // Pinned, it is accepted.
+    let opts = opts.pinned_certificates([certificate.sha256.clone()]);
+    list_folders(&opts, &unique_user("pinned"), PASSWORD)
+        .await
+        .unwrap();
 }

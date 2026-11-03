@@ -26,12 +26,33 @@ const account = {
   host: "mail.example.com",
   port: 4190,
   security: "startTls",
+  certificate: null as string | null,
   username: "lukas",
-  imap: { host: "mail.example.com", port: 993, security: "implicitTls" },
+  imap: { host: "mail.example.com", port: 993, security: "implicitTls", certificate: null as string | null },
   multipleScripts: true,
   lastMoveWins: true,
   roundcube: false,
 };
+
+// A NAS with a self-signed certificate: connecting fails until it is trusted.
+const NAS_CERTIFICATE = {
+  sha256: "3f9a0c47d2e1b85a6c0d4e7f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d",
+  subject: "C=US, O=Example NAS CA, OU=server, CN=nas.internal",
+  issuer: "C=US, O=Example NAS CA, OU=CA",
+  notBefore: 1762128000,
+  notAfter: 2077747200,
+  names: ["nas.internal", "127.0.0.1", "192.168.1.20"],
+};
+const nas = {
+  ...account,
+  id: "nas",
+  label: "NAS",
+  host: "192.168.1.20",
+  imap: { ...account.imap, host: "192.168.1.20" },
+};
+// `?nasChanged` starts with another certificate trusted, as after a new one.
+if (new URLSearchParams(location.search).has("nasChanged")) nas.certificate = "aa".repeat(32);
+const accounts = [account, nas];
 
 // Modified UTF-7 names, as IMAP sends them.
 const folders = (
@@ -58,9 +79,17 @@ export function installMock() {
     const a = (args ?? {}) as Record<string, any>;
     switch (cmd) {
       case "list_accounts":
-        return [account];
+        return accounts;
       case "connect_account":
         await new Promise((r) => setTimeout(r, 300));
+        if (a.id === nas.id && nas.certificate !== NAS_CERTIFICATE.sha256) {
+          throw {
+            kind: "untrustedCertificate",
+            message: "invalid peer certificate: UnknownIssuer",
+            diagnostics: [],
+            certificate: { service: "manageSieve", certificate: NAS_CERTIFICATE, pinned: nas.certificate },
+          };
+        }
         return {
           tls: true,
           capabilities: { implementation: "Dovecot Pigeonhole", sasl: ["PLAIN"], sieve, starttls: true, maxRedirects: 4, notify: [], language: null, owner: "lukas", version: "1.0", unauthenticate: false, other: [] },
@@ -88,8 +117,15 @@ export function installMock() {
       }
       case "save_account": {
         const { password: _, ...input } = a.input;
-        Object.assign(account, input, { id: account.id });
-        return account;
+        const target = accounts.find((x) => x.id === input.id) ?? account;
+        Object.assign(target, input, { id: target.id });
+        return target;
+      }
+      case "trust_certificate": {
+        const target = accounts.find((x) => x.id === a.id)!;
+        if (a.service === "manageSieve") target.certificate = a.sha256;
+        else target.imap.certificate = a.sha256;
+        return target;
       }
       case "roundcube_risks": {
         // Rough stand-in for sieve-core's check: every raw block counts.

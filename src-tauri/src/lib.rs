@@ -40,6 +40,7 @@ pub fn run() {
             accounts::list_accounts,
             accounts::save_account,
             accounts::delete_account,
+            accounts::trust_certificate,
             server::connect_account,
             server::disconnect_account,
             server::list_scripts,

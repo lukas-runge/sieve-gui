@@ -18,6 +18,17 @@ pub enum Error {
     #[error("TLS error: {0}")]
     Tls(#[source] std::io::Error),
 
+    /// The server's certificate is neither trusted by the platform nor
+    /// pinned. Holds the certificate, so it can be shown to the user and
+    /// pinned (see [`crate::tls::PinningVerifier`]).
+    #[error("untrusted server certificate: {reason}")]
+    UntrustedCertificate {
+        /// The certificate the server presented.
+        certificate: Box<crate::tls::CertificateInfo>,
+        /// Why the platform verifier rejected it.
+        reason: String,
+    },
+
     /// Building the TLS configuration failed.
     #[error("TLS configuration error: {0}")]
     TlsConfig(#[from] rustls::Error),

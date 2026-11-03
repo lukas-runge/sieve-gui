@@ -14,7 +14,12 @@ pub async fn list_folders(app: AppHandle, store: State<'_, AccountStore>, id: St
     let Some(imap) = account.imap else {
         return Err(AppError::new(ErrorKind::Config, "IMAP is not set up for this account"));
     };
-    let opts = ConnectOptions::new(&imap.host).port(imap.port).security(imap.security.into());
+    let opts = ConnectOptions::new(&imap.host)
+        .port(imap.port)
+        .security(imap.security.into())
+        .pinned_certificates(imap.certificate.iter());
     let password = accounts::password(&account.id)?;
-    Ok(mailstore::list_folders(&opts, &account.username, &password).await?)
+    mailstore::list_folders(&opts, &account.username, &password)
+        .await
+        .map_err(|e| AppError::from(e).with_pinned(imap.certificate.as_ref()))
 }

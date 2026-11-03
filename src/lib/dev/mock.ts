@@ -47,6 +47,7 @@ const account = {
   multipleScripts: true,
   lastMoveWins: true,
   roundcube: false,
+  keywordNames: {} as Record<string, string>,
 };
 
 // A NAS with a self-signed certificate: connecting fails until it is trusted.
@@ -153,6 +154,11 @@ export function installMock() {
         const { password: _, ...input } = a.input;
         const target = accounts.find((x) => x.id === input.id) ?? account;
         Object.assign(target, input, { id: target.id });
+        return target;
+      }
+      case "set_keyword_names": {
+        const target = accounts.find((x) => x.id === a.id)!;
+        target.keywordNames = a.names;
         return target;
       }
       case "trust_certificate": {

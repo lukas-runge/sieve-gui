@@ -314,6 +314,13 @@ const en = {
   "sentence.else": "Otherwise",
   "sentence.alsoIf": "Also, if",
 
+  "keywords.heading": "Keyword names",
+  "keywords.hint": "Show custom IMAP keywords (e.g. a webmail's labels) by name. One line per keyword: $keyword = Name.",
+  "keywords.namePrompt": "Name for the keyword {keyword}",
+  "keywords.nameTitle": "Name {keyword}",
+  "keywords.unnamed": "Name {keyword}",
+  "keywords.save": "Save",
+
   "theme.toggle": "Switch light/dark",
   "language": "Language",
 } as const;
@@ -632,6 +639,13 @@ const de: Record<MessageKey, string> = {
   "sentence.elsif": "Sonst wenn",
   "sentence.else": "Sonst",
   "sentence.alsoIf": "Zusätzlich, wenn",
+
+  "keywords.heading": "Namen für Schlagwörter",
+  "keywords.hint": "Eigene IMAP-Schlagwörter (z. B. Labels eines Webmails) mit Namen anzeigen. Eine Zeile pro Schlagwort: $schlagwort = Name.",
+  "keywords.namePrompt": "Name für das Schlagwort {keyword}",
+  "keywords.nameTitle": "Namen für {keyword} festlegen",
+  "keywords.unnamed": "{keyword} benennen",
+  "keywords.save": "Speichern",
 
   "theme.toggle": "Hell/Dunkel wechseln",
   "language": "Sprache",

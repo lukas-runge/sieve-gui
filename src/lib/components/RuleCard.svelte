@@ -6,6 +6,7 @@
   import type { ScriptFolders } from "../rules/mailbox";
   import BranchesEditor from "./BranchesEditor.svelte";
   import RuleSentence from "./RuleSentence.svelte";
+  import { session } from "../session.svelte";
 
   let {
     rule,
@@ -95,7 +96,7 @@
   <div class="px-3 pb-3 pt-1.5">
     {#if !editing}
       <button class="block w-full text-left cursor-text" onclick={() => onedit(true)}>
-        <RuleSentence {rule} singleFolder={editor.rules.singleFolder} />
+        <RuleSentence {rule} singleFolder={editor.rules.singleFolder} keywords={session.keywordNames(editor.accountId)} />
       </button>
     {:else}
       <BranchesEditor

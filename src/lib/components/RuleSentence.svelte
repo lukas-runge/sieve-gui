@@ -5,8 +5,13 @@
   import { actionKind, hasValues, headerNames, viewCondition, type Branches } from "../rules/view";
   import { formatDate, formatSize } from "../rules/format";
   import { mailboxLabel } from "../rules/mailbox";
+  import { flagLabel } from "../keywords";
 
-  let { rule, singleFolder }: { rule: Rule; singleFolder: boolean } = $props();
+  let {
+    rule,
+    singleFolder,
+    keywords = {},
+  }: { rule: Rule; singleFolder: boolean; keywords?: Record<string, string> } = $props();
 
   function actionParam(a: Action): string | null {
     switch (a.type) {
@@ -20,7 +25,7 @@
         return a.subject ?? a.reason.split("\n")[0];
       case "flags": {
         const kind = actionKind(a);
-        return kind === "markRead" || kind === "flag" ? null : a.flags.join(" ");
+        return kind === "markRead" || kind === "flag" ? null : a.flags.map((f) => flagLabel(f, keywords)).join(" ");
       }
       default:
         return null;

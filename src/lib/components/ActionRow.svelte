@@ -4,6 +4,9 @@
   import { ACTION_KINDS, actionExtension, actionKind, buildAction, type ActionKind } from "../rules/view";
   import { folderExists, mailboxLabel, mailboxRaw, type ScriptFolders } from "../rules/mailbox";
   import BranchesEditor from "./BranchesEditor.svelte";
+  import { askText } from "../dialogs.svelte";
+  import { isKeyword } from "../keywords";
+  import { session } from "../session.svelte";
 
   let {
     action,
@@ -29,6 +32,15 @@
     ACTION_KINDS.filter((k) => k === kind || !actionExtension(k) || extensions.includes(actionExtension(k)!)),
   );
   const folderListId = `folders-${Math.random().toString(36).slice(2)}`;
+
+  const accountId = $derived(session.editor?.accountId ?? null);
+  const keywordNames = $derived(accountId ? session.keywordNames(accountId) : {});
+
+  async function nameKeyword(keyword: string) {
+    if (!accountId) return;
+    const name = await askText(t("keywords.namePrompt", { keyword }), t("keywords.save"), keywordNames[keyword] ?? "");
+    if (name !== null) await session.setKeywordName(accountId, keyword, name);
+  }
 
   function flagsText(flags: string[]) {
     return flags.join(" ");
@@ -110,6 +122,21 @@
         oninput={(e) => onchange({ ...action, flags: parseFlags(e.currentTarget.value) }, true)}
       />
       <p class="mt-1 text-xs text-base-content/60">{t("action.flagsHint")}</p>
+      {#if accountId && action.flags.some(isKeyword)}
+        <!-- Names for custom keywords, e.g. a webmail's labels. -->
+        <div class="mt-1 flex flex-wrap gap-1">
+          {#each action.flags.filter(isKeyword) as keyword}
+            <button
+              type="button"
+              class={["badge badge-sm cursor-pointer", keywordNames[keyword] ? "badge-soft badge-primary" : "badge-ghost"]}
+              title={t("keywords.nameTitle", { keyword })}
+              onclick={() => nameKeyword(keyword)}
+            >
+              {keywordNames[keyword] ?? t("keywords.unnamed", { keyword })}
+            </button>
+          {/each}
+        </div>
+      {/if}
     </div>
   {:else if action.type === "vacation"}
     <div class="grid grow min-w-64 gap-2">

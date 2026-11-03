@@ -17,6 +17,7 @@ import {
   rootScript,
   saveAccount,
   scriptLinks,
+  setKeywordNames,
   trustCertificate,
 } from "#tauri/commands";
 import type { Account, AccountInput, Folder, Root, ScriptLinks, ServerInfo, UntrustedCertificate } from "#tauri/types";
@@ -135,6 +136,24 @@ class Session {
       if (certificate && (await this.#trustKnown(id, certificate))) return this.loadFolders(id);
       this.folders[id] = { status: "error", folders: [], error: describeError(e), certificate };
       if (certificate && this.#promptCertificates.has(id)) this.showCertificate(id, certificate);
+    }
+  }
+
+  /** Names of the account's custom keywords. */
+  keywordNames(id: string): Record<string, string> {
+    return this.accounts.find((a) => a.id === id)?.keywordNames ?? {};
+  }
+
+  /** Names a keyword of the account (`null` removes the name). */
+  async setKeywordName(id: string, keyword: string, name: string | null) {
+    const names = { ...this.keywordNames(id) };
+    if (name) names[keyword] = name;
+    else delete names[keyword];
+    try {
+      const account = await setKeywordNames(id, names);
+      this.accounts = this.accounts.map((a) => (a.id === id ? account : a));
+    } catch (e) {
+      this.error = describeError(e);
     }
   }
 

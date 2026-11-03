@@ -5,6 +5,7 @@
   import { t, type MessageKey } from "../i18n.svelte";
   import { ROOT_SCRIPT, session } from "../session.svelte";
   import Fingerprint from "./Fingerprint.svelte";
+  import { formatKeywordNames, parseKeywordNames } from "../keywords";
 
   let { account, onclose }: { account: Account | null; onclose: () => void } = $props();
 
@@ -28,6 +29,7 @@
   let lastMoveWins = $state(initial?.lastMoveWins ?? true);
   let multipleScripts = $state(initial?.multipleScripts ?? true);
   let roundcube = $state(initial?.roundcube ?? false);
+  let keywordText = $state(formatKeywordNames(initial?.keywordNames ?? {}));
   // Unknown (all allowed) until the account has connected.
   const supported = untrack(() => (initial ? session.supported(initial.id) : null));
   let saving = $state(false);
@@ -54,6 +56,7 @@
         multipleScripts,
         lastMoveWins,
         roundcube,
+        keywordNames: parseKeywordNames(keywordText),
         password: password || (initial ? null : ""),
       });
       dialog.close();
@@ -191,6 +194,19 @@
         </label>
         <p class="label whitespace-normal">{t("account.roundcubeHint")}</p>
       </div>
+    </fieldset>
+
+    <fieldset class="fieldset">
+      <label class="fieldset-legend" for="acc-keywords">{t("keywords.heading")}</label>
+      <textarea
+        id="acc-keywords"
+        class="textarea w-full font-mono text-sm"
+        rows={Math.min(8, Math.max(2, keywordText.split("\n").length))}
+        placeholder="$label1 = Wichtig"
+        bind:value={keywordText}
+        spellcheck="false"
+      ></textarea>
+      <p class="label whitespace-normal">{t("keywords.hint")}</p>
     </fieldset>
 
     {#if error}<p role="alert" class="text-error">{error}</p>{/if}

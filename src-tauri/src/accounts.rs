@@ -43,6 +43,10 @@ pub struct Account {
     /// drop when it saves them.
     #[serde(default)]
     pub roundcube: bool,
+    /// Names for custom keywords (IMAP flags such as `$label1` or
+    /// `$synolabel_…`), shown instead of the keyword.
+    #[serde(default)]
+    pub keyword_names: HashMap<String, String>,
 }
 
 fn enabled() -> bool {
@@ -105,6 +109,7 @@ pub struct AccountInput {
     pub multiple_scripts: bool,
     pub last_move_wins: bool,
     pub roundcube: bool,
+    pub keyword_names: HashMap<String, String>,
     /// `None` keeps the stored password.
     pub password: Option<String>,
 }
@@ -228,6 +233,7 @@ pub async fn save_account(
         multiple_scripts: input.multiple_scripts,
         last_move_wins: input.last_move_wins,
         roundcube: input.roundcube,
+        keyword_names: input.keyword_names,
     };
     if let Some(pw) = &input.password {
         keychain_entry(&account.id)?.set_password(pw).map_err(keychain_error)?;
@@ -240,6 +246,31 @@ pub async fn save_account(
     store.save(&app)?;
     // Settings may have changed; connect again on next use.
     sessions.disconnect(&account.id).await;
+    Ok(account)
+}
+
+/// Sets the names of the account's custom keywords and returns the account.
+/// Unlike `save_account`, this keeps the connection.
+#[tauri::command]
+pub fn set_keyword_names(
+    app: AppHandle,
+    store: State<'_, AccountStore>,
+    id: String,
+    names: HashMap<String, String>,
+) -> AppResult<Account> {
+    let names = names
+        .into_iter()
+        .map(|(k, v)| (k.trim().to_owned(), v.trim().to_owned()))
+        .filter(|(k, v)| !k.is_empty() && !v.is_empty())
+        .collect();
+    let account = store
+        .with(&app, |accounts| {
+            let account = accounts.iter_mut().find(|a| a.id == id)?;
+            account.keyword_names = names;
+            Some(account.clone())
+        })?
+        .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("unknown account {id}")))?;
+    store.save(&app)?;
     Ok(account)
 }
 

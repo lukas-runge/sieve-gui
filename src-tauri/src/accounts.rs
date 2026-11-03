@@ -1,6 +1,7 @@
 //! Account configuration. Accounts are stored as JSON in the app config
 //! directory; passwords live in the OS keychain, never in the file.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 
@@ -184,11 +185,21 @@ fn keychain_error(e: keyring_core::Error) -> AppError {
 
 /// The stored password of an account.
 pub fn password(id: &str) -> AppResult<String> {
-    keychain_entry(id)?.get_password().map_err(|e| match e {
+    if let Some(password) = PASSWORDS.lock().expect("password cache poisoned").get(id) {
+        return Ok(password.clone());
+    }
+    let password = keychain_entry(id)?.get_password().map_err(|e| match e {
         keyring_core::Error::NoEntry => AppError::new(ErrorKind::Auth, "no password stored for this account"),
         e => keychain_error(e),
-    })
+    })?;
+    PASSWORDS.lock().expect("password cache poisoned").insert(id.to_owned(), password.clone());
+    Ok(password)
 }
+
+/// Passwords read from the keychain during this run, by account. Every
+/// keychain read may ask the user (e.g. for an app build the keychain
+/// doesn't know yet), and each connection needs the password.
+static PASSWORDS: LazyLock<Mutex<HashMap<String, String>>> = LazyLock::new(Default::default);
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
@@ -220,6 +231,7 @@ pub async fn save_account(
     };
     if let Some(pw) = &input.password {
         keychain_entry(&account.id)?.set_password(pw).map_err(keychain_error)?;
+        PASSWORDS.lock().expect("password cache poisoned").insert(account.id.clone(), pw.clone());
     }
     store.with(&app, |accounts| match accounts.iter_mut().find(|a| a.id == account.id) {
         Some(existing) => *existing = account.clone(),
@@ -267,6 +279,7 @@ pub async fn delete_account(
     sessions.disconnect(&id).await;
     store.with(&app, |accounts| accounts.retain(|a| a.id != id))?;
     store.save(&app)?;
+    PASSWORDS.lock().expect("password cache poisoned").remove(&id);
     match keychain_entry(&id)?.delete_credential() {
         Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),
         Err(e) => Err(keychain_error(e)),

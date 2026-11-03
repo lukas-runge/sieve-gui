@@ -1,0 +1,8 @@
+# Sign the app before `pnpm tauri dev` / `cargo run` starts it on macOS, so
+# the keychain doesn't ask for its password after every rebuild (see
+# scripts/dev-runner.sh).
+[target.aarch64-apple-darwin]
+runner = "scripts/dev-runner.sh"
+
+[target.x86_64-apple-darwin]
+runner = "scripts/dev-runner.sh"

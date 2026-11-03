@@ -58,6 +58,8 @@ pnpm tauri dev
 
 The app window opens automatically. The Vite dev server runs on `http://localhost:1420`.
 
+On macOS, `cargo run` and `pnpm tauri dev` sign the app with your "Apple Development" identity before starting it (`scripts/dev-runner.sh`; override with `SIEVE_GUI_SIGNING_IDENTITY`). The keychain then recognizes rebuilds as the same app, so after "Always Allow" once it stops asking for the login keychain password on every start. Without such an identity the app runs unsigned and the keychain asks after every rebuild.
+
 ---
 
 ## Building

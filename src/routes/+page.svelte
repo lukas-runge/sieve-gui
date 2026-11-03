@@ -24,8 +24,14 @@
   const editor = $derived(session.editor);
   const active = $derived(editor ? session.isActive(editor.accountId, editor.name) : false);
   const root = $derived(editor ? session.roots[editor.accountId] : null);
-  /** The open script runs with "last move wins", so it should record moves. */
-  const lastMoveWins = $derived(!!editor && !!root?.lastMoveWins && root.scripts.includes(editor.name));
+  /**
+   * The open script runs with "last move wins", so it should record moves.
+   * Not for scripts included unchanged (e.g. a webmail's own root script):
+   * sieve-gui leaves those alone, so it doesn't offer to convert them.
+   */
+  const lastMoveWins = $derived(
+    !!editor && !!root?.lastMoveWins && root.scripts.includes(editor.name) && !root.unchanged.includes(editor.name),
+  );
 
   $effect(() => {
     document.documentElement.lang = i18n.locale;

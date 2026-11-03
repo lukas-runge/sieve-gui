@@ -192,7 +192,7 @@ sieve-gui/
 
 - Tauri commands wrapping both crates; typed bindings via `tauri-ts-generator`
 - IMAP via `mailstore` on top of `async-imap` (MIT/Apache-2.0) for folder listing, dry runs and applying. IMAP host, port and security are set per account; user name and password are shared with ManageSieve
-- Credentials via the OS keychain (e.g. `keyring` crate); account list without secrets in app config
+- Credentials via the OS keychain (`keyring-core` with the native store per platform: Keychain on macOS, Credential Manager on Windows, Secret Service through the system's libdbus on Linux); account list without secrets in app config
 - Long-running work (dry runs) streams progress to the UI via Tauri channels
 
 ### Frontend

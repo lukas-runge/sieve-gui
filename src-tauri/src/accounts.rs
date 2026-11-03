@@ -2,7 +2,7 @@
 //! directory; passwords live in the OS keychain, never in the file.
 
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, State};
@@ -157,18 +157,35 @@ fn config_error(e: std::io::Error) -> AppError {
     AppError::new(ErrorKind::Config, e.to_string())
 }
 
-fn keychain_entry(id: &str) -> AppResult<keyring::Entry> {
-    keyring::Entry::new(KEYCHAIN_SERVICE, id).map_err(keychain_error)
+/// The platform's credential store, set up on first use.
+static KEYCHAIN: LazyLock<Result<(), String>> = LazyLock::new(|| use_platform_keychain().map_err(|e| e.to_string()));
+
+fn use_platform_keychain() -> keyring_core::Result<()> {
+    #[cfg(target_os = "macos")]
+    let store = apple_native_keyring_store::keychain::Store::new()?;
+    #[cfg(target_os = "windows")]
+    let store = windows_native_keyring_store::Store::new()?;
+    #[cfg(all(unix, not(any(target_os = "macos", target_os = "ios", target_os = "android"))))]
+    let store = dbus_secret_service_keyring_store::Store::new()?;
+    keyring_core::set_default_store(store);
+    Ok(())
 }
 
-fn keychain_error(e: keyring::Error) -> AppError {
+fn keychain_entry(id: &str) -> AppResult<keyring_core::Entry> {
+    if let Err(e) = &*KEYCHAIN {
+        return Err(AppError::new(ErrorKind::Keychain, e.clone()));
+    }
+    keyring_core::Entry::new(KEYCHAIN_SERVICE, id).map_err(keychain_error)
+}
+
+fn keychain_error(e: keyring_core::Error) -> AppError {
     AppError::new(ErrorKind::Keychain, e.to_string())
 }
 
 /// The stored password of an account.
 pub fn password(id: &str) -> AppResult<String> {
     keychain_entry(id)?.get_password().map_err(|e| match e {
-        keyring::Error::NoEntry => AppError::new(ErrorKind::Auth, "no password stored for this account"),
+        keyring_core::Error::NoEntry => AppError::new(ErrorKind::Auth, "no password stored for this account"),
         e => keychain_error(e),
     })
 }
@@ -251,7 +268,7 @@ pub async fn delete_account(
     store.with(&app, |accounts| accounts.retain(|a| a.id != id))?;
     store.save(&app)?;
     match keychain_entry(&id)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+        Ok(()) | Err(keyring_core::Error::NoEntry) => Ok(()),
         Err(e) => Err(keychain_error(e)),
     }
 }

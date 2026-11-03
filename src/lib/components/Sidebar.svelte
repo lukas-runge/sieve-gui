@@ -154,7 +154,7 @@
     >
       <span class="block truncate {current ? 'font-semibold' : ''}">{name}</span>
       {#if notes.length}
-        <span class="block text-xs leading-snug break-words {movesItself ? 'text-warning' : 'text-base-content/60'}">{notes.join(" · ")}</span>
+        <span class="block text-xs leading-snug break-words text-base-content/60">{notes.join(" · ")}</span>
       {/if}
     </button>
     {#if running && node.via}

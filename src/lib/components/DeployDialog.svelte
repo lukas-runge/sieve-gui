@@ -47,6 +47,7 @@
     try {
       diagnostics = await deployScript(editor.accountId, editor.name, code, editor.original);
       editor.original = code;
+      session.scriptChanged(editor.accountId, editor.name);
       if (activate) await session.activate(editor.accountId, editor.name);
       else await session.refreshScripts(editor.accountId);
       dialog.close();

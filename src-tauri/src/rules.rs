@@ -2,7 +2,7 @@
 
 use sieve_core::compat::RoundcubeRisks;
 use sieve_core::model::RuleSet;
-use sieve_core::root::Root;
+use sieve_core::root::{Root, ScriptLinks};
 use sieve_core::PrintOptions;
 
 use crate::error::AppResult;
@@ -28,11 +28,17 @@ pub fn roundcube_risks(rules: RuleSet) -> RoundcubeRisks {
     sieve_core::compat::roundcube_risks(&rules)
 }
 
-/// The root script that includes `scripts` in this order (see
-/// `sieve_core::root`).
+/// The root script that includes `scripts` in this order, those in
+/// `unchanged` marked as not to be rewritten (see `sieve_core::root`).
 #[tauri::command]
-pub fn root_script(scripts: Vec<String>, last_move_wins: bool) -> String {
-    sieve_core::root::root_script(&scripts, last_move_wins, &PrintOptions::readable())
+pub fn root_script(scripts: Vec<String>, unchanged: Vec<String>, last_move_wins: bool) -> String {
+    sieve_core::root::root_script(&scripts, &unchanged, last_move_wins, &PrintOptions::readable())
+}
+
+/// Which scripts a script includes and whether it moves messages itself.
+#[tauri::command]
+pub fn script_links(source: String) -> ScriptLinks {
+    sieve_core::root::script_links(&source)
 }
 
 /// What a root script does, or `None` if `source` is no root.

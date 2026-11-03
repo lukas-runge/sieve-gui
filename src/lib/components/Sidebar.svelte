@@ -30,7 +30,25 @@
 
   async function remove(id: string, name: string, active: boolean) {
     if (active) return tell(t("scripts.deleteActive"));
-    if (await ask(t("scripts.deleteConfirm", { name }), t("scripts.delete"), true)) await session.deleteScript(id, name);
+    const parents = session.includedBy(id, name);
+    const message = parents.length
+      ? t("scripts.deleteIncluded", { name, names: quoted(parents) })
+      : t("scripts.deleteConfirm", { name });
+    if (await ask(message, t("scripts.delete"), true)) await session.deleteScript(id, name);
+  }
+
+  const quoted = (names: string[]) => names.map((n) => t("scripts.quoted", { name: n })).join(", ");
+
+  async function takeOver(id: string, name: string, pending: boolean) {
+    if (!(await ask(t("scripts.takeOverConfirm", { name }), t("scripts.takeOver")))) return;
+    if (pending) await session.adopt(id, "takeOver");
+    else await session.takeOver(id, name);
+  }
+
+  async function leaveUnchanged(id: string, name: string) {
+    if (await ask(t("scripts.leaveUnchangedConfirm", { name }), t("scripts.leaveUnchanged"))) {
+      await session.leaveUnchanged(id, name);
+    }
   }
 
   /** The script being dragged to a new place in the list. */
@@ -79,6 +97,21 @@
   {@const current = session.editor?.accountId === id && session.editor.name === name}
   {@const arrangeable = session.multipleActive(id)}
   {@const key = `${id}:${name}`}
+  {@const root = session.roots[id]}
+  {@const included = !!root?.scripts.includes(name)}
+  <!-- Whether sieve-gui leaving the script alone makes a difference. -->
+  {@const unchanged = !!root?.lastMoveWins && !!root?.unchanged.includes(name)}
+  {@const movesItself = unchanged && !!session.links[id]?.[name]?.filesMessages}
+  {@const parents = session.includedBy(id, name)}
+  {@const notes = [
+    ...(unchanged ? [t("scripts.unchanged")] : []),
+    ...(movesItself ? [t("scripts.filesMessages")] : []),
+    ...(parents.length ? [t("scripts.includedBy", { names: quoted(parents) })] : []),
+  ]}
+  {@const hints = [
+    ...(unchanged ? [t("scripts.unchangedHint")] : []),
+    ...(movesItself ? [t("scripts.filesMessagesHint")] : []),
+  ]}
   <div class="group flex items-center rounded-field {current ? 'bg-base-100 shadow-[inset_3px_0_0_var(--color-primary)]' : 'hover:bg-base-100/60'}">
     {#if index >= 0 && order.length > 1}
       <button
@@ -100,12 +133,17 @@
       <!-- Lines the name up with those that have a handle. -->
       <span class="ml-0.5 w-6 shrink-0" aria-hidden="true"></span>
     {/if}
+    <!-- contain: long names and notes truncate instead of widening the sidebar. -->
     <button
-      class="grow truncate px-2 py-1 text-left text-sm {current ? 'font-semibold' : ''}"
+      class="min-w-0 grow px-2 py-1 text-left text-sm [contain:inline-size]"
       aria-current={current ? "page" : undefined}
+      title={hints.join(" ") || undefined}
       onclick={() => open(id, name)}
     >
-      {name}
+      <span class="block truncate {current ? 'font-semibold' : ''}">{name}</span>
+      {#if notes.length}
+        <span class="block text-xs leading-snug break-words {movesItself ? 'text-warning' : 'text-base-content/60'}">{notes.join(" · ")}</span>
+      {/if}
     </button>
     <button
       class={[
@@ -125,6 +163,13 @@
       <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square opacity-60 group-hover:opacity-100 focus:opacity-100" aria-label="{name}: …">⋯</div>
       <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
         <li><button onclick={() => rename(id, name)}>{t("scripts.rename")}</button></li>
+        {#if root?.lastMoveWins && included}
+          {#if root.unchanged.includes(name)}
+            <li><button onclick={() => takeOver(id, name, false)}>{t("scripts.takeOver")}…</button></li>
+          {:else}
+            <li><button onclick={() => leaveUnchanged(id, name)}>{t("scripts.leaveUnchanged")}…</button></li>
+          {/if}
+        {/if}
         <li><button class="text-error" onclick={() => remove(id, name, active)}>{t("scripts.delete")}</button></li>
       </ul>
     </div>
@@ -164,6 +209,18 @@
           {/if}
         </div>
       {:else if server.info}
+        {@const adoption = session.adoption[account.id]}
+        {#if adoption}
+          <div role="alert" class="grid gap-1.5 rounded-box border border-info/40 bg-info/10 px-2 py-1.5 text-xs">
+            <p>{t("adopt.notice", { name: adoption.active })}</p>
+            <div class="flex flex-wrap gap-1">
+              <button class="btn btn-xs btn-primary" onclick={() => session.adopt(account.id, "unchanged")}>{t("adopt.unchanged")}</button>
+              {#if session.rootSettings(account.id).lastMoveWins}
+                <button class="btn btn-xs" onclick={() => takeOver(account.id, adoption.active, true)}>{t("scripts.takeOver")}…</button>
+              {/if}
+            </div>
+          </div>
+        {/if}
         {@const displaced = session.displaced[account.id]}
         {#if displaced}
           <div role="alert" class="grid gap-1.5 rounded-box border border-warning/40 bg-warning/10 px-2 py-1.5 text-xs">

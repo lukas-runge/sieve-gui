@@ -16,9 +16,10 @@ import {
   renameScript,
   rootScript,
   saveAccount,
+  scriptLinks,
   trustCertificate,
 } from "#tauri/commands";
-import type { Account, AccountInput, Folder, Root, ServerInfo, UntrustedCertificate } from "#tauri/types";
+import type { Account, AccountInput, Folder, Root, ScriptLinks, ServerInfo, UntrustedCertificate } from "#tauri/types";
 import { describeError, untrustedCertificate } from "./api";
 import { ask, tell } from "./dialogs.svelte";
 import { t } from "./i18n.svelte";
@@ -70,6 +71,14 @@ class Session {
    * made active elsewhere, e.g. by saving filters in SOGo. Holds that script.
    */
   displaced = $state<Record<string, { active: string | null }>>({});
+  /**
+   * Per account: a script sieve-gui didn't create is active, and the root
+   * script would take over. Waits for the user to decide whether that script
+   * runs unchanged inside the root or is taken over (see `adopt`).
+   */
+  adoption = $state<Record<string, { active: string }>>({});
+  /** Per account and script: what it includes and whether it files messages. */
+  links = $state<Record<string, Record<string, ScriptLinks>>>({});
   /** The account whose root script is shown (read-only) instead of an editor. */
   rootView = $state<string | null>(null);
   /** Per account: script names in the order the user arranged them. */
@@ -102,6 +111,7 @@ class Session {
       return;
     }
     void this.loadFolders(id);
+    void this.#loadLinks(id);
     await this.#applySettings(id);
   }
 
@@ -140,6 +150,37 @@ class Session {
     } catch (e) {
       this.error = describeError(e);
     }
+    void this.#loadLinks(id);
+  }
+
+  /**
+   * Reads what the account's scripts include and whether they file messages
+   * themselves. Scripts already read are kept until `scriptChanged`.
+   */
+  async #loadLinks(id: string) {
+    const names = (this.servers[id]?.info?.scripts ?? []).map((s) => s.name).filter((n) => n !== ROOT_SCRIPT);
+    const known = this.links[id] ?? {};
+    const next: Record<string, ScriptLinks> = {};
+    for (const name of names) {
+      try {
+        next[name] = known[name] ?? (await scriptLinks(await getScript(id, name)));
+      } catch {
+        // Not readable right now; shown without links.
+      }
+    }
+    this.links[id] = next;
+  }
+
+  /** Forgets what is known about a script after it was written. */
+  scriptChanged(id: string, name: string) {
+    if (this.links[id]) delete this.links[id][name];
+  }
+
+  /** The scripts that include `name`. */
+  includedBy(id: string, name: string): string[] {
+    return Object.entries(this.links[id] ?? {})
+      .filter(([other, links]) => other !== name && links.includes.includes(name))
+      .map(([other]) => other);
   }
 
   async #loadRoot(id: string, info: ServerInfo) {
@@ -195,6 +236,7 @@ class Session {
     const needed = settings.multipleScripts || settings.lastMoveWins;
     const root = this.roots[id];
     delete this.displaced[id];
+    delete this.adoption[id];
     if (!needed && !root) return;
     const affected = root ? root.scripts : info.scripts.filter((s) => s.active).map((s) => s.name);
     if (!(await this.#canRewrite(id, affected))) return;
@@ -212,18 +254,24 @@ class Session {
           return;
         }
         const current = info.scripts.find((s) => s.active)?.name;
-        const scripts = current ? [current] : [];
-        await deployScript(id, ROOT_SCRIPT, await rootScript(scripts, settings.lastMoveWins), null);
+        if (current) {
+          // A script sieve-gui didn't create runs today. Ask before the root
+          // takes over (see adopt).
+          this.adoption[id] = { active: current };
+          return;
+        }
+        await deployScript(id, ROOT_SCRIPT, await rootScript([], [], settings.lastMoveWins), null);
         await activateScript(id, ROOT_SCRIPT);
-        if (settings.lastMoveWins) for (const name of scripts) await this.#setSingleFolder(id, name, true);
       } else if (needed && root) {
         // Only one script may stay active: the first.
         const scripts = settings.multipleScripts ? root.scripts : root.scripts.slice(0, 1);
+        // Scripts included unchanged are never rewritten.
+        const managed = (names: string[]) => names.filter((n) => !root.unchanged.includes(n));
         if (settings.lastMoveWins && !root.lastMoveWins) {
           await this.#writeRoot(id, scripts, true);
-          for (const name of scripts) await this.#setSingleFolder(id, name, true);
+          for (const name of managed(scripts)) await this.#setSingleFolder(id, name, true);
         } else if (!settings.lastMoveWins && root.lastMoveWins) {
-          for (const name of root.scripts) await this.#setSingleFolder(id, name, false);
+          for (const name of managed(root.scripts)) await this.#setSingleFolder(id, name, false);
           await this.#writeRoot(id, scripts, false);
         } else if (scripts.length !== root.scripts.length) {
           await this.#writeRoot(id, scripts, root.lastMoveWins);
@@ -232,7 +280,9 @@ class Session {
         }
       } else if (root) {
         // Back to a single active script, the first of the root.
-        for (const name of root.scripts) await this.#setSingleFolder(id, name, false);
+        for (const name of root.scripts.filter((n) => !root.unchanged.includes(n))) {
+          await this.#setSingleFolder(id, name, false);
+        }
         await activateScript(id, root.scripts[0] ?? null);
         await deleteScript(id, ROOT_SCRIPT);
       }
@@ -264,6 +314,8 @@ class Session {
     delete this.folders[id];
     delete this.roots[id];
     delete this.rootSources[id];
+    delete this.adoption[id];
+    delete this.links[id];
     if (this.rootView === id) this.rootView = null;
     await this.loadAccounts();
   }
@@ -272,6 +324,56 @@ class Session {
   async confirmLeave(): Promise<boolean> {
     if (!this.editor?.dirty) return true;
     return ask(t("editor.discardConfirm", { name: this.editor.name }), t("editor.discard"), true);
+  }
+
+  /**
+   * Lets the root script take over from the script that is active today
+   * (see `adoption`): `unchanged` runs it inside the root as it is, never
+   * rewriting it; `takeOver` lets sieve-gui adjust it like its own scripts
+   * (single-folder mode with "last move wins").
+   */
+  async adopt(id: string, mode: "unchanged" | "takeOver") {
+    const pending = this.adoption[id];
+    if (!pending) return;
+    const name = pending.active;
+    if (mode === "takeOver" && !(await this.#canRewrite(id, [name]))) return;
+    const settings = this.rootSettings(id);
+    delete this.adoption[id];
+    try {
+      const unchanged = mode === "unchanged" ? [name] : [];
+      await deployScript(id, ROOT_SCRIPT, await rootScript([name], unchanged, settings.lastMoveWins), null);
+      await activateScript(id, ROOT_SCRIPT);
+      if (settings.lastMoveWins && mode === "takeOver") await this.#setSingleFolder(id, name, true);
+    } catch (e) {
+      this.error = describeError(e);
+    }
+    await this.refreshScripts(id);
+  }
+
+  /** Lets sieve-gui adjust a script the root includes unchanged. */
+  async takeOver(id: string, name: string) {
+    const root = this.roots[id];
+    if (!root?.unchanged.includes(name) || !(await this.#canRewrite(id, [name]))) return;
+    try {
+      if (root.lastMoveWins) await this.#setSingleFolder(id, name, true);
+      await this.#writeRoot(id, root.scripts, root.lastMoveWins, root.unchanged.filter((n) => n !== name));
+    } catch (e) {
+      this.error = describeError(e);
+    }
+    await this.refreshScripts(id);
+  }
+
+  /** Includes a script unchanged again, undoing sieve-gui's adjustments. */
+  async leaveUnchanged(id: string, name: string) {
+    const root = this.roots[id];
+    if (!root?.scripts.includes(name) || root.unchanged.includes(name) || !(await this.#canRewrite(id, [name]))) return;
+    try {
+      if (root.lastMoveWins) await this.#setSingleFolder(id, name, false);
+      await this.#writeRoot(id, root.scripts, root.lastMoveWins, [...root.unchanged, name]);
+    } catch (e) {
+      this.error = describeError(e);
+    }
+    await this.refreshScripts(id);
   }
 
   /** Makes the root script active again after something else replaced it. */
@@ -320,6 +422,8 @@ class Session {
     if (name !== null && !(await this.#canRewrite(id, [name]))) return;
     // Activating a script means running the root again.
     if (name !== null && this.displaced[id]) await this.reactivateRoot(id);
+    // The script that runs today keeps running, unchanged.
+    if (name !== null && this.adoption[id]) await this.adopt(id, "unchanged");
     const root = this.roots[id];
     try {
       // Every step leaves a working setup: a script not yet in single-folder
@@ -404,10 +508,12 @@ class Session {
     }
   }
 
-  async #writeRoot(id: string, scripts: string[], lastMoveWins: boolean) {
-    const source = await rootScript(scripts, lastMoveWins);
+  /** Writes the root; `unchanged` defaults to what the current root has. */
+  async #writeRoot(id: string, scripts: string[], lastMoveWins: boolean, unchanged?: string[]) {
+    const keep = (unchanged ?? this.roots[id]?.unchanged ?? []).filter((n) => scripts.includes(n));
+    const source = await rootScript(scripts, keep, lastMoveWins);
     await deployScript(id, ROOT_SCRIPT, source, null);
-    this.roots[id] = { scripts, lastMoveWins };
+    this.roots[id] = { scripts, unchanged: keep, lastMoveWins };
     this.rootSources[id] = source;
   }
 
@@ -429,6 +535,7 @@ class Session {
     rules.singleFolder = on;
     const code = await exportRules(rules, this.#roundcube(id));
     await deployScript(id, name, code, source);
+    this.scriptChanged(id, name);
     if (this.editor?.accountId === id && this.editor.name === name) {
       this.editor = await ScriptEditor.open(id, name, code, this.#roundcube(id));
     }
@@ -445,7 +552,8 @@ class Session {
       if (this.editor?.accountId === id && this.editor.name === name) this.editor.name = newName;
       const root = this.roots[id];
       if (root?.scripts.includes(name)) {
-        await this.#writeRoot(id, root.scripts.map((s) => (s === name ? newName : s)), root.lastMoveWins);
+        const renamed = (names: string[]) => names.map((s) => (s === name ? newName : s));
+        await this.#writeRoot(id, renamed(root.scripts), root.lastMoveWins, renamed(root.unchanged));
       }
       await this.refreshScripts(id);
     } catch (e) {

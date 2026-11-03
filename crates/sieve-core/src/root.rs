@@ -19,6 +19,15 @@
 //! ```
 //!
 //! Without "last move wins", only the `require` and `include` commands remain.
+//!
+//! Scripts that were on the server before sieve-gui (e.g. a webmail's own
+//! root script, such as Synology MailPlus' `synomc`) can be included
+//! *unchanged*: sieve-gui runs them but never rewrites them, not even into
+//! single-folder mode. Such includes carry a `# unchanged` comment:
+//!
+//! ```sieve
+//! include :personal :optional "synomc"; # unchanged
+//! ```
 
 use serde::Serialize;
 
@@ -33,18 +42,25 @@ pub const ROOT_SCRIPT_NAME: &str = "sieve-gui";
 /// The global variable holding the folder a message goes to.
 pub const FOLDER_VARIABLE: &str = "move_to_folder";
 
+/// The comment that marks an include as unchanged.
+const UNCHANGED: &str = "unchanged";
+
 /// What a root script does.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Root {
     /// The included scripts, in the order they run.
     pub scripts: Vec<String>,
+    /// The included scripts sieve-gui must not rewrite (a subset of
+    /// `scripts`).
+    pub unchanged: Vec<String>,
     /// Whether it files the message into the folder recorded last.
     pub last_move_wins: bool,
 }
 
-/// The root script including `scripts` in this order.
-pub fn root_script(scripts: &[String], last_move_wins: bool, options: &PrintOptions) -> String {
+/// The root script including `scripts` in this order; those also in
+/// `unchanged` are marked as such.
+pub fn root_script(scripts: &[String], unchanged: &[String], last_move_wins: bool, options: &PrintOptions) -> String {
     let (header, extensions): (&[&str], &[&str]) = if last_move_wins {
         (
             &[
@@ -67,7 +83,10 @@ pub fn root_script(scripts: &[String], last_move_wins: bool, options: &PrintOpti
         out.push_str(&print_command(&global_command(), 0, options));
     }
     for name in scripts {
-        let include = command("include", vec![tag("personal"), tag("optional"), string(name)], None);
+        let mut include = command("include", vec![tag("personal"), tag("optional"), string(name)], None);
+        if unchanged.contains(name) {
+            include.trailing_comment = Some(hash_comment(format!(" {UNCHANGED}")));
+        }
         out.push_str(&print_command(&include, 0, options));
     }
     if last_move_wins {
@@ -82,6 +101,7 @@ pub fn root_script(scripts: &[String], last_move_wins: bool, options: &PrintOpti
 pub fn parse_root(source: &str) -> Option<Root> {
     let script = crate::parse(source).ok()?;
     let mut commands: Vec<Command> = script.commands;
+    let marked: Vec<bool> = commands.iter().map(is_marked_unchanged).collect();
     commands.iter_mut().for_each(normalize);
     let [require, rest @ ..] = commands.as_slice() else { return None };
     if !require.is("require") {
@@ -93,8 +113,61 @@ pub fn parse_root(source: &str) -> Option<Root> {
         }
         includes => (includes, false),
     };
-    let scripts = includes.iter().map(include_name).collect::<Option<_>>()?;
-    Some(Root { scripts, last_move_wins })
+    let scripts: Vec<String> = includes.iter().map(include_name).collect::<Option<_>>()?;
+    // The includes start after `require` (and `global`).
+    let first = if last_move_wins { 2 } else { 1 };
+    let unchanged = scripts
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| marked[first + i])
+        .map(|(_, name)| name.clone())
+        .collect();
+    Some(Root { scripts, unchanged, last_move_wins })
+}
+
+fn is_marked_unchanged(cmd: &Command) -> bool {
+    cmd.trailing_comment.as_ref().is_some_and(|c| c.text.trim() == UNCHANGED)
+}
+
+/// How a script relates to others.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScriptLinks {
+    /// Personal scripts it includes (`include` without `:global`), in
+    /// order of appearance, without duplicates.
+    pub includes: Vec<String>,
+    /// Whether it files messages into folders itself (`fileinto` without
+    /// `:copy`), anywhere in the script.
+    pub files_messages: bool,
+}
+
+/// What `source` includes and whether it moves messages. Unparsable scripts
+/// give nothing.
+pub fn script_links(source: &str) -> ScriptLinks {
+    let mut links = ScriptLinks::default();
+    if let Ok(script) = crate::parse(source) {
+        collect_links(&script.commands, &mut links);
+    }
+    links
+}
+
+fn collect_links(commands: &[Command], links: &mut ScriptLinks) {
+    for cmd in commands {
+        let args = &cmd.arguments.args;
+        if cmd.is("include")
+            && !args.iter().any(|a| a.is_tag("global"))
+            && let Some(Argument::String(name)) = args.last()
+            && !links.includes.contains(&name.value)
+        {
+            links.includes.push(name.value.clone());
+        }
+        if cmd.is("fileinto") && !args.iter().any(|a| a.is_tag("copy")) {
+            links.files_messages = true;
+        }
+        if let Some(block) = &cmd.block {
+            collect_links(&block.commands, links);
+        }
+    }
 }
 
 /// `include :personal [:optional] "name"` → the name.
@@ -150,7 +223,7 @@ mod tests {
 
     #[test]
     fn generates_the_root() {
-        let text = root_script(&names(&["Work", "News \"letters\""]), true, &PrintOptions::default());
+        let text = root_script(&names(&["Work", "News \"letters\""]), &[], true, &PrintOptions::default());
         assert_eq!(
             text,
             "# Generated by sieve-gui: runs the active filter scripts in this order\n\
@@ -163,7 +236,7 @@ mod tests {
              \tfileinto \"${move_to_folder}\";\n\
              }\n"
         );
-        let text = root_script(&names(&["Work"]), false, &PrintOptions::default());
+        let text = root_script(&names(&["Work"]), &[], false, &PrintOptions::default());
         assert_eq!(
             text,
             "# Generated by sieve-gui: runs the active filter scripts in this order.\n\
@@ -178,14 +251,40 @@ mod tests {
         for list in [vec![], names(&["Work"]), names(&["a", "b \"c\"", "Ä"])] {
             for last_move_wins in [true, false] {
                 for options in [PrintOptions::default(), PrintOptions::roundcube()] {
-                    let root = parse_root(&root_script(&list, last_move_wins, &options));
-                    assert_eq!(root, Some(Root { scripts: list.clone(), last_move_wins }));
+                    // Every second script unchanged.
+                    let unchanged: Vec<String> = list.iter().step_by(2).cloned().collect();
+                    let root = parse_root(&root_script(&list, &unchanged, last_move_wins, &options));
+                    assert_eq!(root, Some(Root { scripts: list.clone(), unchanged, last_move_wins }));
                 }
             }
         }
         let edited = "require [\"include\", \"variables\", \"fileinto\"];\r\n# note\r\nglobal \"move_to_folder\";\r\n\
             include :optional :personal \"x\";\r\nif not string :is \"${move_to_folder}\" \"\" { fileinto \"${move_to_folder}\"; }";
-        assert_eq!(parse_root(edited), Some(Root { scripts: names(&["x"]), last_move_wins: true }));
+        assert_eq!(parse_root(edited), Some(Root { scripts: names(&["x"]), unchanged: vec![], last_move_wins: true }));
+    }
+
+    #[test]
+    fn marks_unchanged_includes() {
+        let text = root_script(&names(&["synomc", "Work"]), &names(&["synomc"]), true, &PrintOptions::default());
+        assert!(text.contains("include :personal :optional \"synomc\"; # unchanged\n"), "{text}");
+        assert!(text.contains("include :personal :optional \"Work\";\n"), "{text}");
+        let root = parse_root(&text).unwrap();
+        assert_eq!(root.unchanged, names(&["synomc"]));
+    }
+
+    #[test]
+    fn links_between_scripts() {
+        let links = script_links(
+            "require [\"include\", \"fileinto\", \"copy\"];\n\
+             include :global :once \"spam\";\n\
+             include :personal :optional \"rules\";\n\
+             include \"more\";\n\
+             if true { include :personal \"rules\"; fileinto :copy \"Archive\"; }",
+        );
+        assert_eq!(links.includes, names(&["rules", "more"]));
+        assert!(!links.files_messages);
+        assert!(script_links("require \"fileinto\";\nif true { stop; } elsif false { fileinto \"X\"; }").files_messages);
+        assert_eq!(script_links("not sieve {"), ScriptLinks::default());
     }
 
     #[test]

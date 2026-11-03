@@ -1,0 +1,83 @@
+{
+  "filter": {
+    "rules": {
+      "items": [
+        {
+          "code": "global \"filter_mailbox\";",
+          "type": "raw"
+        }
+      ],
+      "preamble": null,
+      "requires": [
+        "body",
+        "copy",
+        "fileinto",
+        "imap4flags",
+        "include",
+        "variables"
+      ],
+      "singleFolder": false
+    },
+    "source": "require [\"body\",\"copy\",\"fileinto\",\"imap4flags\",\"include\",\"variables\"];\nglobal \"filter_mailbox\";\n"
+  },
+  "spam_rule": {
+    "rules": {
+      "items": [
+        {
+          "code": "global [\"spam_rule_blacklist_mailbox\",\"spam_rule_whitelist_mailbox\",\"spam_enable_rewrite\",\"spam_rewrite_subject\"];",
+          "type": "raw"
+        },
+        {
+          "code": "if string :is \"${spam_enable_rewrite}\" \"yes\"\n{\n        if not string :is \"${spam_rule_whitelist_mailbox}\" \"\"\n        {\n                if header :matches \"subject\" \"${spam_rewrite_subject} *\"\n                {\n                        set \"subject\" \"${1}\";\n                        deleteheader \"subject\";\n                        addheader :last \"subject\" \"${subject}\";\n                }\n        }\n}",
+          "type": "raw"
+        },
+        {
+          "code": "if not allof(string :is \"${spam_rule_blacklist_mailbox}\" \"\", string :is \"${spam_rule_whitelist_mailbox}\" \"\")\n{\n        if not string :is \"${spam_rule_whitelist_mailbox}\" \"\"\n        {\n                addheader :last \"X-Synology-Personal-Spam-Rule\" \"whitelist\";\n        }\n        else    {\n                addheader :last \"X-Synology-Personal-Spam-Rule\" \"blacklist\";\n        }\n}",
+          "type": "raw"
+        }
+      ],
+      "preamble": null,
+      "requires": [
+        "editheader",
+        "include",
+        "variables"
+      ],
+      "singleFolder": false
+    },
+    "source": "require [\"editheader\",\"include\",\"variables\"];\nglobal [\"spam_rule_blacklist_mailbox\",\"spam_rule_whitelist_mailbox\",\"spam_enable_rewrite\",\"spam_rewrite_subject\"];\nif string :is \"${spam_enable_rewrite}\" \"yes\"\n{\n        if not string :is \"${spam_rule_whitelist_mailbox}\" \"\"\n        {\n                if header :matches \"subject\" \"${spam_rewrite_subject} *\"\n                {\n                        set \"subject\" \"${1}\";\n                        deleteheader \"subject\";\n                        addheader :last \"subject\" \"${subject}\";\n                }\n        }\n}\nif not allof(string :is \"${spam_rule_blacklist_mailbox}\" \"\", string :is \"${spam_rule_whitelist_mailbox}\" \"\")\n{\n        if not string :is \"${spam_rule_whitelist_mailbox}\" \"\"\n        {\n                addheader :last \"X-Synology-Personal-Spam-Rule\" \"whitelist\";\n        }\n        else    {\n                addheader :last \"X-Synology-Personal-Spam-Rule\" \"blacklist\";\n        }\n}\n"
+  },
+  "synomc": {
+    "rules": {
+      "items": [
+        {
+          "code": "global [\"filter_mailbox\",\"spam_rule_blacklist_mailbox\",\"spam_rule_whitelist_mailbox\"];",
+          "type": "raw"
+        },
+        {
+          "code": "include :global :once \"spam_rewrite_subject\";",
+          "type": "raw"
+        },
+        {
+          "code": "include :personal :optional \"spam_rule\";",
+          "type": "raw"
+        },
+        {
+          "code": "include :personal :optional \"filter\";",
+          "type": "raw"
+        },
+        {
+          "code": "if not string :is \"${spam_rule_blacklist_mailbox}\" \"\"\n{\n        fileinto \"${spam_rule_blacklist_mailbox}\";\n}\nelsif not string :is \"${filter_mailbox}\" \"\"\n{\n        fileinto \"${filter_mailbox}\";\n}\nelsif not string :is \"${spam_rule_whitelist_mailbox}\" \"\"\n{\n        fileinto \"${spam_rule_whitelist_mailbox}\";\n}",
+          "type": "raw"
+        }
+      ],
+      "preamble": null,
+      "requires": [
+        "fileinto",
+        "include",
+        "variables"
+      ],
+      "singleFolder": false
+    },
+    "source": "require [\"fileinto\",\"include\",\"variables\"];\nglobal [\"filter_mailbox\",\"spam_rule_blacklist_mailbox\",\"spam_rule_whitelist_mailbox\"];\ninclude :global :once \"spam_rewrite_subject\";\ninclude :personal :optional \"spam_rule\";\ninclude :personal :optional \"filter\";\nif not string :is \"${spam_rule_blacklist_mailbox}\" \"\"\n{\n        fileinto \"${spam_rule_blacklist_mailbox}\";\n}\nelsif not string :is \"${filter_mailbox}\" \"\"\n{\n        fileinto \"${filter_mailbox}\";\n}\nelsif not string :is \"${spam_rule_whitelist_mailbox}\" \"\"\n{\n        fileinto \"${spam_rule_whitelist_mailbox}\";\n}\n"
+  }
+}

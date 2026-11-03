@@ -48,6 +48,12 @@
     } else if (e.key.toLowerCase() === "s") {
       e.preventDefault();
       deploying = true;
+    } else if (e.key.toLowerCase() === "f") {
+      const search = document.getElementById("rule-search");
+      if (search) {
+        e.preventDefault();
+        search.focus();
+      }
     }
   }
 </script>

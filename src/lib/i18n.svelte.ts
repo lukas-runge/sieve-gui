@@ -299,6 +299,11 @@ const en = {
   "certificate.trusted": "Trusted certificate (SHA-256)",
   "certificate.untrust": "Stop trusting",
 
+  "search.label": "Search rules",
+  "search.placeholder": "Search rules (⌘F)",
+  "search.count": "{shown} of {total}",
+  "search.none": "No rule matches the search.",
+
   "theme.toggle": "Switch light/dark",
   "language": "Language",
 } as const;
@@ -602,6 +607,11 @@ const de: Record<MessageKey, string> = {
   "certificate.trustNew": "Dem neuen Zertifikat vertrauen",
   "certificate.trusted": "Vertrautes Zertifikat (SHA-256)",
   "certificate.untrust": "Nicht mehr vertrauen",
+
+  "search.label": "Regeln durchsuchen",
+  "search.placeholder": "Regeln durchsuchen (⌘F)",
+  "search.count": "{shown} von {total}",
+  "search.none": "Keine Regel passt zur Suche.",
 
   "theme.toggle": "Hell/Dunkel wechseln",
   "language": "Sprache",

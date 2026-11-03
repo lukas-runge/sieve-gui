@@ -6,6 +6,7 @@
   import { t } from "../i18n.svelte";
   import { scriptFolders, type ScriptFolders } from "../rules/mailbox";
   import { newRule } from "../rules/view";
+  import { matches, queryWords } from "../rules/search";
   import RawCard from "./RawCard.svelte";
   import RuleCard from "./RuleCard.svelte";
 
@@ -16,6 +17,12 @@
   }: { editor: ScriptEditor; extensions: string[]; serverFolders: Folder[] | null } = $props();
 
   let editingUid = $state<string | null>(null);
+  let query = $state("");
+  const words = $derived(queryWords(query));
+  /** While searching, only matching items show and the order can't change. */
+  const searching = $derived(words.length > 0);
+  const shown = $derived(editor.rules.items.map((item) => !searching || matches(item, words)));
+  const shownCount = $derived(shown.filter(Boolean).length);
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
 
@@ -82,6 +89,11 @@
   }
 </script>
 
+<!-- Lines cards up with draggable ones while the order can't change. -->
+{#snippet noHandle(_index: number)}
+  <span class="w-6 shrink-0" aria-hidden="true"></span>
+{/snippet}
+
 {#snippet handle(index: number)}
   <button
     class="btn btn-ghost btn-xs btn-square cursor-grab text-base-content/50"
@@ -100,11 +112,34 @@
   </button>
 {/snippet}
 
+{#if editor.rules.items.length > 1}
+  <div class="sticky -top-5 z-20 -mx-1 -mt-1 bg-base-200 px-1 pb-1 pt-1">
+    <label class="input input-sm w-full">
+      <span class="text-base-content/50" aria-hidden="true">⌕</span>
+      <input
+        id="rule-search"
+        type="search"
+        class="grow"
+        placeholder={t("search.placeholder")}
+        aria-label={t("search.label")}
+        bind:value={query}
+        onkeydown={(e) => e.key === "Escape" && (query = "")}
+      />
+      {#if searching}
+        <span class="text-xs text-base-content/60 whitespace-nowrap" role="status">
+          {t("search.count", { shown: shownCount, total: editor.rules.items.length })}
+        </span>
+      {/if}
+    </label>
+  </div>
+{/if}
+
 <div class="grid grid-cols-[minmax(0,1fr)] gap-3" role="list">
   {#each editor.rules.items as item, index (item.uid)}
     <div
       role="listitem"
       animate:flip={{ duration: 150 }}
+      hidden={!shown[index]}
       class="relative {dragFrom === index ? 'opacity-50' : ''}"
       ondragover={(e) => {
         if (dragFrom === null) return;
@@ -129,7 +164,7 @@
           onmove={(d) => move(index, index + d)}
           onduplicate={() => duplicate(index)}
           ondelete={() => remove(index)}
-          dragHandle={handle}
+          dragHandle={searching ? noHandle : handle}
         />
       {:else}
         <RawCard
@@ -140,7 +175,7 @@
           onedit={(on) => (editingUid = on ? item.uid : null)}
           onmove={(d) => move(index, index + d)}
           ondelete={() => remove(index)}
-          dragHandle={handle}
+          dragHandle={searching ? noHandle : handle}
         />
       {/if}
       {#if dropAt === index + 1 && index === editor.rules.items.length - 1 && dragFrom !== null}
@@ -152,6 +187,9 @@
       {t("editor.noRules")}
     </p>
   {/each}
+  {#if searching && shownCount === 0}
+    <p class="p-6 text-center text-base-content/70">{t("search.none")}</p>
+  {/if}
 
   <div class="flex flex-wrap gap-2">
     <button class="btn btn-primary btn-sm" onclick={addRule}>+ {t("editor.addRule")}</button>

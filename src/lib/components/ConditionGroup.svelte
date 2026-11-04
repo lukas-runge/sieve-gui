@@ -16,6 +16,7 @@
   } from "../rules/view";
   import ConditionRow from "./ConditionRow.svelte";
   import Self from "./ConditionGroup.svelte";
+  import Icon from "./Icon.svelte";
 
   let {
     group,
@@ -99,13 +100,13 @@
   {/each}
   <div class="flex flex-wrap gap-1">
     <button
-      class="btn btn-ghost btn-sm w-fit"
+      class="btn btn-ghost btn-xs w-fit gap-1 text-base-content/70"
       onclick={() => mutate((g) => (top ? addCondition(g, newCondition()) : g.items.push(newCondition())))}
     >
-      + {t("conditions.add")}
+      <Icon name="plus" size={13} />{t("conditions.add")}
     </button>
-    <button class="btn btn-ghost btn-sm w-fit" onclick={() => mutate((g) => addGroup(g, top))}>
-      + {t("conditions.addGroup")}
+    <button class="btn btn-ghost btn-xs w-fit gap-1 text-base-content/70" onclick={() => mutate((g) => addGroup(g, top))}>
+      <Icon name="plus" size={13} />{t("conditions.addGroup")}
     </button>
   </div>
 {/snippet}
@@ -113,20 +114,20 @@
 {#if top}
   <section class="mt-1 grid gap-2" aria-label={heading ?? t("conditions.heading")}>
     <div class="flex items-center gap-2">
-      <h4 class="font-semibold">{heading ?? t("conditions.heading")}</h4>
+      <h4 class="text-sm font-semibold text-base-content/70">{heading ?? t("conditions.heading")}</h4>
       {@render joinSelect()}
     </div>
     {@render body()}
   </section>
 {:else}
-  <div role="group" aria-label={t("conditions.group")} class="grid gap-2 rounded-box border border-base-300 p-2">
+  <div role="group" aria-label={t("conditions.group")} class="grid gap-2 rounded-field border border-base-300 border-l-2 border-l-base-content/25 p-2">
     <div class="flex items-center gap-2">
       {@render joinSelect()}
       <button
         class="btn btn-ghost btn-sm btn-square ml-auto"
         aria-label={t("conditions.removeGroup")}
         title={t("conditions.removeGroup")}
-        onclick={() => onremove?.()}>✕</button
+        onclick={() => onremove?.()}><Icon name="x" size={15} /></button
       >
     </div>
     {@render body()}

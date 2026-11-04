@@ -18,6 +18,7 @@
   } from "../rules/view";
   import { SIZE_UNITS, splitSize } from "../rules/format";
   import ValueList from "./ValueList.svelte";
+  import Icon from "./Icon.svelte";
   import { checkRegex, regexMatches, type RegexProblem } from "../rules/regex";
 
   let {
@@ -81,7 +82,7 @@
   }
 </script>
 
-<div class="flex flex-wrap items-start gap-2 rounded-box bg-base-200/60 p-2">
+<div class="flex flex-wrap items-start gap-2 rounded-field bg-base-200/70 p-2">
   {#if view}
     <select
       class="select select-sm w-auto"
@@ -217,9 +218,9 @@
     </div>
   {/if}
   <button
-    class="btn btn-ghost btn-sm btn-square ml-auto"
+    class="btn btn-ghost btn-sm btn-square ml-auto text-base-content/50"
     aria-label={t("conditions.remove")}
     title={t("conditions.remove")}
-    onclick={onremove}>✕</button
+    onclick={onremove}><Icon name="x" size={15} /></button
   >
 </div>

@@ -9,6 +9,7 @@
   import { ask, askText, tell } from "../dialogs.svelte";
   import { closesMenu } from "../menu";
   import { ROOT_SCRIPT, session } from "../session.svelte";
+  import Icon from "./Icon.svelte";
 
   let { onaccount }: { onaccount: (account: Account | null) => void } = $props();
 
@@ -98,29 +99,30 @@
        running: the script runs, on its own or included by `node.via`. -->
   {@const name = node.name}
   {@const current = session.editor?.accountId === id && session.editor.name === name}
-  {@const arrangeable = session.multipleActive(id)}
   {@const key = `${id}:${name}`}
   {@const root = session.roots[id]}
   {@const included = !!root?.scripts.includes(name)}
   {@const parents = session.includedBy(id, name)}
+  {@const position = order.indexOf(name)}
   <!-- Listed under the script including it; other including scripts are named. -->
   {@const notes = parents.some((p) => p !== node.via)
     ? [t("scripts.includedBy", { names: quoted(parents.filter((p) => p !== node.via)) })]
     : []}
   <div
-    class="group flex items-center rounded-field {current ? 'bg-base-100 shadow-[inset_3px_0_0_var(--color-primary)]' : 'hover:bg-base-100/60'}"
-    style:margin-left="{node.depth * 1.25}rem"
+    class={[
+      "group flex items-center gap-1 rounded-field pr-1",
+      current ? "bg-base-100 shadow-sm ring-1 ring-base-300" : "hover:bg-base-100/70",
+    ]}
+    style:margin-left="{node.depth * 1.1}rem"
   >
-    {#if node.depth > 0}
-      <span class="text-base-content/40" aria-hidden="true">↳</span>
-    {/if}
+    <!-- The run order: a number for running scripts, a hollow ring for the others. -->
     {#if index >= 0 && order.length > 1}
       <button
-        class="btn btn-ghost btn-xs btn-square ml-0.5 cursor-grab text-base-content/50"
+        class="ml-1 grid size-6 shrink-0 cursor-grab place-items-center rounded-full bg-primary/12 text-[0.72rem] font-bold text-primary hover:bg-primary/20"
         draggable="true"
         data-script-handle="{id}:{index}"
         aria-label="{t('scripts.drag')}: {name} (Alt+↑/↓)"
-        title="{t('scripts.drag')} (Alt+↑/↓)"
+        title="{t('scripts.position', { n: index + 1 })} · {t('scripts.drag')} (Alt+↑/↓)"
         ondragstart={(e) => {
           drag = { account: id, from: index };
           e.dataTransfer?.setData("text/plain", name);
@@ -128,47 +130,58 @@
         ondragend={() => (drag = dropAt = null)}
         onkeydown={(e) => onhandlekey(e, id, order, index)}
       >
-        ⠿
+        {index + 1}
       </button>
-    {:else if arrangeable && node.depth === 0}
-      <!-- Lines the name up with those that have a handle. -->
-      <span class="ml-0.5 w-6 shrink-0" aria-hidden="true"></span>
+    {:else if node.depth > 0}
+      <span class="ml-1 grid size-6 shrink-0 place-items-center text-base-content/35" aria-hidden="true"><Icon name="nested" size={14} /></span>
+    {:else if running && position >= 0}
+      <span class="ml-1 grid size-6 shrink-0 place-items-center rounded-full bg-primary/12 text-[0.72rem] font-bold text-primary" aria-hidden="true">1</span>
+    {:else}
+      <span class="ml-1 grid size-6 shrink-0 place-items-center" aria-hidden="true">
+        <span class="size-2.5 rounded-full border-2 border-base-content/25"></span>
+      </span>
     {/if}
     <!-- contain: long names and notes truncate instead of widening the sidebar. -->
     <button
-      class="min-w-0 grow px-2 py-1 text-left text-sm [contain:inline-size]"
+      class="min-w-0 grow py-1.5 pr-1 pl-1 text-left text-[0.9rem] [contain:inline-size]"
       aria-current={current ? "page" : undefined}
       onclick={() => open(id, name)}
     >
-      <span class="block truncate {current ? 'font-semibold' : ''}">{name}</span>
+      <span class={["block truncate", current && "font-semibold", !running && "text-base-content/70"]}>{name}</span>
+      {#if running && node.via}
+        <span class="block truncate text-[0.75rem] text-base-content/50" title={t("scripts.viaHint", { name: node.via })}>{t("scripts.viaShort", { name: node.via })}</span>
+      {/if}
       {#if notes.length}
-        <span class="block text-xs leading-snug break-words text-base-content/60">{notes.join(" · ")}</span>
+        <span class="block text-[0.75rem] leading-snug break-words text-base-content/50">{notes.join(", ")}</span>
       {/if}
     </button>
-    {#if running && node.via}
-      <!-- Runs because the script above includes it. -->
-      <span class="badge badge-sm badge-soft badge-primary mr-1 whitespace-nowrap" title={t("scripts.viaHint", { name: node.via })}>
-        {t("scripts.via")}
-      </span>
-    {:else}
-    <button
-      class={[
-        "badge badge-sm mr-1 cursor-pointer whitespace-nowrap",
-        active ? "badge-primary hover:brightness-110" : "badge-ghost opacity-60 group-hover:opacity-100 focus-visible:opacity-100",
-      ]}
-      aria-pressed={active}
-      aria-label="{name}: {t('scripts.active')}"
-      title={active ? t("scripts.deactivate") : t("scripts.activate")}
-      disabled={toggling.has(key)}
-      onclick={() => toggle(id, name, active)}
-    >
-      {#if toggling.has(key)}<span class="loading loading-spinner loading-xs"></span>{/if}
-      {active ? t("scripts.active") : t("scripts.off")}
-    </button>
+    {#if !(running && node.via)}
+      <button
+        class={[
+          "grid size-6 shrink-0 place-items-center rounded-full",
+          active ? "text-base-content/45 hover:bg-base-200 hover:text-base-content" : "text-primary hover:bg-primary/12",
+          "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+          current && "opacity-100",
+        ]}
+        aria-pressed={active}
+        aria-label="{name}: {active ? t('scripts.deactivate') : t('scripts.activate')}"
+        title={active ? t("scripts.deactivate") : t("scripts.activate")}
+        disabled={toggling.has(key)}
+        onclick={() => toggle(id, name, active)}
+      >
+        {#if toggling.has(key)}<span class="loading loading-spinner loading-xs"></span>{:else}<Icon name={active ? "pause" : "play"} size={12} />{/if}
+      </button>
     {/if}
     <div class="dropdown dropdown-end">
-      <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square opacity-60 group-hover:opacity-100 focus:opacity-100" aria-label="{name}: …">⋯</div>
-      <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
+      <div
+        tabindex="0"
+        role="button"
+        class="grid size-6 place-items-center rounded-full text-base-content/45 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-base-200 {current ? 'opacity-100' : ''}"
+        aria-label="{name}: …"
+      >
+        <Icon name="more" size={15} />
+      </div>
+      <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-52 rounded-box border border-base-300 bg-base-100 p-1 shadow-lg">
         <li><button onclick={() => rename(id, name)}>{t("scripts.rename")}</button></li>
         {#if root?.lastMoveWins && included}
           {#if root.unchanged.includes(name)}
@@ -183,14 +196,34 @@
   </div>
 {/snippet}
 
-<nav class="flex h-full flex-col gap-4 overflow-y-auto p-3" aria-label={t("accounts.heading")}>
+{#snippet callout(tone: "warning" | "info", text: string)}
+  <div class="flex items-start gap-2">
+    <Icon name={tone === "warning" ? "alert" : "info"} size={15} class={tone === "warning" ? "mt-px text-warning" : "mt-px text-primary"} />
+    <p>{text}</p>
+  </div>
+{/snippet}
+
+<nav class="flex h-full flex-col overflow-y-auto" aria-label={t("accounts.heading")}>
+  <div class="flex items-center gap-2 px-4 pt-4 pb-3">
+    <img src="/favicon.png" alt="" class="size-6 rounded-md" />
+    <span class="font-semibold tracking-tight">sieve-gui</span>
+  </div>
+  <div class="grid gap-5 px-2 pb-3">
   {#each session.accounts as account (account.id)}
     {@const server = session.servers[account.id]}
+    {@const status = !server || server.status === "connecting" ? "connecting" : server.status === "error" ? "error" : "ready"}
     <section class="grid gap-1">
-      <div class="flex items-center gap-1">
-        <h2 class="grow truncate font-semibold" title="{account.username}@{account.host}">{account.label}</h2>
+      <div class="flex items-center gap-2 px-2">
+        <span
+          class={["size-2 shrink-0 rounded-full", status === "ready" ? "bg-success" : status === "error" ? "bg-error" : "bg-warning animate-pulse"]}
+          title={t(`accounts.status.${status}`)}
+        ></span>
+        <div class="min-w-0 grow">
+          <h2 class="truncate text-[0.95rem] font-semibold" title="{account.username}@{account.host}">{account.label}</h2>
+          <p class="truncate text-[0.75rem] text-base-content/50">{account.username}@{account.host}</p>
+        </div>
         <div class="dropdown dropdown-end">
-          <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label="{t('accounts.edit')}: {account.label}">⋯</div>
+          <div tabindex="0" role="button" class="grid size-7 place-items-center rounded-full text-base-content/50 hover:bg-base-100" aria-label="{t('accounts.edit')}: {account.label}"><Icon name="more" size={16} /></div>
           <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
             <li><button onclick={() => onaccount(account)}>{t("accounts.edit")}</button></li>
             {#if session.roots[account.id]}
@@ -202,11 +235,11 @@
       </div>
 
       {#if !server || server.status === "connecting"}
-        <p class="flex items-center gap-2 text-sm text-base-content/60">
+        <p class="flex items-center gap-2 px-2 text-sm text-base-content/60">
           <span class="loading loading-spinner loading-xs"></span>{t("accounts.connecting")}
         </p>
       {:else if server.status === "error"}
-        <div role="alert" class="grid gap-1 text-sm">
+        <div role="alert" class="mx-1 grid gap-2 rounded-field bg-error/8 px-2.5 py-2 text-[0.82rem]">
           <p class="text-error">{server.error}</p>
           {#if server.certificate}
             {@const untrusted = server.certificate}
@@ -218,8 +251,8 @@
       {:else if server.info}
         {@const copy = session.copies[account.id]}
         {#if copy}
-          <div role="alert" class="grid gap-1.5 rounded-box border border-warning/40 bg-warning/10 px-2 py-1.5 text-xs">
-            <p>{t("copy.notice", { count: copy.differences.length + (copy.active ? 1 : 0) })}</p>
+          <div role="alert" class="mx-1 grid gap-2 rounded-field bg-warning/10 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("warning", t("copy.notice", { count: copy.differences.length + (copy.active ? 1 : 0) }))}
             <button class="btn btn-xs justify-self-start" onclick={() => (session.copyPrompt = account.id)}>
               {t("copy.show")}
             </button>
@@ -227,8 +260,8 @@
         {/if}
         {@const adoption = session.adoption[account.id]}
         {#if adoption}
-          <div role="alert" class="grid gap-1.5 rounded-box border border-info/40 bg-info/10 px-2 py-1.5 text-xs">
-            <p>{t("adopt.notice", { name: adoption.active })}</p>
+          <div role="alert" class="mx-1 grid gap-2 rounded-field bg-primary/8 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("info", t("adopt.notice", { name: adoption.active }))}
             <div class="flex flex-wrap gap-1">
               <button class="btn btn-xs btn-primary" onclick={() => session.adopt(account.id, "unchanged")}>{t("adopt.unchanged")}</button>
               {#if session.rootSettings(account.id).lastMoveWins}
@@ -239,10 +272,8 @@
         {/if}
         {@const displaced = session.displaced[account.id]}
         {#if displaced}
-          <div role="alert" class="grid gap-1.5 rounded-box border border-warning/40 bg-warning/10 px-2 py-1.5 text-xs">
-            <p>
-              {displaced.active ? t("root.displaced", { name: displaced.active }) : t("root.displacedNone")}
-            </p>
+          <div role="alert" class="mx-1 grid gap-2 rounded-field bg-warning/10 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("warning", displaced.active ? t("root.displaced", { name: displaced.active }) : t("root.displacedNone"))}
             <button class="btn btn-xs justify-self-start" onclick={() => session.reactivateRoot(account.id)}>
               {t("root.reactivate", { name: ROOT_SCRIPT })}
             </button>
@@ -285,7 +316,7 @@
             </li>
           {/each}
           {#if tree.running.length && tree.inactive.length}
-            <li class="mt-2 px-2 text-xs font-semibold text-base-content/50">{t("scripts.inactiveHeading")}</li>
+            <li class="mt-2.5 mb-0.5 px-2 text-[0.75rem] font-medium text-base-content/50">{t("scripts.inactiveHeading")}</li>
           {/if}
           {#each tree.inactive as node (node.name)}
             <li animate:flip={{ duration: 150 }}>
@@ -296,11 +327,11 @@
             <li class="px-2 text-sm text-base-content/60">{t("scripts.none")}</li>
           {/if}
         </ul>
-        <button class="btn btn-ghost btn-xs justify-self-start w-fit" onclick={() => create(account.id)}>+ {t("scripts.new")}</button>
+        <button class="btn btn-ghost btn-xs ml-1 w-fit justify-self-start gap-1 text-base-content/60" onclick={() => create(account.id)}><Icon name="plus" size={13} />{t("scripts.new")}</button>
         {@const folders = session.folders[account.id]}
         {#if folders?.status === "error"}
-          <div role="alert" class="grid gap-1 text-xs">
-            <p class="text-base-content/70">{t("folders.error", { message: folders.error ?? "" })}</p>
+          <div role="alert" class="mx-1 grid gap-1.5 rounded-field bg-base-100 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("warning", t("folders.error", { message: folders.error ?? "" }))}
             {#if folders.certificate}
               {@const untrusted = folders.certificate}
               <button class="btn btn-xs self-start" onclick={() => session.showCertificate(account.id, untrusted)}>{t("certificate.show")}</button>
@@ -312,10 +343,13 @@
       {/if}
     </section>
   {:else}
-    <p class="text-sm text-base-content/70">{t("accounts.empty")}</p>
+    <p class="px-2 text-sm text-base-content/70">{t("accounts.empty")}</p>
   {/each}
+  </div>
 
-  <button class="btn btn-sm mt-auto" onclick={() => onaccount(null)}>+ {t("accounts.add")}</button>
+  <div class="mt-auto border-t border-base-300 p-2">
+    <button class="btn btn-ghost btn-sm w-full justify-start gap-2 text-base-content/70" onclick={() => onaccount(null)}><Icon name="plus" size={15} />{t("accounts.add")}</button>
+  </div>
 </nav>
 
 {#if session.copyPrompt && session.copies[session.copyPrompt]}

@@ -7,12 +7,14 @@
   import { askText } from "../dialogs.svelte";
   import { isKeyword } from "../keywords";
   import { session } from "../session.svelte";
+  import Icon from "./Icon.svelte";
 
   let {
     action,
     extensions,
     folders,
     singleFolder,
+    depth = 1,
     onchange,
     onremove,
   }: {
@@ -22,6 +24,8 @@
     /** Single-folder mode: "stop" ends only this script, and `:create`
      * would turn a move into a direct `fileinto`, so it isn't offered. */
     singleFolder: boolean;
+    /** Nesting level a check in this action would have. */
+    depth?: number;
     onchange: (a: Action, merge: boolean) => void;
     onremove: () => void;
   } = $props();
@@ -50,7 +54,7 @@
   }
 </script>
 
-<div class="flex flex-wrap items-start gap-2 rounded-box bg-base-200/60 p-2">
+<div class="flex flex-wrap items-start gap-2 rounded-field bg-base-200/70 p-2">
   <select
     class="select select-sm w-auto"
     aria-label={t("actions.heading")}
@@ -182,21 +186,22 @@
   {/if}
 
   <button
-    class="btn btn-ghost btn-sm btn-square ml-auto"
+    class="btn btn-ghost btn-sm btn-square ml-auto text-base-content/50"
     aria-label={t("actions.remove")}
     title={t("actions.remove")}
-    onclick={onremove}>✕</button
+    onclick={onremove}><Icon name="x" size={15} /></button
   >
 
   {#if action.type === "if"}
     {@const nested = action}
     <!-- "Also check": an if with its own branches, nested to any depth. -->
-    <div class="basis-full border-l-2 border-base-300 pl-3">
+    <div class="basis-full border-l-2 pl-3" style="border-color: var(--rail-{Math.min(depth, 3)})">
       <BranchesEditor
         block={nested}
         {extensions}
         {folders}
         {singleFolder}
+        {depth}
         mutate={(fn, merge) => {
           const copy = $state.snapshot(nested);
           fn(copy);

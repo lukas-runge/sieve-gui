@@ -6,36 +6,37 @@
   themes: false;
 }
 
-/* Sorting office: cool paper, navy ink, sorting blue for actions.
-   Highlighter yellow is reserved for the editable parts of a rule sentence. */
+/* Sorting office: a message runs down a line of rules like a letter through
+   a sorting machine. Cool paper, navy ink, route blue for the main line and
+   actions; each nesting level of a rule gets its own calm rail color. */
 @plugin "daisyui/theme" {
   name: "post";
   default: true;
   prefersdark: false;
   color-scheme: light;
   --color-base-100: #ffffff;
-  --color-base-200: #eef1f4;
-  --color-base-300: #dde2e8;
-  --color-base-content: #1b2433;
-  --color-primary: #1f4fd1;
+  --color-base-200: #f2f4f7;
+  --color-base-300: #dce1e8;
+  --color-base-content: #17202d;
+  --color-primary: #2456e0;
   --color-primary-content: #ffffff;
   --color-secondary: #5b6676;
   --color-secondary-content: #ffffff;
-  --color-accent: #ffe27a;
-  --color-accent-content: #1b2433;
-  --color-neutral: #1b2433;
-  --color-neutral-content: #eef1f4;
-  --color-info: #1f4fd1;
+  --color-accent: #7647d6;
+  --color-accent-content: #ffffff;
+  --color-neutral: #17202d;
+  --color-neutral-content: #f2f4f7;
+  --color-info: #2456e0;
   --color-info-content: #ffffff;
   --color-success: #1e7a4c;
   --color-success-content: #ffffff;
-  --color-warning: #b26b00;
+  --color-warning: #a8650a;
   --color-warning-content: #ffffff;
-  --color-error: #c2362b;
+  --color-error: #c23f2e;
   --color-error-content: #ffffff;
-  --radius-selector: 0.375rem;
-  --radius-field: 0.375rem;
-  --radius-box: 0.5rem;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -48,29 +49,29 @@
   default: false;
   prefersdark: true;
   color-scheme: dark;
-  --color-base-100: #1f2733;
-  --color-base-200: #161c26;
-  --color-base-300: #2c3646;
-  --color-base-content: #e3e8ef;
-  --color-primary: #7d9cff;
+  --color-base-100: #1b222d;
+  --color-base-200: #131820;
+  --color-base-300: #2b3543;
+  --color-base-content: #e4e9f0;
+  --color-primary: #7fa0ff;
   --color-primary-content: #0f1626;
   --color-secondary: #9aa5b5;
-  --color-secondary-content: #161c26;
-  --color-accent: #f5d04c;
-  --color-accent-content: #1b2433;
-  --color-neutral: #e3e8ef;
-  --color-neutral-content: #161c26;
-  --color-info: #7d9cff;
+  --color-secondary-content: #131820;
+  --color-accent: #a889f0;
+  --color-accent-content: #131820;
+  --color-neutral: #e4e9f0;
+  --color-neutral-content: #131820;
+  --color-info: #7fa0ff;
   --color-info-content: #0f1626;
   --color-success: #5fc28f;
   --color-success-content: #0f1626;
-  --color-warning: #e6a23c;
-  --color-warning-content: #161c26;
-  --color-error: #f0796f;
-  --color-error-content: #161c26;
-  --radius-selector: 0.375rem;
-  --radius-field: 0.375rem;
-  --radius-box: 0.5rem;
+  --color-warning: #e0a84a;
+  --color-warning-content: #131820;
+  --color-error: #f07a6e;
+  --color-error-content: #131820;
+  --radius-selector: 0.5rem;
+  --radius-field: 0.5rem;
+  --radius-box: 0.75rem;
   --size-selector: 0.25rem;
   --size-field: 0.25rem;
   --border: 1px;
@@ -90,32 +91,82 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* The editable parts of a rule sentence: marked like a filled-in form. */
-.slot {
-  background: linear-gradient(
-    to bottom,
-    transparent 0.15em,
-    color-mix(in oklab, var(--color-accent) 85%, transparent) 0.15em,
-    color-mix(in oklab, var(--color-accent) 85%, transparent) calc(100% - 0.1em),
-    transparent calc(100% - 0.1em)
-  );
-  color: var(--color-accent-content);
-  padding: 0 0.25em;
-  border-radius: 0.2em;
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
-  font-weight: 600;
+/* Rail colors per nesting level: a rule's cases, a check inside a case, … */
+:root {
+  --rail-0: #2456e0;
+  --rail-1: #7647d6;
+  --rail-2: #0d8c84;
+  --rail-3: #b9770e;
+  --spine: #c9d1dc;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --rail-0: #7fa0ff;
+    --rail-1: #a889f0;
+    --rail-2: #4cc2b8;
+    --rail-3: #e0a84a;
+    --spine: #364254;
+  }
 }
 
-.slot-code {
-  font-family: var(--font-mono);
-  font-weight: 500;
+/* A tree drawn with rails: every item hangs off its list's vertical line by
+   an elbow; the last item's elbow ends the line. `--rail` is the color,
+   `--elbow` the height of the elbow from the top of the item. */
+.rails {
+  --elbow: 0.8rem;
+}
+.rails > li {
+  position: relative;
+  padding-left: 1.5rem;
+}
+.rails > li::before {
+  content: "";
+  position: absolute;
+  left: 0.45rem;
+  top: 0;
+  bottom: 0;
+  border-left: 2px solid var(--rail);
+}
+.rails > li::after {
+  content: "";
+  position: absolute;
+  left: 0.45rem;
+  top: var(--elbow);
+  width: 0.75rem;
+  border-top: 2px solid var(--rail);
+}
+.rails > li:last-child::before {
+  bottom: auto;
+  height: var(--elbow);
+}
+.rails > li:last-child::after {
+  top: calc(var(--elbow) - 0.5rem);
+  height: 0.5rem;
+  border-top: 0;
+  border-left: 2px solid var(--rail);
+  border-bottom: 2px solid var(--rail);
+  border-bottom-left-radius: 0.5rem;
+}
+.rails > li:last-child::before {
+  height: calc(var(--elbow) - 0.5rem);
 }
 
-/* Disabled rules: the marker fades, the sentence stays readable. */
-.rule-disabled .slot {
-  background: var(--color-base-300);
-  color: var(--color-base-content);
+/* A row of the route: what is tested, and what happens in a column of the
+   same width on every row and depth, so destinations line up. */
+.route-sheet {
+  container: route / inline-size;
+}
+.route-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--outcome-width, clamp(10rem, 32cqi, 16rem));
+  column-gap: 1.25rem;
+  align-items: start;
+}
+@container route (max-width: 38rem) {
+  .route-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.25rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

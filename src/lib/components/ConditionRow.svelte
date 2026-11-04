@@ -18,24 +18,43 @@
   } from "../rules/view";
   import { SIZE_UNITS, splitSize } from "../rules/format";
   import ValueList from "./ValueList.svelte";
+  import Token from "./route/Token.svelte";
+  import { conditionToken } from "../rules/route";
+  import Icon from "./Icon.svelte";
   import { checkRegex, regexMatches, type RegexProblem } from "../rules/regex";
 
   let {
     condition,
     extensions,
+    compact = false,
     onchange,
     onremove,
   }: {
     condition: Condition;
     extensions: string[];
+    /** One of several: shows as a line to read until it's opened for editing. */
+    compact?: boolean;
     onchange: (c: Condition, merge: boolean) => void;
     onremove: () => void;
   } = $props();
 
   const view = $derived(viewCondition(condition));
+  /** Editing this condition (a compact one opens on click; empty ones start open). */
+  let editing = $state(false);
+  const open = $derived(!compact || editing || !view || (hasValues(view.operator) && view.values.every((v) => v === "")));
   const size = $derived(view?.field === "size" ? splitSize(Number(view.values[0])) : null);
   // "exists" asks for the header, not a part of its addresses.
-  const parts = $derived(view && hasValues(view.operator) ? partsFor(view.field, extensions, view.part) : []);
+  // For a header typed in by hand, the address part is an expert detail: only
+  // shown once one is chosen.
+  const parts = $derived(
+    view && hasValues(view.operator) && (view.field !== "header" || view.part !== "header")
+      ? partsFor(view.field, extensions, view.part)
+      : [],
+  );
+
+  /** Which part of an address to compare is a detail: shown once asked for or chosen. */
+  let morePart = $state(false);
+  const showPart = $derived(morePart || (!!view && view.part !== "header" && view.part !== "all"));
 
   const regex = $derived(view?.operator === "regex" || view?.operator === "notRegex");
   // The current operator stays selectable, e.g. a regex on a server without `regex`.
@@ -44,6 +63,7 @@
   );
   const regexUnsupported = $derived(regex && extensions.length > 0 && !extensions.includes("regex"));
   let sample = $state("");
+  let regexHelp = $state(false);
   /** Whether the condition holds for the sample, or null if an expression is invalid. */
   const sampleResult = $derived.by(() => {
     if (!view || !regex || sample === "") return undefined;
@@ -81,8 +101,16 @@
   }
 </script>
 
-<div class="flex flex-wrap items-start gap-2 rounded-box bg-base-200/60 p-2">
-  {#if view}
+<!-- One sentence: [field] [compare] [values], the remove button at its end. -->
+<div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-1 rounded-field bg-base-200/70 p-2">
+  <div class="flex min-w-0 flex-wrap items-start gap-2">
+  {#if !open}
+    <!-- Read like on the route; click to change. -->
+    <button class="flex min-w-0 grow items-start gap-2 rounded-field px-1 py-1 text-left hover:bg-base-100" title={t("conditions.edit")} onclick={() => (editing = true)}>
+      <span class="min-w-0 grow"><Token token={conditionToken(condition, Infinity)} /></span>
+      <Icon name="pencil" size={14} class="mt-1 text-base-content/65" />
+    </button>
+  {:else if view}
     <select
       class="select select-sm w-auto"
       aria-label={t("conditions.heading")}
@@ -95,7 +123,7 @@
     </select>
     {#if view.field === "header"}
       <input
-        class="input input-sm w-56 font-mono"
+        class="input input-sm w-56"
         aria-label={t("field.headerName")}
         placeholder={t("field.headerName")}
         title={t("field.headerNameHint")}
@@ -103,7 +131,7 @@
         oninput={(e) => update({ header: e.currentTarget.value }, true)}
       />
     {/if}
-    {#if parts.length > 0}
+    {#if parts.length > 0 && showPart}
       <select
         class="select select-sm w-auto"
         aria-label={t("part.label")}
@@ -166,10 +194,12 @@
         {t("field.withTime")}
       </label>
     {:else if hasValues(view.operator)}
-      <div class="grow min-w-48">
+      <div class="grow min-w-40">
         <ValueList
           values={view.values.length ? view.values : [""]}
           label={t(`op.${view.operator}` as MessageKey)}
+          mono={regex || view.operator === "matches" || view.operator === "notMatches"}
+          placeholder={view.part !== "header" ? samplePlaceholder(view) : undefined}
           onchange={(values, merge) => update({ values }, merge)}
         />
         {#if regex}
@@ -177,16 +207,21 @@
           {#each view.values as value, i}
             {@const problem = value ? checkRegex(value) : null}
             {#if problem}
-              <p class="mt-1 text-xs text-error" role="alert">
+              <p class="mt-1 text-[0.8rem] text-error" role="alert">
                 {view.values.length > 1 ? t("regex.which", { n: i + 1 }) : ""}{problemText(problem)}
               </p>
             {/if}
           {/each}
           {#if regexUnsupported}
-            <p class="mt-1 text-xs text-warning" role="alert">{t("regex.unsupported")}</p>
+            <p class="mt-1 text-[0.8rem] text-warning" role="alert">{t("regex.unsupported")}</p>
           {/if}
-          <p class="mt-1 text-xs text-base-content/60">{t("op.regexHint")}</p>
-          <label class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <!-- Help and trying it out, on request. -->
+          <button class="mt-1 text-[0.8125rem] text-base-content/70 hover:text-base-content hover:underline" aria-expanded={regexHelp} onclick={() => (regexHelp = !regexHelp)}>
+            {regexHelp ? t("regex.hideHelp") : t("regex.help")}
+          </button>
+          {#if regexHelp}
+          <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.regexHint")}</p>
+          <label class="mt-2 flex flex-wrap items-center gap-2 text-[0.8rem]">
             <span class="text-base-content/70">{t("regex.try")}</span>
             <input
               class="input input-xs min-w-48 grow font-mono"
@@ -201,25 +236,32 @@
               <span class="badge badge-sm badge-ghost">{t("regex.doesNotHold")}</span>
             {/if}
           </label>
+          {/if}
         {:else if view.operator.toLowerCase().includes("matches")}
-          <p class="mt-1 text-xs text-base-content/60">{t("op.patternHint")}</p>
+          <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.patternHint")}</p>
         {:else if view.operator.endsWith("WithSubdomains")}
-          <p class="mt-1 text-xs text-base-content/60">{t("op.subdomainHint")}</p>
+          <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.subdomainHint")}</p>
         {:else if view.field === "parts"}
-          <p class="mt-1 text-xs text-base-content/60">{t("op.typeHint")}</p>
+          <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.typeHint")}</p>
         {/if}
       </div>
+    {/if}
+    {#if parts.length > 0 && !showPart}
+      <button class="basis-full text-left text-[0.8rem] text-base-content/70 hover:text-base-content hover:underline" onclick={() => (morePart = true)}>
+        {t("part.more")}
+      </button>
     {/if}
   {:else}
     <div class="grow">
       <code class="block font-mono text-sm break-all">{print(condition)}</code>
-      <p class="mt-1 text-xs text-base-content/60">{t("conditions.advanced")}</p>
+      <p class="mt-1 text-[0.8rem] text-base-content/70">{t("conditions.advanced")}</p>
     </div>
   {/if}
+  </div>
   <button
-    class="btn btn-ghost btn-sm btn-square ml-auto"
+    class="btn btn-ghost btn-sm btn-square text-base-content/70"
     aria-label={t("conditions.remove")}
     title={t("conditions.remove")}
-    onclick={onremove}>✕</button
+    onclick={onremove}><Icon name="trash" size={15} /></button
   >
 </div>

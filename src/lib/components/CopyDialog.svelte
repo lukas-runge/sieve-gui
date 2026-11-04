@@ -135,14 +135,14 @@
           <div class="flex flex-wrap items-center gap-2 text-sm">
             <span class={["grow", d.changed.includes("server") ? "text-warning" : "text-base-content/70"]}>{t(what(d))}</span>
             {#if d.server !== null && d.local !== null}
-              <button type="button" class="link text-xs" onclick={() => (open[d.name] = !open[d.name])}>
+              <button type="button" class="link text-[0.8125rem]" onclick={() => (open[d.name] = !open[d.name])}>
                 {open[d.name] ? t("copy.hideDiff") : t("copy.showDiff")}
               </button>
             {/if}
           </div>
           {#if open[d.name]}
             <!-- From the copy to the server: + is only on the server. -->
-            <pre class="max-h-64 overflow-auto rounded-field bg-base-200 p-2 font-mono text-xs leading-relaxed">{#each diffLines(...compared(d)) as line}<span
+            <pre class="max-h-64 overflow-auto rounded-field bg-base-200 p-2 font-mono text-[0.8125rem] leading-relaxed">{#each diffLines(...compared(d)) as line}<span
                   class="block {line.kind === 'add'
                     ? 'bg-success/15 text-success'
                     : line.kind === 'remove'
@@ -151,7 +151,7 @@
                     >{line.kind === "add" ? "+ " : line.kind === "remove" ? "− " : "  "}</span
                   >{line.text || " "}</span
                 >{/each}</pre>
-            <div class="flex flex-wrap items-center gap-3 text-xs text-base-content/60">
+            <div class="flex flex-wrap items-center gap-3 text-[0.8125rem] text-base-content/60">
               <span class="grow">{t("copy.diffLegend")}</span>
               <label class="flex items-center gap-1.5">
                 <input type="checkbox" class="checkbox checkbox-xs" bind:checked={fullText} />
@@ -163,7 +163,7 @@
       {/each}
     </ul>
 
-    <p class="text-xs text-base-content/60">{t("copy.where", { dir: status.dir })}</p>
+    <p class="text-[0.8125rem] text-base-content/60">{t("copy.where", { dir: status.dir })}</p>
 
     <div class="modal-action mt-0">
       <button type="button" class="btn btn-ghost" onclick={() => dialog.close()}>{t("copy.later")}</button>

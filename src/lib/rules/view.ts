@@ -6,7 +6,20 @@ import type { Action, AddressPart, Condition, Conditions, ConditionTest, Join, M
 
 // ── Conditions ────────────────────────────────────────────────────────────────
 
-export const FIELDS = ["from", "to", "cc", "toOrCc", "subject", "header", "body", "parts", "size", "date"] as const;
+export const FIELDS = [
+  "from",
+  "to",
+  "cc",
+  "toOrCc",
+  "recipients",
+  "delivered",
+  "subject",
+  "header",
+  "body",
+  "parts",
+  "size",
+  "date",
+] as const;
 export type Field = (typeof FIELDS)[number];
 
 export const TEXT_OPERATORS = [
@@ -49,7 +62,7 @@ export type Operator =
 export type Part = "header" | AddressPart;
 export const PARTS: readonly Part[] = ["header", "all", "domain", "localPart", "user", "detail"];
 /** Fields that hold addresses, so an address part can be chosen. */
-const ADDRESS_FIELDS: readonly Field[] = ["from", "to", "cc", "toOrCc", "header"];
+const ADDRESS_FIELDS: readonly Field[] = ["from", "to", "cc", "toOrCc", "recipients", "delivered", "header"];
 
 export interface ConditionView {
   field: Field;
@@ -69,6 +82,9 @@ const FIELD_HEADERS: Partial<Record<Field, string[]>> = {
   to: ["to"],
   cc: ["cc"],
   toOrCc: ["to", "cc"],
+  recipients: ["to", "cc", "bcc"],
+  // Where the server delivered the message, e.g. an alias of the account.
+  delivered: ["x-original-to", "delivered-to"],
   subject: ["subject"],
 };
 

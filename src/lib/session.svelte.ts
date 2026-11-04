@@ -29,6 +29,7 @@ import type {
   CopyStatus,
   Folder,
   Root,
+  RuleSet,
   ScriptLinks,
   ServerInfo,
   Side,
@@ -295,6 +296,31 @@ class Session {
   /** Forgets what is known about a script after it was written. */
   scriptChanged(id: string, name: string) {
     if (this.links[id]) delete this.links[id][name];
+    delete this.#rules[`${id}:${name}`];
+  }
+
+  /** Rules of scripts read for searching across scripts, by `account:name`. */
+  #rules: Record<string, RuleSet> = {};
+
+  /**
+   * The rules of every script of the account (not the root), in the order
+   * the sidebar lists them, for searching across scripts. Scripts that can't
+   * be read are left out.
+   */
+  async allRules(id: string): Promise<{ name: string; rules: RuleSet }[]> {
+    const tree = this.scriptTree(id);
+    const names = [...tree.running, ...tree.inactive].map((n) => n.name);
+    const out: { name: string; rules: RuleSet }[] = [];
+    for (const name of [...new Set(names)]) {
+      const key = `${id}:${name}`;
+      try {
+        this.#rules[key] ??= await importRules(await getScript(id, name));
+        out.push({ name, rules: this.#rules[key] });
+      } catch {
+        // Not readable right now.
+      }
+    }
+    return out;
   }
 
   /** The scripts that include `name`. */

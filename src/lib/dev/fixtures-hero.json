@@ -1,0 +1,390 @@
+{
+  "Archive": {
+    "rules": {
+      "items": [
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Archive/Lists",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "list-id"
+                  ],
+                  "keys": [
+                    "announce.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "contains"
+                    }
+                  },
+                  "type": "header"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Old mail lists",
+          "otherwise": null,
+          "type": "rule"
+        }
+      ],
+      "preamble": null,
+      "requires": [
+        "include",
+        "variables"
+      ],
+      "singleFolder": true
+    },
+    "source": "require [\"include\",\"variables\"];\r\nglobal \"move_to_folder\";\r\n\r\n# rule:[Old mail lists]\r\nif header :contains \"list-id\" \"announce.example\" {\r\n\tset \"move_to_folder\" \"Archive/Lists\";\r\n}\r\n"
+  },
+  "Mail routing": {
+    "rules": {
+      "items": [
+        {
+          "actions": [
+            {
+              "flags": [
+                "$label1"
+              ],
+              "op": "add",
+              "type": "flags"
+            },
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Personal/Family",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "mia@example.com"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "all",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Family",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Clients/Acme",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "acme.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [
+            {
+              "actions": [
+                {
+                  "copy": false,
+                  "create": false,
+                  "flags": null,
+                  "mailbox": "Clients/Studio",
+                  "type": "fileInto"
+                }
+              ],
+              "conditions": {
+                "items": [
+                  {
+                    "negate": false,
+                    "test": {
+                      "headers": [
+                        "from"
+                      ],
+                      "keys": [
+                        "studio.example"
+                      ],
+                      "matcher": {
+                        "comparator": null,
+                        "matchType": {
+                          "type": "is"
+                        }
+                      },
+                      "part": "domain",
+                      "type": "address"
+                    }
+                  }
+                ],
+                "join": "any"
+              }
+            },
+            {
+              "actions": [
+                {
+                  "copy": false,
+                  "create": false,
+                  "flags": null,
+                  "mailbox": "Clients/Billing",
+                  "type": "fileInto"
+                }
+              ],
+              "conditions": {
+                "items": [
+                  {
+                    "negate": false,
+                    "test": {
+                      "headers": [
+                        "subject"
+                      ],
+                      "keys": [
+                        "invoice"
+                      ],
+                      "matcher": {
+                        "comparator": null,
+                        "matchType": {
+                          "type": "contains"
+                        }
+                      },
+                      "type": "header"
+                    }
+                  }
+                ],
+                "join": "any"
+              }
+            }
+          ],
+          "enabled": true,
+          "name": "Clients",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Reading",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "List-Unsubscribe"
+                  ],
+                  "type": "exists"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Newsletters",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Receipts/Shop",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "shop.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Receipts",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Receipts/Books",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "bookstore.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "",
+          "otherwise": null,
+          "type": "rule"
+        }
+      ],
+      "preamble": null,
+      "requires": [
+        "imap4flags",
+        "include",
+        "variables"
+      ],
+      "singleFolder": true
+    },
+    "source": "require [\"imap4flags\",\"include\",\"variables\"];\r\nglobal \"move_to_folder\";\r\n\r\n# rule:[Family]\r\nif address :is \"from\" \"mia@example.com\" {\r\n\taddflag \"$label1\";\r\n\tset \"move_to_folder\" \"Personal/Family\";\r\n}\r\n\r\n# rule:[Clients]\r\nif address :domain :is \"from\" \"acme.example\" {\r\n\tset \"move_to_folder\" \"Clients/Acme\";\r\n} elsif address :domain :is \"from\" \"studio.example\" {\r\n\tset \"move_to_folder\" \"Clients/Studio\";\r\n} elsif header :contains \"subject\" \"invoice\" {\r\n\tset \"move_to_folder\" \"Clients/Billing\";\r\n}\r\n\r\n# rule:[Newsletters]\r\nif exists \"List-Unsubscribe\" {\r\n\tset \"move_to_folder\" \"Reading\";\r\n}\r\n\r\n# rule:[Receipts]\r\nif address :domain :is \"from\" \"shop.example\" {\r\n\tset \"move_to_folder\" \"Receipts/Shop\";\r\n}\r\n\r\nif address :domain :is \"from\" \"bookstore.example\" {\r\n\tset \"move_to_folder\" \"Receipts/Books\";\r\n}\r\n"
+  },
+  "Spam": {
+    "rules": {
+      "items": [
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Junk",
+              "type": "fileInto"
+            },
+            {
+              "type": "stop"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "x-spam-flag"
+                  ],
+                  "keys": [
+                    "yes"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "contains"
+                    }
+                  },
+                  "type": "header"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Spam",
+          "otherwise": null,
+          "type": "rule"
+        }
+      ],
+      "preamble": null,
+      "requires": [
+        "include",
+        "variables"
+      ],
+      "singleFolder": true
+    },
+    "source": "require [\"include\",\"variables\"];\r\nglobal \"move_to_folder\";\r\n\r\n# rule:[Spam]\r\nif header :contains \"x-spam-flag\" \"yes\" {\r\n\tset \"move_to_folder\" \"Junk\";\r\n\treturn;\r\n}\r\n"
+  }
+}

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { RuleItem } from "#tauri/types";
-import { matches, queryWords } from "./search.ts";
+import { goesTo, matches, queryWords } from "./search.ts";
 
 const rule = {
   type: "rule",
@@ -47,4 +47,11 @@ test("branches and nested ifs are searched", () => {
   } as unknown as RuleItem;
   assert.ok(matches(branched, queryWords("rechnungen")));
   assert.ok(matches(branched, queryWords("boss")));
+});
+
+test("finds rules by where they file messages", () => {
+  assert.equal(goesTo(rule, { kind: "folder", key: "Accounts.Versand.B&APw-cher" }), true);
+  assert.equal(goesTo(rule, { kind: "folder", key: "Accounts" }), false);
+  assert.equal(goesTo(rule, { kind: "folder", key: "Accounts", subfolders: true }), true);
+  assert.equal(goesTo(rule, { kind: "label", key: "$label1" }), false);
 });

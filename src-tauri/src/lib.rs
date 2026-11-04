@@ -33,6 +33,7 @@ pub fn run() {
         .manage(server::Sessions::default())
         .invoke_handler(tauri::generate_handler![
             get_app_info,
+            rules::script_content,
             rules::import_rules,
             rules::import_rules_single_folder,
             rules::export_rules,

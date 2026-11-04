@@ -199,15 +199,19 @@ test("removing the last condition of a nested group removes the group", () => {
 test("several headers in the header field", () => {
   const c = {
     negate: false,
-    test: { type: "header", headers: ["X-Original-To", "Delivered-To"], matcher: { matchType: { type: "contains" }, comparator: null }, keys: ["list@example.org"] },
+    test: { type: "header", headers: ["X-Original-To", "X-Envelope-To"], matcher: { matchType: { type: "contains" }, comparator: null }, keys: ["list@example.org"] },
   } as Condition;
   const view = viewCondition(c);
-  assert.deepEqual(view, { field: "header", header: "X-Original-To, Delivered-To", part: "header", operator: "contains", values: ["list@example.org"] });
+  assert.deepEqual(view, { field: "header", header: "X-Original-To, X-Envelope-To", part: "header", operator: "contains", values: ["list@example.org"] });
   assert.deepEqual(buildCondition(view!), c);
   assert.deepEqual(headerNames(" a ,, b,"), ["a", "b"]);
   // Known pairs keep their own field.
   const toCc = { ...c, test: { ...c.test, headers: ["Cc", "To"] } } as Condition;
   assert.equal(viewCondition(toCc)?.field, "toOrCc");
+  const recipients = { ...c, test: { ...c.test, headers: ["to", "cc", "bcc"] } } as Condition;
+  assert.equal(viewCondition(recipients)?.field, "recipients");
+  const delivered = { ...c, test: { ...c.test, headers: ["Delivered-To", "X-Original-To"] } } as Condition;
+  assert.equal(viewCondition(delivered)?.field, "delivered");
   // A name with a comma can't be told apart from two names.
   const comma = { ...c, test: { ...c.test, headers: ["a,b"] } } as Condition;
   assert.equal(viewCondition(comma), null);

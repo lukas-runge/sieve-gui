@@ -6,6 +6,10 @@
   import { ROOT_SCRIPT, session } from "../session.svelte";
   import Fingerprint from "./Fingerprint.svelte";
   import { formatKeywordNames, parseKeywordNames } from "../keywords";
+  import { ICON_HUES, iconImage, initials, shortText } from "../accountIcon";
+  import { labelHue } from "../rules/route";
+  import AccountIconView from "./AccountIcon.svelte";
+  import Icon from "./Icon.svelte";
 
   let { account, onclose }: { account: Account | null; onclose: () => void } = $props();
 
@@ -31,6 +35,23 @@
   let roundcube = $state(initial?.roundcube ?? false);
   let keywordText = $state(formatKeywordNames(initial?.keywordNames ?? {}));
   let copyDir = $state(initial?.copyDir ?? "");
+  // The icon: its own text, colour or picture; empty means "from the name".
+  let iconTextValue = $state(initial?.icon?.text ?? "");
+  let iconHueValue = $state<number | null>(initial?.icon?.hue ?? null);
+  let iconImageValue = $state<string | null>(initial?.icon?.image ?? null);
+  const iconDraft = $derived({ text: iconTextValue.trim() || null, hue: iconHueValue, image: iconImageValue });
+  let iconError = $state<string | null>(null);
+  async function pickImage(e: Event & { currentTarget: HTMLInputElement }) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = "";
+    if (!file) return;
+    iconError = null;
+    try {
+      iconImageValue = await iconImage(file);
+    } catch {
+      iconError = t("account.iconImageError");
+    }
+  }
   // Unknown (all allowed) until the account has connected.
   const supported = untrack(() => (initial ? session.supported(initial.id) : null));
   // The stored choice is kept, so it comes back when Roundcube is turned off.
@@ -63,6 +84,7 @@
         roundcube,
         keywordNames: parseKeywordNames(keywordText),
         copyDir: copyDir.trim() || null,
+        icon: iconDraft.text || iconDraft.hue !== null || iconDraft.image ? iconDraft : null,
         password: password || (initial ? null : ""),
       });
       dialog.close();
@@ -88,7 +110,7 @@
 </script>
 
 {#snippet trusted(sha256: string, untrust: () => void)}
-  <div class="grid gap-1 text-xs">
+  <div class="grid gap-1 text-[0.8125rem]">
     <span class="text-base-content/70">{t("certificate.trusted")}</span>
     <Fingerprint {sha256} />
     <button type="button" class="btn btn-ghost btn-xs justify-self-start" onclick={untrust}>{t("certificate.untrust")}</button>
@@ -116,6 +138,65 @@
       <label class="fieldset-legend" for="acc-label">{t("account.label")}</label>
       <input id="acc-label" class="input w-full" bind:value={label} placeholder={host || "Work"} />
       <p class="label whitespace-normal">{t("account.labelHint")}</p>
+    </fieldset>
+
+    <!-- The icon in the account switcher: a picture, or a short text on a colour. -->
+    <fieldset class="fieldset">
+      <legend class="fieldset-legend">{t("account.icon")}</legend>
+      <div class="flex items-start gap-3">
+        <AccountIconView label={label || host || "?"} icon={iconDraft} size={48} />
+        <div class="grid min-w-0 gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            {#if !iconImageValue}
+              <input
+                class="input input-sm w-20 text-center"
+                aria-label={t("account.iconText")}
+                title={t("account.iconText")}
+                placeholder={initials(label || host || "?")}
+                value={iconTextValue}
+                oninput={(e) => {
+                  iconTextValue = shortText(e.currentTarget.value);
+                  e.currentTarget.value = iconTextValue;
+                }}
+              />
+            {/if}
+            <label class="btn btn-sm gap-1.5">
+              <Icon name="plus" size={14} />{iconImageValue ? t("account.iconImageReplace") : t("account.iconImage")}
+              <input type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml" class="hidden" onchange={pickImage} />
+            </label>
+            {#if iconImageValue}
+              <button type="button" class="btn btn-ghost btn-sm" onclick={() => (iconImageValue = null)}>{t("account.iconImageRemove")}</button>
+            {/if}
+          </div>
+          {#if !iconImageValue}
+            <div class="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label={t("account.iconColor")}>
+              <!-- "From the name": the colour it gets on its own. -->
+              <button
+                type="button"
+                role="radio"
+                aria-checked={iconHueValue === null}
+                aria-label={t("account.iconColorAuto")}
+                title={t("account.iconColorAuto")}
+                class={["grid size-6 place-items-center rounded-full text-[0.625rem] font-bold", iconHueValue === null && "ring-2 ring-primary ring-offset-1 ring-offset-base-100"]}
+                style="background: conic-gradient(from 0deg, oklch(0.7 0.12 {labelHue(label || host)}), oklch(0.7 0.12 {labelHue(label || host) + 120}), oklch(0.7 0.12 {labelHue(label || host) + 240}), oklch(0.7 0.12 {labelHue(label || host)}))"
+                onclick={() => (iconHueValue = null)}>A</button
+              >
+              {#each ICON_HUES as hue}
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={iconHueValue === hue}
+                  aria-label="{t('account.iconColor')} {hue}°"
+                  class={["size-6 rounded-full", iconHueValue === hue && "ring-2 ring-primary ring-offset-1 ring-offset-base-100"]}
+                  style="background: oklch(0.66 0.13 {hue})"
+                  onclick={() => (iconHueValue = hue)}
+                ></button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </div>
+      {#if iconError}<p role="alert" class="label text-error">{iconError}</p>{:else}<p class="label whitespace-normal">{t("account.iconHint")}</p>{/if}
     </fieldset>
 
     <div class="grid grid-cols-[1fr_6rem] gap-2">

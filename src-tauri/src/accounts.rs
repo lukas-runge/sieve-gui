@@ -49,6 +49,42 @@ pub struct Account {
     /// folder (see `copy`).
     #[serde(default)]
     pub copy_dir: Option<String>,
+    /// How the account looks in the account switcher; `None`: its initials
+    /// in a colour derived from its name.
+    #[serde(default)]
+    pub icon: Option<AccountIcon>,
+}
+
+/// An account's icon: a picture, or a short text on a colour.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountIcon {
+    /// One or two characters (or an emoji) instead of the initials.
+    #[serde(default)]
+    pub text: Option<String>,
+    /// Hue (0–359) of the colour, instead of one derived from the name.
+    #[serde(default)]
+    pub hue: Option<u16>,
+    /// A picture as a `data:image/…` URL, small and square (the app scales
+    /// uploads down); shown instead of text and colour.
+    #[serde(default)]
+    pub image: Option<String>,
+}
+
+/// Largest picture kept for an icon (as a data URL), so the account file stays small.
+const MAX_ICON_IMAGE: usize = 256 * 1024;
+
+impl AccountIcon {
+    fn checked(self) -> AppResult<Option<Self>> {
+        let text = self.text.map(|t| t.trim().to_owned()).filter(|t| !t.is_empty());
+        if let Some(image) = &self.image {
+            if !image.starts_with("data:image/") || image.len() > MAX_ICON_IMAGE {
+                return Err(AppError::new(ErrorKind::Config, "the icon must be a small picture"));
+            }
+        }
+        let icon = Self { text, hue: self.hue.map(|h| h % 360), image: self.image };
+        Ok((icon.text.is_some() || icon.hue.is_some() || icon.image.is_some()).then_some(icon))
+    }
 }
 
 fn enabled() -> bool {
@@ -113,6 +149,8 @@ pub struct AccountInput {
     pub roundcube: bool,
     pub keyword_names: HashMap<String, String>,
     pub copy_dir: Option<String>,
+    #[serde(default)]
+    pub icon: Option<AccountIcon>,
     /// `None` keeps the stored password.
     pub password: Option<String>,
 }
@@ -200,6 +238,10 @@ pub async fn save_account(
         roundcube: input.roundcube,
         keyword_names: input.keyword_names,
         copy_dir: input.copy_dir.map(|d| d.trim().to_owned()).filter(|d| !d.is_empty()),
+        icon: match input.icon {
+            Some(icon) => icon.checked()?,
+            None => None,
+        },
     };
     if let Some(pw) = &input.password {
         crate::passwords::set(&account.id, pw)?;

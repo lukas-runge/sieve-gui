@@ -37,6 +37,10 @@ export class ScriptEditor {
   roundcube = $state(false);
   /** What Roundcube would drop of the current rules (only if `roundcube`). */
   roundcubeRisks = $state<RoundcubeRisks | null>(null);
+  /** The item shown in the inspector (`uid`), if any. */
+  selected = $state<string | null>(null);
+  /** The case of the selected rule to show first (see `CasePath`); "" for the whole rule. */
+  focus = $state("");
 
   #past: string[] = [];
   #future: string[] = [];

@@ -78,7 +78,7 @@
       {/if}
     </dl>
 
-    <p class="text-xs text-base-content/70">{t("certificate.verifyHint")}</p>
+    <p class="text-[0.8125rem] text-base-content/70">{t("certificate.verifyHint")}</p>
 
     <div class="modal-action mt-0">
       <button type="button" class="btn btn-ghost" onclick={() => dialog.close()}>{t("account.cancel")}</button>

@@ -4,6 +4,14 @@
 // See: https://v2.tauri.app/start/frontend/sveltekit/ for more info
 export const ssr = false;
 
+import { macTitleBar } from "../lib/platform";
+
+if (macTitleBar) {
+  document.documentElement.classList.add("mac-titlebar");
+  // The preview has no window controls: stand-ins show where they'd be.
+  if (!("__TAURI_INTERNALS__" in window)) document.documentElement.classList.add("fake-lights");
+}
+
 export async function load() {
   // Browser preview: fake the backend when running outside of Tauri.
   if (import.meta.env.DEV && !("__TAURI_INTERNALS__" in window)) {

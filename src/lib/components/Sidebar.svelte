@@ -9,13 +9,97 @@
   import { ask, askText, tell } from "../dialogs.svelte";
   import { closesMenu } from "../menu";
   import { ROOT_SCRIPT, session } from "../session.svelte";
+  import Icon from "./Icon.svelte";
+  import { flowView } from "../scope.svelte";
+  import AccountIcon from "./AccountIcon.svelte";
 
-  let { onaccount }: { onaccount: (account: Account | null) => void } = $props();
+  let {
+    onaccount,
+    ontoggle,
+  }: {
+    onaccount: (account: Account | null) => void;
+    /** Hides the sidebar (its toggle sits in its header). */
+    ontoggle?: () => void;
+  } = $props();
 
 
   async function open(id: string, name: string) {
-    if (session.editor?.accountId === id && session.editor.name === name) return;
-    if (await session.confirmLeave()) await session.openScript(id, name);
+    if (session.editor?.accountId === id && session.editor.name === name) {
+      flowView.account = null;
+      return;
+    }
+    if (await session.confirmLeave()) {
+      await session.openScript(id, name);
+      flowView.account = null;
+    }
+  }
+
+  /**
+   * One account at a time: the one picked above, following the open script.
+   * Each account remembers the script last open in it, to come back to.
+   */
+  let picked = $state<string | null>(localStorage.getItem("account"));
+  $effect(() => {
+    const ed = session.editor;
+    if (!ed) return;
+    picked = ed.accountId;
+    localStorage.setItem(`lastScript:${ed.accountId}`, ed.name);
+  });
+  $effect(() => {
+    if (picked) localStorage.setItem("account", picked);
+  });
+  const current = $derived(session.accounts.find((a) => a.id === picked) ?? session.accounts[0] ?? null);
+
+  /** Switches to another account, opening its last script (or its first). */
+  async function pickAccount(id: string) {
+    if (current?.id === id && session.editor?.accountId === id) return;
+    if (session.editor && session.editor.accountId !== id && !(await session.confirmLeave())) return;
+    flowView.account = null;
+    picked = id;
+    const tree = session.scriptTree(id);
+    const names = [...tree.running, ...tree.inactive].map((n) => n.name);
+    const last = localStorage.getItem(`lastScript:${id}`);
+    const name = last && names.includes(last) ? last : (tree.running.find((n) => n.depth === 0)?.name ?? names[0]);
+    if (name) await session.openScript(id, name);
+    else session.editor = null;
+  }
+
+  /** The account icons scroll sideways when there are more than fit; the open one stays in view. */
+  let iconStrip = $state<HTMLElement>();
+  /** More icons that way: the edge fades out to say so. */
+  let more = $state({ left: false, right: false });
+  function measure() {
+    const el = iconStrip;
+    if (!el) return;
+    more = { left: el.scrollLeft > 1, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1 };
+  }
+  $effect(() => {
+    void session.accounts.length;
+    const el = iconStrip;
+    if (!el) return;
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  });
+  $effect(() => {
+    const id = current?.id;
+    if (id) iconStrip?.querySelector(`[data-account="${id}"]`)?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  });
+
+  /** Something the account needs: a problem or a decision waiting. */
+  function needsAttention(id: string): boolean {
+    return !!(session.copies[id] || session.adoption[id] || session.displaced[id] || session.folders[id]?.status === "error");
+  }
+
+  /** All running scripts of the account together; opens the first if none of its scripts is open. */
+  async function openFlow(id: string, order: string[]) {
+    if (session.editor?.accountId !== id) {
+      if (!(await session.confirmLeave())) return;
+      await session.openScript(id, order[0]);
+    }
+    if (session.editor) session.editor.selected = null;
+    flowView.account = id;
   }
 
   async function create(id: string) {
@@ -97,30 +181,31 @@
   <!-- index: position in the run order if it can be rearranged, -1 otherwise.
        running: the script runs, on its own or included by `node.via`. -->
   {@const name = node.name}
-  {@const current = session.editor?.accountId === id && session.editor.name === name}
-  {@const arrangeable = session.multipleActive(id)}
+  {@const current = session.editor?.accountId === id && session.editor.name === name && flowView.account !== id}
   {@const key = `${id}:${name}`}
   {@const root = session.roots[id]}
   {@const included = !!root?.scripts.includes(name)}
   {@const parents = session.includedBy(id, name)}
+  {@const position = order.indexOf(name)}
   <!-- Listed under the script including it; other including scripts are named. -->
   {@const notes = parents.some((p) => p !== node.via)
     ? [t("scripts.includedBy", { names: quoted(parents.filter((p) => p !== node.via)) })]
     : []}
   <div
-    class="group flex items-center rounded-field {current ? 'bg-base-100 shadow-[inset_3px_0_0_var(--color-primary)]' : 'hover:bg-base-100/60'}"
-    style:margin-left="{node.depth * 1.25}rem"
+    class={[
+      "group flex items-center gap-1 rounded-field pr-1",
+      current ? "bg-base-100 shadow-sm ring-1 ring-base-300" : "hover:bg-base-100/70",
+    ]}
+    style:margin-left="{node.depth * 1.1}rem"
   >
-    {#if node.depth > 0}
-      <span class="text-base-content/40" aria-hidden="true">↳</span>
-    {/if}
+    <!-- The run order: a number for running scripts, a hollow ring for the others. -->
     {#if index >= 0 && order.length > 1}
       <button
-        class="btn btn-ghost btn-xs btn-square ml-0.5 cursor-grab text-base-content/50"
+        class="ml-1 grid size-6 shrink-0 cursor-grab place-items-center rounded-md bg-primary/12 text-[0.8rem] font-bold text-primary hover:bg-primary/20"
         draggable="true"
         data-script-handle="{id}:{index}"
         aria-label="{t('scripts.drag')}: {name} (Alt+↑/↓)"
-        title="{t('scripts.drag')} (Alt+↑/↓)"
+        title="{t('scripts.position', { n: index + 1 })} · {t('scripts.drag')} (Alt+↑/↓)"
         ondragstart={(e) => {
           drag = { account: id, from: index };
           e.dataTransfer?.setData("text/plain", name);
@@ -128,47 +213,65 @@
         ondragend={() => (drag = dropAt = null)}
         onkeydown={(e) => onhandlekey(e, id, order, index)}
       >
-        ⠿
+        <span class="badge-num">{index + 1}</span>
       </button>
-    {:else if arrangeable && node.depth === 0}
-      <!-- Lines the name up with those that have a handle. -->
-      <span class="ml-0.5 w-6 shrink-0" aria-hidden="true"></span>
+    {:else if node.depth > 0}
+      <span class="ml-1 grid size-6 shrink-0 place-items-center text-base-content/35" aria-hidden="true"><Icon name="nested" size={14} /></span>
+    {:else if running && position >= 0}
+      <span class="ml-1 grid size-6 shrink-0 place-items-center rounded-md bg-primary/12 text-[0.8rem] font-bold text-primary" aria-hidden="true"><span class="badge-num">1</span></span>
+    {:else}
+      <span class="ml-1 grid size-6 shrink-0 place-items-center" aria-hidden="true">
+        <span class="size-2.5 rounded-full border-2 border-base-content/25"></span>
+      </span>
     {/if}
     <!-- contain: long names and notes truncate instead of widening the sidebar. -->
     <button
-      class="min-w-0 grow px-2 py-1 text-left text-sm [contain:inline-size]"
+      class="min-w-0 grow py-1.5 pr-1 pl-1 text-left text-[0.9rem] [contain:inline-size]"
       aria-current={current ? "page" : undefined}
       onclick={() => open(id, name)}
     >
-      <span class="block truncate {current ? 'font-semibold' : ''}">{name}</span>
+      <span class={["block truncate", current && "font-semibold", !running && "text-base-content/70"]}>{name}</span>
+      {#if running && node.via}
+        <span class="block truncate text-[0.8rem] text-base-content/65" title={t("scripts.viaHint", { name: node.via })}>{t("scripts.viaShort", { name: node.via })}</span>
+      {/if}
       {#if notes.length}
-        <span class="block text-xs leading-snug break-words text-base-content/60">{notes.join(" · ")}</span>
+        <span class="block text-[0.8rem] leading-snug break-words text-base-content/65">{notes.join(", ")}</span>
       {/if}
     </button>
-    {#if running && node.via}
-      <!-- Runs because the script above includes it. -->
-      <span class="badge badge-sm badge-soft badge-primary mr-1 whitespace-nowrap" title={t("scripts.viaHint", { name: node.via })}>
-        {t("scripts.via")}
-      </span>
-    {:else}
-    <button
-      class={[
-        "badge badge-sm mr-1 cursor-pointer whitespace-nowrap",
-        active ? "badge-primary hover:brightness-110" : "badge-ghost opacity-60 group-hover:opacity-100 focus-visible:opacity-100",
-      ]}
-      aria-pressed={active}
-      aria-label="{name}: {t('scripts.active')}"
-      title={active ? t("scripts.deactivate") : t("scripts.activate")}
-      disabled={toggling.has(key)}
-      onclick={() => toggle(id, name, active)}
-    >
-      {#if toggling.has(key)}<span class="loading loading-spinner loading-xs"></span>{/if}
-      {active ? t("scripts.active") : t("scripts.off")}
-    </button>
+    {#if !(running && node.via)}
+      <!-- On/off as a switch: what it does is visible without a tooltip. -->
+      {#if toggling.has(key)}
+        <span class="grid w-7 shrink-0 place-items-center"><span class="loading loading-spinner loading-xs"></span></span>
+      {:else}
+        <input
+          type="checkbox"
+          class={[
+            "toggle toggle-xs shrink-0",
+            active && "toggle-success",
+            "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+            current && "opacity-100",
+          ]}
+          checked={active}
+          tabindex={current ? 0 : -1}
+          aria-label="{name}: {active ? t('scripts.deactivate') : t('scripts.activate')}"
+          title={active ? t("scripts.deactivate") : t("scripts.activate")}
+          onchange={(e) => {
+            e.currentTarget.checked = active;
+            toggle(id, name, active);
+          }}
+        />
+      {/if}
     {/if}
     <div class="dropdown dropdown-end">
-      <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square opacity-60 group-hover:opacity-100 focus:opacity-100" aria-label="{name}: …">⋯</div>
-      <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
+      <div
+        tabindex={current ? 0 : -1}
+        role="button"
+        class="grid size-6 place-items-center rounded-full text-base-content/65 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-base-200 {current ? 'opacity-100' : ''}"
+        aria-label="{name}: …"
+      >
+        <Icon name="more" size={15} />
+      </div>
+      <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-52 rounded-box border border-base-300 bg-base-100 p-1 shadow-lg">
         <li><button onclick={() => rename(id, name)}>{t("scripts.rename")}</button></li>
         {#if root?.lastMoveWins && included}
           {#if root.unchanged.includes(name)}
@@ -183,15 +286,99 @@
   </div>
 {/snippet}
 
-<nav class="flex h-full flex-col gap-4 overflow-y-auto p-3" aria-label={t("accounts.heading")}>
-  {#each session.accounts as account (account.id)}
-    {@const server = session.servers[account.id]}
-    <section class="grid gap-1">
-      <div class="flex items-center gap-1">
-        <h2 class="grow truncate font-semibold" title="{account.username}@{account.host}">{account.label}</h2>
-        <div class="dropdown dropdown-end">
-          <div tabindex="0" role="button" class="btn btn-ghost btn-xs btn-square" aria-label="{t('accounts.edit')}: {account.label}">⋯</div>
-          <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
+{#snippet callout(tone: "warning" | "info", text: string)}
+  <div class="flex items-start gap-2">
+    <Icon name={tone === "warning" ? "alert" : "info"} size={15} class={tone === "warning" ? "mt-px text-warning" : "mt-px text-primary"} />
+    <p>{text}</p>
+  </div>
+{/snippet}
+
+{#snippet accountIcon(account: Account)}
+  {@const server = session.servers[account.id]}
+  {@const status = !server || server.status === "connecting" ? "connecting" : server.status === "error" ? "error" : "ready"}
+  {@const on = current?.id === account.id}
+  <!-- Only what's out of the ordinary is marked: connected is the normal case and shows the icon as it is. -->
+  {@const badge = status === "error" ? "error" : needsAttention(account.id) ? "attention" : null}
+  <button
+    class={[
+      "relative size-7 shrink-0 rounded-lg transition",
+      on ? "ring-1 ring-primary ring-offset-2 ring-offset-base-200" : "hover:brightness-110",
+      status === "connecting" && "animate-pulse opacity-50",
+    ]}
+    aria-pressed={on}
+    data-account={account.id}
+    aria-label="{account.label} ({t(`accounts.status.${status}`)}{badge === 'attention' ? ', ' + t('accounts.attention') : ''})"
+    title="{account.label} · {account.username}@{account.host}{status !== 'ready' ? ' · ' + t(`accounts.status.${status}`) : ''}{badge === 'attention' ? ' · ' + t('accounts.attention') : ''}"
+    onclick={() => pickAccount(account.id)}
+  >
+    <AccountIcon label={account.label} icon={account.icon} size={28} />
+    {#if badge}
+      <!-- On the corner, half outside, like a Dock badge: it covers little of the icon. -->
+      <span
+        class={[
+          "absolute -top-1 -right-1 grid size-3 place-items-center rounded-full text-[0.5rem] leading-none font-black ring-2 ring-base-200",
+          badge === "error" ? "bg-error text-error-content" : "bg-warning text-warning-content",
+        ]}
+        aria-hidden="true">!</span
+      >
+    {/if}
+  </button>
+{/snippet}
+
+<nav class="flex h-full flex-col" aria-label={t("accounts.heading")}>
+  <!-- The top of the window: its controls (macOS), the accounts as icons, the toggle. -->
+  <div class="sidebar-top flex h-13 shrink-0 items-center pr-2 pl-3" data-tauri-drag-region>
+    <!-- Scrolls sideways with many accounts; the padding keeps rings and dots from being cut off. -->
+    <div
+      bind:this={iconStrip}
+      class="flex min-w-0 items-center gap-3 overflow-x-auto py-1 pr-0 pl-1 [scrollbar-width:none]"
+      style:mask-image={more.left || more.right
+        ? `linear-gradient(to right, ${more.left ? "transparent, black 12px" : "black"}, ${more.right ? "black calc(100% - 12px), transparent" : "black"})`
+        : null}
+      onscroll={measure}
+      role="group"
+      aria-label={t("accounts.heading")}
+      onwheel={(e) => {
+        // A mouse wheel scrolls it too, not only a trackpad's sideways swipe.
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+          e.currentTarget.scrollLeft += e.deltaY;
+          e.preventDefault();
+        }
+      }}
+    >
+      {#each session.accounts as account (account.id)}{@render accountIcon(account)}{/each}
+      <button
+        class="grid size-7 shrink-0 place-items-center rounded-lg border border-dashed border-base-content/25 text-base-content/60 hover:border-base-content/50 hover:text-base-content"
+        aria-label={t("accounts.add")}
+        title={t("accounts.add")}
+        onclick={() => onaccount(null)}><Icon name="plus" size={14} /></button
+      >
+    </div>
+    <!-- Room to drag the window; with many accounts it shrinks to a sliver, so the fade ends near the toggle. -->
+    <span class="h-full min-w-1 grow" data-tauri-drag-region></span>
+    {#if ontoggle}
+      <button class="btn btn-ghost btn-sm btn-square shrink-0 text-base-content/60" aria-label={t("sidebar.hide")} title={t("sidebar.hide")} onclick={ontoggle}>
+        <Icon name="panelLeft" size={17} />
+      </button>
+    {/if}
+  </div>
+  <!-- The open account: plain on the sidebar, outside the scrolling list, set off by an inset divider. -->
+  {#if current}
+    {@const account = current}
+    <header class="shrink-0 border-t border-base-300">
+      <div class="flex items-center gap-2 py-3 pr-3 pl-4">
+        <div class="min-w-0 grow">
+          <h2 class="truncate text-[0.9375rem] leading-5 font-semibold" title="{account.label} · {account.username}@{account.host}">{account.label}</h2>
+          <p class="mt-0.5 truncate text-[0.75rem] leading-4 text-base-content/65" title="{account.username}@{account.host}">{account.username}@{account.host}</p>
+        </div>
+        <div class="dropdown dropdown-end shrink-0">
+          <div
+            tabindex="0"
+            role="button"
+            class="grid size-7 place-items-center rounded-md text-base-content/65 hover:bg-base-content/10 hover:text-base-content focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:outline-none"
+            aria-label="{t('accounts.edit')}: {account.label}"
+          ><Icon name="more" size={16} /></div>
+          <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-30 w-48 rounded-box border border-base-300 bg-base-100 p-1 shadow-lg">
             <li><button onclick={() => onaccount(account)}>{t("accounts.edit")}</button></li>
             {#if session.roots[account.id]}
               <li><button onclick={() => session.viewRoot(account.id)}>{t("root.view")}</button></li>
@@ -200,17 +387,25 @@
           </ul>
         </div>
       </div>
-
+      <div class="mx-4 h-px bg-base-content/10"></div>
+    </header>
+  {/if}
+  <div class="min-h-0 grow overflow-y-auto pt-3">
+  <div class="grid grid-cols-[minmax(0,1fr)] gap-5 px-2 pb-3">
+  {#each current ? [current] : [] as account (account.id)}
+    {@const server = session.servers[account.id]}
+    <section class="grid grid-cols-[minmax(0,1fr)] gap-1">
       {#if !server || server.status === "connecting"}
-        <p class="flex items-center gap-2 text-sm text-base-content/60">
+        <p class="flex items-center gap-2 px-2 text-sm text-base-content/60">
           <span class="loading loading-spinner loading-xs"></span>{t("accounts.connecting")}
         </p>
       {:else if server.status === "error"}
-        <div role="alert" class="grid gap-1 text-sm">
-          <p class="text-error">{server.error}</p>
+        <!-- A problem of this account only: said quietly, with the way out. -->
+        <div role="alert" class="mx-1 grid gap-1.5 px-2 py-1 text-[0.8125rem]">
+          <p class="flex items-start gap-1.5 text-base-content/80"><Icon name="alert" size={14} class="mt-0.5 shrink-0 text-error" />{server.error}</p>
           {#if server.certificate}
             {@const untrusted = server.certificate}
-            <button class="btn btn-xs self-start" onclick={() => session.showCertificate(account.id, untrusted)}>{t("certificate.show")}</button>
+            <button class="btn btn-xs justify-self-start" onclick={() => session.showCertificate(account.id, untrusted)}>{t("certificate.show")}</button>
           {:else}
             <button class="btn btn-xs self-start" onclick={() => session.connect(account.id)}>{t("accounts.retry")}</button>
           {/if}
@@ -218,8 +413,8 @@
       {:else if server.info}
         {@const copy = session.copies[account.id]}
         {#if copy}
-          <div role="alert" class="grid gap-1.5 rounded-box border border-warning/40 bg-warning/10 px-2 py-1.5 text-xs">
-            <p>{t("copy.notice", { count: copy.differences.length + (copy.active ? 1 : 0) })}</p>
+          <div role="alert" class="mx-1 grid gap-2 rounded-field bg-warning/10 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("warning", t("copy.notice", { count: copy.differences.length + (copy.active ? 1 : 0) }))}
             <button class="btn btn-xs justify-self-start" onclick={() => (session.copyPrompt = account.id)}>
               {t("copy.show")}
             </button>
@@ -227,8 +422,8 @@
         {/if}
         {@const adoption = session.adoption[account.id]}
         {#if adoption}
-          <div role="alert" class="grid gap-1.5 rounded-box border border-info/40 bg-info/10 px-2 py-1.5 text-xs">
-            <p>{t("adopt.notice", { name: adoption.active })}</p>
+          <div role="alert" class="mx-1 grid gap-2 rounded-field bg-primary/8 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("info", t("adopt.notice", { name: adoption.active }))}
             <div class="flex flex-wrap gap-1">
               <button class="btn btn-xs btn-primary" onclick={() => session.adopt(account.id, "unchanged")}>{t("adopt.unchanged")}</button>
               {#if session.rootSettings(account.id).lastMoveWins}
@@ -239,10 +434,8 @@
         {/if}
         {@const displaced = session.displaced[account.id]}
         {#if displaced}
-          <div role="alert" class="grid gap-1.5 rounded-box border border-warning/40 bg-warning/10 px-2 py-1.5 text-xs">
-            <p>
-              {displaced.active ? t("root.displaced", { name: displaced.active }) : t("root.displacedNone")}
-            </p>
+          <div role="alert" class="mx-1 grid gap-2 rounded-field bg-warning/10 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("warning", displaced.active ? t("root.displaced", { name: displaced.active }) : t("root.displacedNone"))}
             <button class="btn btn-xs justify-self-start" onclick={() => session.reactivateRoot(account.id)}>
               {t("root.reactivate", { name: ROOT_SCRIPT })}
             </button>
@@ -254,7 +447,26 @@
         <!-- Only the run order of the running scripts can be arranged. -->
         {@const order = tree.running.filter((n) => n.depth === 0).map((n) => n.name)}
         {@const dragging = drag?.account === account.id}
-        <ul class="grid gap-0.5">
+        <ul class="grid grid-cols-[minmax(0,1fr)] gap-1">
+          {#if order.length > 1}
+            <!-- The account's running scripts together: the way every message takes. -->
+            {@const flowOpen = flowView.account === account.id && session.editor?.accountId === account.id}
+            <li>
+              <button
+                class={[
+                  "flex w-full items-center gap-1 rounded-field py-1.5 pr-2 text-left text-[0.9rem]",
+                  flowOpen ? "bg-base-100 font-semibold shadow-sm ring-1 ring-base-300" : "hover:bg-base-100/70",
+                ]}
+                aria-current={flowOpen ? "page" : undefined}
+                title={t("sidebar.flowTitle")}
+                onclick={() => openFlow(account.id, order)}
+              >
+                <span class="ml-1 grid size-6 shrink-0 place-items-center rounded-md text-primary"><Icon name="route" size={15} /></span>
+                <span class="min-w-0 grow truncate pl-1">{t("sidebar.flow")}</span>
+                <span class="shrink-0 text-[0.8rem] font-normal text-base-content/60">{order.length}</span>
+              </button>
+            </li>
+          {/if}
           {#each tree.running as node (node.name)}
             {@const index = node.depth === 0 ? order.indexOf(node.name) : -1}
             <li
@@ -285,7 +497,7 @@
             </li>
           {/each}
           {#if tree.running.length && tree.inactive.length}
-            <li class="mt-2 px-2 text-xs font-semibold text-base-content/50">{t("scripts.inactiveHeading")}</li>
+            <li class="mt-2.5 mb-0.5 px-2 text-[0.8rem] font-medium text-base-content/65">{t("scripts.inactiveHeading")}</li>
           {/if}
           {#each tree.inactive as node (node.name)}
             <li animate:flip={{ duration: 150 }}>
@@ -296,11 +508,11 @@
             <li class="px-2 text-sm text-base-content/60">{t("scripts.none")}</li>
           {/if}
         </ul>
-        <button class="btn btn-ghost btn-xs justify-self-start w-fit" onclick={() => create(account.id)}>+ {t("scripts.new")}</button>
+        <button class="btn btn-ghost btn-xs ml-1 w-fit justify-self-start gap-1 text-base-content/60" onclick={() => create(account.id)}><Icon name="plus" size={13} />{t("scripts.new")}</button>
         {@const folders = session.folders[account.id]}
         {#if folders?.status === "error"}
-          <div role="alert" class="grid gap-1 text-xs">
-            <p class="text-base-content/70">{t("folders.error", { message: folders.error ?? "" })}</p>
+          <div role="alert" class="mx-1 grid gap-1.5 rounded-field bg-base-100 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("warning", t("folders.error", { message: folders.error ?? "" }))}
             {#if folders.certificate}
               {@const untrusted = folders.certificate}
               <button class="btn btn-xs self-start" onclick={() => session.showCertificate(account.id, untrusted)}>{t("certificate.show")}</button>
@@ -312,10 +524,11 @@
       {/if}
     </section>
   {:else}
-    <p class="text-sm text-base-content/70">{t("accounts.empty")}</p>
+    <p class="px-2 text-sm text-base-content/70">{t("accounts.empty")}</p>
   {/each}
+  </div>
+  </div>
 
-  <button class="btn btn-sm mt-auto" onclick={() => onaccount(null)}>+ {t("accounts.add")}</button>
 </nav>
 
 {#if session.copyPrompt && session.copies[session.copyPrompt]}

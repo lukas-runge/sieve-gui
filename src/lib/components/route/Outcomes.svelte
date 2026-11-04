@@ -76,7 +76,7 @@
           <!-- The direct parent says enough (the full path is in the tooltip),
                unless the search found a word higher up. -->
           {#if o.path.length > 1 && !hideParent}
-            <span class="min-w-0 truncate text-[0.875rem] text-base-content/65"
+            <span class="min-w-0 truncate text-[0.875rem] text-base-content/70"
               >{#if words.length || fullPath}<Mark text={o.path.slice(0, -1).join(" / ")} {words} />{:else}{o.path.length > 2 ? "… / " : ""}<Mark
                   text={o.path.at(-2) ?? ""}
                   {words}
@@ -103,13 +103,13 @@
       </span>
     {:else}
       <span class="inline-flex items-center gap-1 text-[0.875rem] whitespace-nowrap text-base-content/80">
-        <Icon name={icon[o.kind]} size={14} class="text-base-content/60" /><Mark text={o.text} {words} />
+        <Icon name={icon[o.kind]} size={14} class="text-base-content/70" /><Mark text={o.text} {words} />
       </span>
     {/if}
   {/each}
   {#if stop}
     <span
-      class="inline-flex items-start gap-1 text-[0.875rem] text-base-content/65"
+      class="inline-flex items-start gap-1 text-[0.875rem] text-base-content/70"
       title={singleFolder ? t("route.stopScriptHint") : t("route.stopHint")}
     >
       <Icon name="stop" size={14} class="mt-[0.2rem]" />{singleFolder ? (next ? t("route.stopScriptNext", { name: next }) : t("route.stopScriptRules")) : t("route.stopRules")}

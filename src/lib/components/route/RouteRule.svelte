@@ -7,8 +7,10 @@
   import type { Rule } from "#tauri/types";
   import { t } from "../../i18n.svelte";
   import type { Branches } from "../../rules/view";
-  import { caseMatches, cases, nestedOutcomes, unreachable, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
+  import { folds, toggleFold } from "../../folds.svelte";
+  import { blockOutcomes, caseMatches, cases, nestedOutcomes, unreachable, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
   import Conditions from "./Conditions.svelte";
+  import { SvelteSet } from "svelte/reactivity";
   import Icon from "../Icon.svelte";
   import Mark from "./Mark.svelte";
   import Outcomes from "./Outcomes.svelte";
@@ -25,6 +27,7 @@
     trial = null,
     filter = null,
     compact = false,
+    id = "",
     ontarget,
     onpick,
   }: {
@@ -46,6 +49,8 @@
     filter?: ((c: Case) => boolean) | null;
     /** In a list of matches: cases that don't match fold into one line. */
     compact?: boolean;
+    /** Identifies the rule for folding it; none: it can't be folded. */
+    id?: string;
     ontarget?: (o: Outcome) => void;
     onpick: (path: CasePath) => void;
   } = $props();
@@ -53,12 +58,15 @@
   /** A case that neither the search nor the filter is about. */
   const unrelated = (c: Case) => (words.length > 0 && !caseMatches(c, words, keywords, delimiter)) || (filter !== null && !filter(c));
 
+  /** Runs of hidden cases the user asked to see, by block prefix. */
+  const unfolded = new SvelteSet<string>();
+
   /** The cases in order, runs of unrelated ones folded into one entry when compact. */
-  function segments(list: Case[]) {
+  function segments(list: Case[], prefix: string) {
     const out: ({ kind: "case"; c: Case; i: number } | { kind: "folded"; count: number; i: number })[] = [];
     for (const [i, c] of list.entries()) {
       const last = out.at(-1);
-      if (compact && unrelated(c)) {
+      if (compact && !unfolded.has(prefix) && unrelated(c)) {
         if (last?.kind === "folded") last.count++;
         else out.push({ kind: "folded", count: 1, i });
       } else out.push({ kind: "case", c, i });
@@ -133,7 +141,7 @@
     {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && c.nested.length}
       <!-- Nothing of its own: what happens is in the check below. -->
       <span class="grid gap-0.5">
-        <span class="flex items-center gap-1 text-[0.8rem] text-base-content/65"><Icon name="chevronDown" size={13} />{t("route.seeBelow")}</span>
+        <span class="flex items-center gap-1 text-[0.8rem] text-base-content/70"><Icon name="chevronDown" size={13} />{t("route.seeBelow")}</span>
         <span class="opacity-75"><Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} /></span>
       </span>
     {:else}
@@ -148,11 +156,17 @@
   {@const single = list.length === 1}
   {@const dead = unreachable(list)}
   <ul class="rails" style="--rail: var(--rail-{Math.min(depth, 3)}); --elbow: 0.95rem">
-    {#each segments(list) as seg}
+    {#each segments(list, prefix) as seg}
       {#if seg.kind === "folded"}
         <li>
-          <button class="w-full rounded-field px-1 py-0.5 text-left text-[0.875rem] text-base-content/65 hover:bg-base-content/[0.04]" onclick={() => onpick(prefix + seg.i)}>
-            {seg.count === 1 ? t("route.otherCase") : t("route.otherCases", { count: seg.count })}
+          <button
+            class="flex w-full items-center gap-1 rounded-field px-1 py-0.5 text-left text-[0.875rem] text-base-content/75 hover:bg-base-content/[0.04]"
+            onclick={(e) => {
+              e.stopPropagation();
+              unfolded.add(prefix);
+            }}
+          >
+            <Icon name="chevronRight" size={14} />{seg.count === 1 ? t("route.otherCase") : t("route.otherCases", { count: seg.count })}
           </button>
         </li>
       {:else}
@@ -166,19 +180,39 @@
         {#each c.nested as n, j}
           {@const multi = cases(n).length > 1}
           {@const color = `var(--rail-${Math.min(depth + 1, 3)})`}
+          {@const fold = id ? `${id}|${path}.${j}` : ""}
+          {@const folded = !!fold && folds.has(fold)}
           <!-- A check inside this case: a box of its own, one rail deeper, saying whose it is. -->
           <!-- Hangs off its case's number by an elbow, indented: a child, not a sibling. -->
           <div
             class="nested-box relative mt-0.5 mb-1.5 ml-[1.6rem] rounded-field border-l-2 py-1.5 pr-1.5 pl-2"
             style="--box: {color}; border-color: {color}; background: color-mix(in oklab, {color} 6%, transparent)"
           >
-            <p class={["mb-1 pl-1 text-[0.875rem] text-base-content/70", applies(path) === false && "opacity-60"]}>
-              <span class="font-semibold" style="color: {color}">
-                {#if c.kind === "else"}{t("route.nestedInOtherwise")}{:else if own}{t("route.nestedIn", { n: own })}{:else}{t("route.nestedHeadingSingle")}{/if}</span
-              >
-              {#if multi}<span class="text-base-content/65">· {t("route.casesFirst", { count: cases(n).length })}</span>{/if}
+            <p class={["flex items-start gap-1 pl-0.5 text-[0.875rem] text-base-content/75", !folded && "mb-1", applies(path) === false && "opacity-60"]}>
+              {#if fold}
+                <button
+                  class="mt-0.5 grid size-5 shrink-0 place-items-center rounded hover:bg-base-content/10"
+                  aria-expanded={!folded}
+                  aria-label={folded ? t("route.unfold") : t("route.fold")}
+                  title={folded ? t("route.unfold") : t("route.fold")}
+                  onclick={(e) => {
+                    e.stopPropagation();
+                    toggleFold(fold);
+                  }}><Icon name={folded ? "chevronRight" : "chevronDown"} size={14} /></button
+                >
+              {/if}
+              <span>
+                <span class="font-semibold" style="color: {color}">
+                  {#if c.kind === "else"}{t("route.nestedInOtherwise")}{:else if own}{t("route.nestedIn", { n: own })}{:else}{t("route.nestedHeadingSingle")}{/if}</span
+                >
+                {#if multi}<span class="text-base-content/70">· {t("route.casesFirst", { count: cases(n).length })}</span>{/if}
+              </span>
             </p>
-            {@render switchCases(n, depth + 1, `${path}.${j}.`, c.kind === "else" ? "" : own)}
+            {#if folded}
+              <div class="pt-1 pb-0.5 pl-6"><Outcomes items={blockOutcomes(n, keywords, delimiter)} {words} /></div>
+            {:else}
+              {@render switchCases(n, depth + 1, `${path}.${j}.`, c.kind === "else" ? "" : own)}
+            {/if}
           </div>
         {/each}
       </li>
@@ -204,13 +238,33 @@
     </span>
   </button>
 {:else}
-  <button class={["flex w-full flex-wrap items-baseline gap-x-2 text-left", trial && !trial.hits.length && "opacity-60"]} onclick={() => onpick("")}>
-    <span class="font-semibold"><Mark text={rule.name || t("route.switch")} {words} /></span>
-    {#if top.length > 1}
-      <span class="text-[0.875rem] text-base-content/65">{t("route.casesFirst", { count: top.length })}</span>
+  {@const folded = !!id && folds.has(id)}
+  <div class={["flex items-start gap-1", trial && !trial.hits.length && "opacity-60"]}>
+    {#if id}
+      <button
+        class="-ml-1 mt-0.5 grid size-6 shrink-0 place-items-center rounded hover:bg-base-content/10"
+        aria-expanded={!folded}
+        aria-label={folded ? t("route.unfold") : t("route.fold")}
+        title={folded ? t("route.unfold") : t("route.fold")}
+        onclick={() => toggleFold(id)}><Icon name={folded ? "chevronRight" : "chevronDown"} size={15} /></button
+      >
     {/if}
-  </button>
-  <div class="mt-1">
-    {@render switchCases(rule, 0, "", "")}
+    <button class="flex min-w-0 grow flex-wrap items-baseline gap-x-2 text-left" data-nav onclick={() => onpick("")}>
+      <span class="font-semibold"><Mark text={rule.name || t("route.switch")} {words} /></span>
+      {#if top.length > 1}
+        <span class="text-[0.875rem] text-base-content/70">{t("route.casesFirst", { count: top.length })}</span>
+      {/if}
+    </button>
   </div>
+  {#if folded}
+    <!-- Folded: where its mail can go, in one line. -->
+    <button class="route-row mt-1 w-full rounded-field py-1 pl-6 text-left hover:bg-base-content/[0.04]" onclick={() => onpick("")}>
+      <span class="text-[0.875rem] text-base-content/70">{t("route.foldedSummary")}</span>
+      <Outcomes items={blockOutcomes(rule, keywords, delimiter)} {words} />
+    </button>
+  {:else}
+    <div class="mt-1">
+      {@render switchCases(rule, 0, "", "")}
+    </div>
+  {/if}
 {/if}

@@ -145,7 +145,7 @@
             {/if}
             <button
               type="button"
-              class="grid size-5 place-items-center rounded-full text-base-content/65 hover:bg-base-200 hover:text-base-content"
+              class="grid size-5 place-items-center rounded-full text-base-content/70 hover:bg-base-200 hover:text-base-content"
               aria-label={t("action.flagRemove", { name: flagName(flag, keywordNames) })}
               onclick={() => onchange({ ...action, flags: flags.filter((_, j) => j !== i) }, false)}><Icon name="x" size={12} /></button
             >
@@ -175,7 +175,7 @@
         {#each Object.values(keywordNames) as name}<option value={name}></option>{/each}
       </datalist>
       {#if flags.some((f) => isKeyword(f) && !keywordNames[f])}
-        <p class="text-[0.8rem] text-base-content/65">{t("action.flagNameHint")}</p>
+        <p class="text-[0.8rem] text-base-content/70">{t("action.flagNameHint")}</p>
       {/if}
     </div>
   {:else if action.type === "vacation"}
@@ -223,7 +223,7 @@
 
   </div>
   <button
-    class="btn btn-ghost btn-sm btn-square text-base-content/65"
+    class="btn btn-ghost btn-sm btn-square text-base-content/70"
     aria-label={t("actions.remove")}
     title={t("actions.remove")}
     onclick={onremove}><Icon name="trash" size={15} /></button

@@ -21,9 +21,9 @@
   {#if noneOf}<span class="neg">{t("route.noneOf")}</span>{/if}
   {#each token.values as v, i}
     <span class={["max-w-full [overflow-wrap:break-word] text-base-content", token.pattern ? "font-mono text-[0.875rem]" : "text-[0.94rem]"]}
-      >{#if v.before}<span class="text-base-content/55">{v.before}</span>{/if}<Mark text={v.text} {words} breaks={!token.pattern} />{#if v.after}<span
+      >{#if v.before}<span class="text-base-content/65">{v.before}</span>{/if}<Mark text={v.text} {words} breaks={!token.pattern} />{#if v.after}<span
           class="font-normal text-base-content/70">{v.after}</span
-        >{/if}{#if i < token.values.length - 1}<span class="font-normal text-base-content/60">{noneOf ? ", " : t("route.listOr")}</span>{/if}</span
+        >{/if}{#if i < token.values.length - 1}<span class="font-normal text-base-content/70">{noneOf ? ", " : t("route.listOr")}</span>{/if}</span
     >
   {/each}
   {#if token.more.length}

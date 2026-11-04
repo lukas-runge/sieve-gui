@@ -132,7 +132,7 @@
       {#if c.conditions}<RouteConditions shape={conditionShape(c.conditions, false, 2)} />{:else}<span class="text-base-content/70">{t("route.allOthers")}</span>{/if}
       <RouteOutcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} />
       {#if c.nested.length && !context}
-        <span class="flex items-center gap-1 text-[0.8rem] text-base-content/65"><Icon name="nested" size={13} />{c.nested.length === 1 ? t("case.hasCheck") : t("case.hasChecks", { count: c.nested.length })}</span>
+        <span class="flex items-center gap-1 text-[0.8rem] text-base-content/70"><Icon name="nested" size={13} />{c.nested.length === 1 ? t("case.hasCheck") : t("case.hasChecks", { count: c.nested.length })}</span>
       {/if}
     </span>
   </button>
@@ -148,7 +148,7 @@
     {/each}
   </ul>
   <div class="mt-3 flex flex-wrap gap-1 border-t border-dashed border-base-300 pt-2">
-    <button class="btn btn-ghost btn-sm gap-1 text-base-content/75" onclick={() => addCase(false)}><Icon name="branch" size={14} />{t("case.addElsif")}</button>
+    <button class="btn btn-ghost btn-sm gap-1 text-base-content/75" title={t("case.addElsifHint")} onclick={() => addCase(false)}><Icon name="branch" size={14} />{t("case.addElsif")}</button>
     {#if !rule.otherwise}
       <button class="btn btn-ghost btn-sm gap-1 text-base-content/75" onclick={() => addCase(true)}><Icon name="plus" size={14} />{t("case.addElse")}</button>
     {/if}
@@ -203,7 +203,7 @@
   {#if step.case.nested.length}
     <!-- A long case: jump to its parts. -->
     <nav class="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap items-center gap-1 bg-base-100 px-1 py-1" aria-label={t("case.parts")}>
-      <span class="mr-1 text-[0.8rem] text-base-content/65">{t("case.jump")}</span>
+      <span class="mr-1 text-[0.8rem] text-base-content/70">{t("case.jump")}</span>
       {#each [{ el: conditionsEl, label: t("conditions.heading") }, { el: actionsEl, label: t("actions.heading") }, { el: checksEl, label: t("case.checkOne") }] as part}
         {#if part.el}
           <button class="btn btn-xs btn-soft" onclick={() => part.el?.scrollIntoView({ block: "start", behavior: "smooth" })}>{part.label}</button>
@@ -237,7 +237,7 @@
                 {list.length > 1 ? t("case.checkMany") : t("case.checkOne")}
               </p>
               <button
-                class="btn btn-ghost btn-xs btn-square text-base-content/65"
+                class="btn btn-ghost btn-xs btn-square text-base-content/70"
                 aria-label={t("case.removeCheck")}
                 title={t("case.removeCheck")}
                 onclick={() => mutate((r) => actionsIn(blockOf(r), step!.index).splice(i, 1))}><Icon name="trash" size={14} /></button
@@ -268,9 +268,10 @@
   </div>
 
   <div class="mt-4 flex flex-wrap gap-1 border-t border-dashed border-base-300 pt-2">
-      <button class="btn btn-ghost btn-sm gap-1 text-base-content/75" onclick={() => addCase(false)}><Icon name="branch" size={14} />{t("case.addElsif")}</button>
+      <button class="btn btn-ghost btn-sm gap-1 text-base-content/75" title={t("case.addElsifHint")} onclick={() => addCase(false)}><Icon name="branch" size={14} />{t("case.addElsif")}</button>
       {#if !step.list.some((c) => c.kind === "else")}
         <button class="btn btn-ghost btn-sm gap-1 text-base-content/75" onclick={() => addCase(true)}><Icon name="plus" size={14} />{t("case.addElse")}</button>
       {/if}
+      <p class="basis-full px-1 text-[0.8125rem] text-base-content/70">{t("case.addElsifHint")}</p>
   </div>
 {/if}

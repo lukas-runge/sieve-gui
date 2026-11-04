@@ -107,7 +107,7 @@
     <!-- Read like on the route; click to change. -->
     <button class="flex min-w-0 grow items-start gap-2 rounded-field px-1 py-1 text-left hover:bg-base-100" title={t("conditions.edit")} onclick={() => (editing = true)}>
       <span class="min-w-0 grow"><Token token={conditionToken(condition, Infinity)} /></span>
-      <Icon name="pencil" size={14} class="mt-1 text-base-content/55" />
+      <Icon name="pencil" size={14} class="mt-1 text-base-content/65" />
     </button>
   {:else if view}
     <select
@@ -214,7 +214,7 @@
           {#if regexUnsupported}
             <p class="mt-1 text-[0.8rem] text-warning" role="alert">{t("regex.unsupported")}</p>
           {/if}
-          <p class="mt-1 text-[0.8rem] text-base-content/60">{t("op.regexHint")}</p>
+          <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.regexHint")}</p>
           <label class="mt-2 flex flex-wrap items-center gap-2 text-[0.8rem]">
             <span class="text-base-content/70">{t("regex.try")}</span>
             <input
@@ -231,28 +231,28 @@
             {/if}
           </label>
         {:else if view.operator.toLowerCase().includes("matches")}
-          <p class="mt-1 text-[0.8rem] text-base-content/60">{t("op.patternHint")}</p>
+          <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.patternHint")}</p>
         {:else if view.operator.endsWith("WithSubdomains")}
-          <p class="mt-1 text-[0.8rem] text-base-content/60">{t("op.subdomainHint")}</p>
+          <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.subdomainHint")}</p>
         {:else if view.field === "parts"}
-          <p class="mt-1 text-[0.8rem] text-base-content/60">{t("op.typeHint")}</p>
+          <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.typeHint")}</p>
         {/if}
       </div>
     {/if}
     {#if parts.length > 0 && !showPart}
-      <button class="basis-full text-left text-[0.8rem] text-base-content/60 hover:text-base-content hover:underline" onclick={() => (morePart = true)}>
+      <button class="basis-full text-left text-[0.8rem] text-base-content/70 hover:text-base-content hover:underline" onclick={() => (morePart = true)}>
         {t("part.more")}
       </button>
     {/if}
   {:else}
     <div class="grow">
       <code class="block font-mono text-sm break-all">{print(condition)}</code>
-      <p class="mt-1 text-[0.8rem] text-base-content/60">{t("conditions.advanced")}</p>
+      <p class="mt-1 text-[0.8rem] text-base-content/70">{t("conditions.advanced")}</p>
     </div>
   {/if}
   </div>
   <button
-    class="btn btn-ghost btn-sm btn-square text-base-content/65"
+    class="btn btn-ghost btn-sm btn-square text-base-content/70"
     aria-label={t("conditions.remove")}
     title={t("conditions.remove")}
     onclick={onremove}><Icon name="trash" size={15} /></button

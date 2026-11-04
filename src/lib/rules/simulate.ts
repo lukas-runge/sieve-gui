@@ -339,6 +339,8 @@ export interface Delivery {
   rejected: boolean;
   discarded: boolean;
   replied: boolean;
+  /** Which script filed into a folder ("folder:<name>") or set a label ("flag:<name>"). */
+  sources: Record<string, string>;
 }
 
 export interface Trial {
@@ -374,22 +376,24 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
   const msg = toMessage(mail);
   const runs: ScriptRun[] = [];
   const steps: Step[] = [];
-  const delivery: Delivery = { folders: [], inbox: false, flags: [], forwards: [], rejected: false, discarded: false, replied: false };
+  const delivery: Delivery = { folders: [], inbox: false, flags: [], forwards: [], rejected: false, discarded: false, replied: false, sources: {} };
   let keepCancelled = false;
   let recorded: { folder: string; step: Step } | null = null;
   let stoppedAll = false;
   let uncertain = false;
   let flags: string[] = [];
 
-  const setFlags = (op: string, list: string[]) => {
+  const setFlags = (op: string, list: string[], script: string) => {
     const words = list.flatMap((f) => f.split(/\s+/)).filter(Boolean);
+    if (op !== "remove") for (const w of words) delivery.sources[`flag:${w}`] ??= script;
     const has = (f: string) => flags.some((x) => x.toLowerCase() === f.toLowerCase());
     if (op === "set") flags = [...new Set(words)];
     else if (op === "add") flags = [...flags, ...words.filter((w) => !has(w))];
     else flags = flags.filter((x) => !words.some((w) => w.toLowerCase() === x.toLowerCase()));
   };
-  const file = (folder: string) => {
+  const file = (folder: string, script: string) => {
     if (!delivery.folders.includes(folder)) delivery.folders.push(folder);
+    delivery.sources[`folder:${folder}`] ??= script;
   };
 
   for (const script of scripts) {
@@ -410,7 +414,7 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
               if (recorded) recorded.step.overridden = true;
               recorded = { folder: a.mailbox, step };
             } else {
-              file(a.mailbox);
+              file(a.mailbox, script.name);
               if (!a.copy) keepCancelled = true;
             }
             break;
@@ -430,7 +434,7 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
             delivery.inbox = true;
             break;
           case "flags":
-            setFlags(a.op, a.flags);
+            setFlags(a.op, a.flags, script.name);
             break;
           case "vacation":
             delivery.replied = true;
@@ -481,7 +485,8 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
   }
 
   if (recorded) {
-    file((recorded as { folder: string }).folder);
+    const last = recorded as { folder: string; step: Step };
+    file(last.folder, last.step.script);
     keepCancelled = true;
   }
   if (!keepCancelled) delivery.inbox = true;

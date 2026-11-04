@@ -32,7 +32,7 @@
     <ul class="ml-0.5 grid border-l-[1.5px] border-base-content/25 pl-2.5">
       {#each shape.items as item, i}
         {#if i > 0}
-          <li class="text-[0.8125rem] text-base-content/60" aria-hidden="true">{joiner}</li>
+          <li class="text-[0.8125rem] text-base-content/70" aria-hidden="true">{joiner}</li>
         {/if}
         <li class="min-w-0">
           {#if item.kind === "token"}<Token token={item.token} {words} />{:else}<Self shape={item.shape} {words} nested />{/if}

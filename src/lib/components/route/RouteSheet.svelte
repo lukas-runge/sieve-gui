@@ -99,6 +99,8 @@
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
 
+  const accountLabel = $derived(session.accounts.find((a) => a.id === editor.accountId)?.label ?? "");
+
   /** The route, or where mail goes ("destinations"). */
   let view = $state<"route" | "dest">("route");
   /** The running scripts with their rules, the open one with its edits. */
@@ -334,24 +336,24 @@
             <input type="checkbox" class="checkbox checkbox-xs" bind:checked={target.subfolders} />{t("target.subfolders")}
           </label>
         {/if}
-        <span class="whitespace-nowrap text-[0.8rem] text-base-content/65" role="status">{withInactive
+        <span class="whitespace-nowrap text-[0.8rem] text-base-content/70" role="status">{withInactive
             ? t(resultCount === 1 ? "search.hitOne" : "search.countAll", { count: resultCount })
             : t(resultCount === 1 ? "target.countOne" : "target.count", { count: resultCount })}</span>
       </div>
     {:else}
     <label class="flex min-w-48 grow basis-48 items-center gap-2 rounded-field px-1.5 py-1 focus-within:bg-base-200">
-      <Icon name="search" size={15} class="text-base-content/65" />
+      <Icon name="search" size={15} class="text-base-content/70" />
       <input
         id="rule-search"
         type="search"
-        class="min-w-0 grow bg-transparent text-sm outline-none placeholder:text-base-content/65"
+        class="min-w-0 grow bg-transparent text-sm outline-none placeholder:text-base-content/70"
         placeholder={t("search.placeholder")}
         aria-label={t("search.label")}
         bind:value={query}
         onkeydown={(e) => e.key === "Escape" && (query = "")}
       />
       {#if searching}
-        <span class="text-[0.8rem] whitespace-nowrap text-base-content/65" role="status">
+        <span class="text-[0.8rem] whitespace-nowrap text-base-content/70" role="status">
           {scope === "all"
             ? resultCount === 1 ? t("search.hitOne") : t("search.countAll", { count: resultCount })
             : t("search.count", { shown: shownCount, total: editor.rules.items.length })}
@@ -421,14 +423,17 @@
   {:else if listing}
     <!-- Matches in every script of the account, in the order the scripts run. -->
     <div class="grid gap-4 px-3 py-3">
+      <p class="px-1 text-[0.8125rem] text-base-content/70">
+        {target && !withInactive ? t("scope.running", { account: accountLabel }) : t("scope.all", { account: accountLabel })}
+      </p>
       {#each results as r (r.name)}
         <section class="grid gap-1" aria-label={r.name}>
           <h3 class="flex items-center gap-2 px-1 text-[0.875rem] font-semibold">
-            <Icon name="text" size={15} class="text-base-content/65" />{r.name}
+            <Icon name="text" size={15} class="text-base-content/70" />{r.name}
             {#if !session.runs(editor.accountId, r.name)}
-              <span class="rounded-full bg-base-200 px-2 text-[0.8rem] leading-5 font-medium text-base-content/65">{t("status.off")}</span>
+              <span class="rounded-full bg-base-200 px-2 text-[0.8rem] leading-5 font-medium text-base-content/70">{t("status.off")}</span>
             {/if}
-            <span class="font-normal text-base-content/65">{r.hits.length === 1 ? t("search.hitOne") : t("search.hits", { count: r.hits.length })}</span>
+            <span class="font-normal text-base-content/70">{r.hits.length === 1 ? t("search.hitOne") : t("search.hits", { count: r.hits.length })}</span>
           </h3>
           {#each r.hits as hit (hit.index)}
             <div class="rounded-field px-2.5 py-2 ring-1 ring-base-300 hover:bg-base-200/50">
@@ -447,15 +452,15 @@
               {:else}
                 <button class="w-full text-left" onclick={() => openMatch(r.name, hit.index, "")}>
                   <span class="font-semibold">{t("raw.heading")}</span>
-                  <span class="text-[0.8rem] text-base-content/60">{t("route.codeNote")}</span>
-                  <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8rem] text-base-content/65">{hit.item.code.trim()}</pre>
+                  <span class="text-[0.8rem] text-base-content/70">{t("route.codeNote")}</span>
+                  <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8rem] text-base-content/70">{hit.item.code.trim()}</pre>
                 </button>
               {/if}
             </div>
           {/each}
         </section>
       {:else}
-        <p class="px-1 py-2 text-sm text-base-content/65">{others === null ? t("search.loading") : t("search.none")}</p>
+        <p class="px-1 py-2 text-sm text-base-content/70">{others === null ? t("search.loading") : t("search.none")}</p>
       {/each}
       {#if inactiveTargets}
         <button class="btn btn-ghost btn-sm justify-self-start text-base-content/70" onclick={() => (withInactive = true)}>
@@ -466,7 +471,7 @@
   {:else}
   <ol class="route relative py-1" role="list">
     <!-- Where the mail comes in. -->
-    <li class="route-item text-[0.875rem] text-base-content/65">
+    <li class="route-item text-[0.875rem] text-base-content/70">
       <span></span>
       <span class="route-node grid place-items-center"><Icon name="mail" size={15} /></span>
       <span class="flex flex-wrap items-center gap-x-1.5 gap-y-1 py-2">
@@ -490,6 +495,16 @@
         {/if}
       </span>
     </li>
+    {#if running && next}
+      <!-- What's shown here isn't necessarily the end of the story. -->
+      <li class="route-item text-[0.8125rem] text-base-content/75">
+        <span></span><span></span>
+        <p class="-mt-1 mb-1 flex items-start gap-1.5 px-0.5">
+          <Icon name="info" size={14} class="mt-0.5 shrink-0 text-primary" />
+          {editor.rules.singleFolder ? t("route.provisional", { name: next }) : t("route.provisionalMore", { name: next })}
+        </p>
+      </li>
+    {/if}
 
     {#each editor.rules.items as item, index (item.uid)}
       {@const selected = editor.selected === item.uid}
@@ -529,10 +544,10 @@
             <span></span>
             <span class="route-node grid place-items-center"><span class="size-1.5 rounded-full bg-[var(--spine)]"></span></span>
             <div class="flex items-center gap-2 px-2.5 text-[0.875rem]">
-              <Icon name="folder" size={14} class="text-base-content/60" />
+              <Icon name="folder" size={14} class="text-base-content/70" />
               <span class="font-semibold text-base-content/80">{groups.head[index]!.split(" / ").join(" › ")}</span>
               <span class="h-px grow bg-base-300"></span>
-              <span class="pr-2 text-[0.8rem] text-base-content/60">{t("route.groupCount", { count: groups.size[index] })}</span>
+              <span class="pr-2 text-[0.8rem] text-base-content/70">{t("route.groupCount", { count: groups.size[index] })}</span>
             </div>
           </div>
         {/if}
@@ -569,6 +584,7 @@
                 {words}
                 picked={selected ? editor.focus : null}
                 hideParent={groups.grouped[index]}
+                id={item.uid}
                 ontarget={showTarget}
                 {next}
                 trial={tr?.reached ? tr : null}
@@ -578,12 +594,12 @@
               <button class="w-full text-left" aria-current={selected ? "true" : undefined} onclick={() => pick(item.uid, "")}>
                 <span class="flex items-baseline gap-2">
                   <span class="font-semibold">{t("raw.heading")}</span>
-                  <span class="text-[0.8rem] text-base-content/60">{t("route.codeNote")}</span>
+                  <span class="text-[0.8rem] text-base-content/70">{t("route.codeNote")}</span>
                   {#if editor.roundcubeRisks?.rawBlocks.includes(index)}
                     <span class="badge badge-sm badge-soft badge-warning">{t("roundcube.badge")}</span>
                   {/if}
                 </span>
-                <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8rem] leading-snug text-base-content/65">{item.code.trim() || "…"}</pre>
+                <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8rem] leading-snug text-base-content/70">{item.code.trim() || "…"}</pre>
               </button>
             {/if}
           </div>
@@ -594,7 +610,7 @@
               >
             {/if}
             {#if item.type === "rule" && !item.enabled}
-              <span class="rounded-full bg-base-200 px-2 text-[0.8rem] leading-5 font-medium text-base-content/60">{t("route.off")}</span>
+              <span class="rounded-full bg-base-200 px-2 text-[0.8rem] leading-5 font-medium text-base-content/70">{t("route.off")}</span>
             {/if}
             {#if item.type === "rule" && editor.roundcubeRisks?.rules.includes(index)}
               <span class="badge badge-sm badge-soft badge-warning" title={t("roundcube.title")}>{t("roundcube.badge")}</span>
@@ -603,7 +619,7 @@
               <div
                 tabindex="0"
                 role="button"
-                class="grid size-7 place-items-center rounded-field text-base-content/65 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-base-200 {selected ? 'opacity-100' : ''}"
+                class="grid size-7 place-items-center rounded-field text-base-content/70 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-base-200 {selected ? 'opacity-100' : ''}"
                 aria-label={t("menu.more")}
               >
                 <Icon name="more" size={16} />
@@ -640,7 +656,7 @@
           <span class="text-base-content/70">{t("search.elsewhere")}</span>
           {#each elsewhere as r (r.name)}
             <button class="btn btn-sm btn-soft btn-primary gap-1" onclick={() => (scope = "all")}>
-              {r.name} <span class="font-normal">· {r.hits.length === 1 ? t("search.hitOne") : t("search.hits", { count: r.hits.length })}</span>
+              {r.name}{#if !session.runs(editor.accountId, r.name)}<span class="font-normal">({t("status.off")})</span>{/if} <span class="font-normal">· {r.hits.length === 1 ? t("search.hitOne") : t("search.hits", { count: r.hits.length })}</span>
             </button>
           {/each}
         </div>
@@ -657,7 +673,7 @@
     {/if}
 
     <!-- Where the mail goes when no rule kept it. -->
-    <li class="route-item route-end text-[0.875rem] text-base-content/65" hidden={searching}>
+    <li class="route-item route-end text-[0.875rem] text-base-content/70" hidden={searching}>
       <span></span>
       <span class="route-node grid place-items-center pt-0.5"><span class="route-mark route-mark-end"></span></span>
       <span class="py-2">

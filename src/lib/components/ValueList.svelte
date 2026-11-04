@@ -26,7 +26,7 @@
 <div class="flex flex-col gap-1.5">
   {#each values as value, i}
     <div class="flex items-center gap-1.5">
-      {#if i > 0}<span class="text-sm text-base-content/60 w-8 text-right">{t("sentence.or")}</span>{/if}
+      {#if i > 0}<span class="text-sm text-base-content/70 w-8 text-right">{t("sentence.or")}</span>{/if}
       <input
         class={["input input-sm grow", mono && "font-mono"]}
         aria-label={label}
@@ -36,7 +36,7 @@
       />
       {#if values.length > 1}
         <button
-          class="btn btn-ghost btn-sm btn-square text-base-content/65"
+          class="btn btn-ghost btn-sm btn-square text-base-content/70"
           aria-label={t("value.remove")}
           title={t("value.remove")}
           onclick={() => onchange(values.filter((_, j) => j !== i), false)}><Icon name="x" size={15} /></button

@@ -135,7 +135,7 @@
       aria-expanded={open.has(i)}
       onclick={() => toggle(i)}
     >
-      <Icon name={open.has(i) ? "chevronDown" : "chevronRight"} size={16} class="mt-0.5 text-base-content/65" />
+      <Icon name={open.has(i) ? "chevronDown" : "chevronRight"} size={16} class="mt-0.5 text-base-content/70" />
       {@render badge(label, dashed)}
       {#if open.has(i)}
         <span class="text-sm text-base-content/70">{i === 0 ? t("branch.firstMatch") : label === t("route.otherwise") ? t("branch.otherwiseHint") : ""}</span>
@@ -144,7 +144,7 @@
       {/if}
     </button>
     {#if remove}
-      <button class="btn btn-ghost btn-xs btn-square text-base-content/65" aria-label={t("branch.remove")} title={t("branch.remove")} onclick={() => mutate(remove)}>
+      <button class="btn btn-ghost btn-xs btn-square text-base-content/70" aria-label={t("branch.remove")} title={t("branch.remove")} onclick={() => mutate(remove)}>
         <Icon name="x" size={14} />
       </button>
     {/if}

@@ -43,6 +43,20 @@
     return outcomes(actions, keywords, delimiter);
   });
 
+  /** What each script contributed to the result, in the order they ran. */
+  const contributions = $derived.by(() => {
+    if (!result) return [];
+    const d = result.delivery;
+    const by = new Map<string, string[]>();
+    const add = (key: string, text: string) => {
+      const script = d.sources[key];
+      if (script) by.set(script, [...(by.get(script) ?? []), text]);
+    };
+    for (const f of d.folders) add(`folder:${f}`, outcomes([{ type: "fileInto", mailbox: f, copy: false, create: false, flags: null }], keywords, delimiter)[0]?.path.at(-1) ?? f);
+    for (const f of d.flags) add(`flag:${f}`, outcomes([{ type: "flags", op: "add", flags: [f] }], keywords, delimiter)[0]?.text ?? f);
+    return trial.order.filter((n) => by.has(n)).map((script) => ({ script, items: by.get(script)! }));
+  });
+
   /** A pasted message fills all fields at once. */
   function onpaste(e: ClipboardEvent) {
     const text = e.clipboardData?.getData("text/plain") ?? "";
@@ -118,7 +132,7 @@
         </label>
       {/each}
     </div>
-    <button class="mt-2 flex items-center gap-1 text-[0.8rem] font-medium text-base-content/65 hover:text-base-content" aria-expanded={more} onclick={() => (more = !more)}>
+    <button class="mt-2 flex items-center gap-1 text-[0.8rem] font-medium text-base-content/70 hover:text-base-content" aria-expanded={more} onclick={() => (more = !more)}>
       <Icon name={more ? "chevronDown" : "chevronRight"} size={14} />{t("trial.more")}
     </button>
     {#if more}
@@ -134,7 +148,7 @@
       </div>
     {/if}
     {#if !trial.active}
-      <p class="mt-3 flex gap-2 text-[0.8rem] text-base-content/65"><Icon name="info" size={14} class="mt-0.5" />{t("trial.pasteTip")}</p>
+      <p class="mt-3 flex gap-2 text-[0.8rem] text-base-content/70"><Icon name="info" size={14} class="mt-0.5" />{t("trial.pasteTip")}</p>
     {/if}
 
     {#if result}
@@ -148,6 +162,14 @@
       <section class="mt-4 rounded-box border border-success/35 bg-success/[0.07] px-3.5 py-3" aria-live="polite">
         <h3 class="mb-1.5 text-[0.8rem] font-semibold tracking-wide text-success uppercase">{t("trial.result")}</h3>
         <div class="text-[1.05rem]"><Outcomes items={delivery} fullPath /></div>
+        {#if contributions.length > 1}
+          <!-- Several scripts had a hand in it: which did what. -->
+          <ul class="mt-2 grid gap-0.5 text-[0.8125rem] text-base-content/75">
+            {#each contributions as c (c.script)}
+              <li><span class="font-medium">{c.script}:</span> {c.items.join(", ")}</li>
+            {/each}
+          </ul>
+        {/if}
         {#if result.delivery.forwards.length || result.delivery.rejected || result.delivery.discarded || result.delivery.replied}
           <ul class="mt-1.5 grid gap-0.5 text-sm text-base-content/80">
             {#each result.delivery.forwards as address}<li class="flex items-center gap-1.5"><Icon name="forward" size={14} />{t("trial.forwarded", { address })}</li>{/each}
@@ -164,7 +186,7 @@
       </section>
 
       <!-- Its way: every script in order, the cases that applied. -->
-      <h3 class="mt-5 mb-2 text-[0.8rem] font-semibold tracking-wide text-base-content/65 uppercase">{t("trial.way")}</h3>
+      <h3 class="mt-5 mb-2 text-[0.8rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("trial.way")}</h3>
       <ol class="grid gap-3">
         {#each result.scripts as run, i (run.name)}
           {@const steps = result.steps.filter((s) => s.script === run.name)}
@@ -174,9 +196,9 @@
             <span></span>
             <div class="grid gap-1 pt-1">
               {#if run.skipped}
-                <p class="text-sm text-base-content/60">{t("trial.skipped")}</p>
+                <p class="text-sm text-base-content/70">{t("trial.skipped")}</p>
               {:else if steps.length === 0 && run.unknown.length === 0}
-                <p class="text-sm text-base-content/60">{t("trial.noMatch")}</p>
+                <p class="text-sm text-base-content/70">{t("trial.noMatch")}</p>
               {/if}
               {#each steps as step}
                 {@const title = stepTitle(step.script, step.index, step.path)}
@@ -188,11 +210,11 @@
                   <span class="flex min-w-0 items-baseline gap-1.5 text-sm">
                     <Icon name="check" size={14} class="self-center text-success" />
                     <span class="truncate font-medium">{title.name}</span>
-                    {#if title.where}<span class="shrink-0 text-base-content/65">› {title.where}</span>{/if}
+                    {#if title.where}<span class="shrink-0 text-base-content/70">› {title.where}</span>{/if}
                   </span>
                   {#if title.conditions && title.conditions.items.length}
                     <span class="pl-5 text-[0.875rem]" title={t("trial.because")}>
-                      <span class="text-[0.8rem] text-base-content/60">{t("trial.because")}</span>
+                      <span class="text-[0.8rem] text-base-content/70">{t("trial.because")}</span>
                       <RouteConditions shape={conditionShape(title.conditions, false, 2)} />
                     </span>
                   {/if}
@@ -200,7 +222,7 @@
                     <span class={["pl-5", step.overridden && "line-through decoration-base-content/50 opacity-60"]} title={step.overridden ? t("trial.overridden") : undefined}>
                       <Outcomes {items} stop={stops(step.actions)} singleFolder={editor.rules.singleFolder} next={nextOf(step.script)} />
                     </span>
-                    {#if step.overridden}<span class="pl-5 text-[0.8rem] text-base-content/60">{t("trial.overridden")}</span>{/if}
+                    {#if step.overridden}<span class="pl-5 text-[0.8rem] text-base-content/70">{t("trial.overridden")}</span>{/if}
                   {/if}
                 </button>
               {/each}
@@ -211,7 +233,7 @@
                   onclick={() => openStep(run.name, index, "")}
                 >
                   <Icon name="helpCircle" size={14} class="text-warning" /><span class="font-medium">{title.name}</span>
-                  <span class="text-base-content/65">– {t("trial.unknown")}</span>
+                  <span class="text-base-content/70">– {t("trial.unknown")}</span>
                 </button>
               {/each}
             </div>

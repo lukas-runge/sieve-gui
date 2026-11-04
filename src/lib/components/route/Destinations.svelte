@@ -87,7 +87,7 @@
       <Icon name="folder" size={15} class={f.rules.size ? "text-primary" : "text-base-content/50"} />
       <span class={["truncate", f.rules.size ? "font-semibold" : "text-base-content/75"]}>{f.name}</span>
       <span class="h-px grow"></span>
-      <span class="shrink-0 text-[0.8rem] text-base-content/60">
+      <span class="shrink-0 text-[0.8rem] text-base-content/70">
         {#if f.rules.size}{count(f.rules.size)}{:else}{t("dest.below", { count: f.all.size })}{/if}
       </span>
     </button>
@@ -102,7 +102,7 @@
 <div class="grid gap-5 px-3 py-4">
   <p class="px-1 text-sm text-base-content/70">{t("dest.intro", { count: scripts.length })}</p>
   <section aria-label={t("dest.folders")}>
-    <h3 class="mb-1 px-1 text-[0.8rem] font-semibold tracking-wide text-base-content/65 uppercase">{t("dest.folders")}</h3>
+    <h3 class="mb-1 px-1 text-[0.8rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.folders")}</h3>
     <ul class="grid">
       {#each sorted(tree.root) as f (f.name)}{@render folder(f, 0)}{/each}
       <li class="flex items-center gap-2 py-1 pr-2 pl-2 text-base-content/70">
@@ -112,7 +112,7 @@
   </section>
   {#if tree.labels.length}
     <section aria-label={t("dest.labels")}>
-      <h3 class="mb-2 px-1 text-[0.8rem] font-semibold tracking-wide text-base-content/65 uppercase">{t("dest.labels")}</h3>
+      <h3 class="mb-2 px-1 text-[0.8rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.labels")}</h3>
       <div class="flex flex-wrap gap-2 px-1">
         {#each tree.labels as l (l.key)}
           {@const h = labelHue(l.text)}
@@ -123,7 +123,7 @@
             onclick={() => onpick({ kind: "label", key: l.key, text: l.text, folder: false })}
           >
             <span class="size-1.5 rounded-full" style="background: oklch(0.62 0.13 {h})"></span>{l.text}
-            <span class="font-normal text-base-content/60">{l.rules.size}</span>
+            <span class="font-normal text-base-content/70">{l.rules.size}</span>
           </button>
         {/each}
       </div>

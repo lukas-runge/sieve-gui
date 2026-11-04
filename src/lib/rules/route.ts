@@ -358,6 +358,24 @@ export function labelHue(name: string): number {
   return LABEL_HUES[h % LABEL_HUES.length];
 }
 
+/** Everything a rule or check can do, each once: its summary when folded. */
+export function blockOutcomes(b: Branches, keywords: Record<string, string>, delimiter: string | null): Outcome[] {
+  const seen = new Set<string>();
+  const out: Outcome[] = [];
+  const visit = (x: Case) => {
+    for (const o of outcomes(x.actions, keywords, delimiter)) {
+      const key = `${o.kind}:${o.text}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(o);
+      }
+    }
+    for (const n of x.nested) for (const inner of cases(n)) visit(inner);
+  };
+  for (const c of cases(b)) visit(c);
+  return out;
+}
+
 /** What the checks inside a case do, for a case without actions of its own. */
 export function nestedOutcomes(c: Case, keywords: Record<string, string>, delimiter: string | null): Outcome[] {
   const seen = new Set<string>();

@@ -102,11 +102,12 @@
   <div class="flex flex-wrap gap-1">
     <button
       class="btn btn-ghost btn-xs w-fit gap-1 text-base-content/70"
+      title={t("conditions.addHint")}
       onclick={() => mutate((g) => (top ? addCondition(g, newCondition()) : g.items.push(newCondition())))}
     >
       <Icon name="plus" size={13} />{t("conditions.add")}
     </button>
-    <button class="btn btn-ghost btn-xs w-fit gap-1 text-base-content/70" onclick={() => mutate((g) => addGroup(g, top))}>
+    <button class="btn btn-ghost btn-xs w-fit gap-1 text-base-content/70" title={t("conditions.addGroupHint")} onclick={() => mutate((g) => addGroup(g, top))}>
       <Icon name="plus" size={13} />{t("conditions.addGroup")}
     </button>
   </div>

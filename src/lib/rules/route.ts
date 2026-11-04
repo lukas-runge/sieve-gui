@@ -497,6 +497,8 @@ export function casePathLabel(rule: Branches, path: CasePath): string {
   if (!chain) return "";
   const last = chain[chain.length - 1];
   const number = caseNumber(chain);
+  // The only case of a rule is the rule itself.
+  if (chain.length === 1 && last.list.length === 1) return "";
   if (last.case.kind === "else") {
     const parent = caseNumber(chain.slice(0, -1));
     return parent ? `${t("route.caseN", { n: parent })} › ${t("route.otherwiseCase")}` : t("route.otherwiseCase");

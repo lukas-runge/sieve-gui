@@ -8,7 +8,7 @@
   import { t } from "../i18n.svelte";
   import { closesMenu } from "../menu";
   import { scriptFolders, type ScriptFolders } from "../rules/mailbox";
-  import { casePathLabel, isSimple } from "../rules/route";
+  import { casePathLabel, cases, isSimple } from "../rules/route";
   import { session } from "../session.svelte";
   import BranchesEditor, { SUMMARY, type SummaryContext } from "./BranchesEditor.svelte";
   import CaseEditor from "./CaseEditor.svelte";
@@ -119,8 +119,10 @@
       {/if}
       <div class="min-w-0 grow">
         <p class="truncate text-[0.8rem] text-base-content/65">
-          {#if item.type === "raw"}{t("raw.heading")}{:else if isSimple(item)}{t("inspector.rule")}{:else}{t("inspector.switch")}{/if}
-          {#if item.type === "rule" && editor.focus}
+          {#if item.type === "raw"}{t("raw.heading")}{:else if isSimple(item)}{t("inspector.rule")}{:else if cases(item).length > 1}{t(
+              "inspector.switch",
+            )}{:else}{t("inspector.withCheck")}{/if}
+          {#if item.type === "rule" && editor.focus && casePathLabel(item, editor.focus)}
             <span class="text-base-content/65">›</span> <span class="font-medium text-base-content/80">{casePathLabel(item, editor.focus)}</span>
           {/if}
         </p>

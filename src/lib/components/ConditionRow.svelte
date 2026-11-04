@@ -102,7 +102,7 @@
     </select>
     {#if view.field === "header"}
       <input
-        class="input input-sm w-56 font-mono"
+        class="input input-sm w-56"
         aria-label={t("field.headerName")}
         placeholder={t("field.headerName")}
         title={t("field.headerNameHint")}

@@ -112,10 +112,10 @@
   {/each}
   {#if stop}
     <span
-      class="inline-flex items-center gap-1 text-[0.875rem] whitespace-nowrap text-base-content/65"
+      class="inline-flex items-start gap-1 text-[0.875rem] text-base-content/65"
       title={singleFolder ? t("route.stopScriptHint") : t("route.stopHint")}
     >
-      <Icon name="stop" size={14} />{singleFolder ? (next ? t("route.stopScriptNext", { name: next }) : t("route.stopScriptRules")) : t("route.stopRules")}
+      <Icon name="stop" size={14} class="mt-[0.2rem]" />{singleFolder ? (next ? t("route.stopScriptNext", { name: next }) : t("route.stopScriptRules")) : t("route.stopRules")}
     </span>
   {/if}
 </div>

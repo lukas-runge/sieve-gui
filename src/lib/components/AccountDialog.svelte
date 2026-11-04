@@ -88,7 +88,7 @@
 </script>
 
 {#snippet trusted(sha256: string, untrust: () => void)}
-  <div class="grid gap-1 text-xs">
+  <div class="grid gap-1 text-[0.8125rem]">
     <span class="text-base-content/70">{t("certificate.trusted")}</span>
     <Fingerprint {sha256} />
     <button type="button" class="btn btn-ghost btn-xs justify-self-start" onclick={untrust}>{t("certificate.untrust")}</button>

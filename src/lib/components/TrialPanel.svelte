@@ -66,6 +66,12 @@
     }
   }
 
+  /** The script running after `script`, where a stop in it continues. */
+  function nextOf(script: string): string | null {
+    const i = trial.order.indexOf(script);
+    return i >= 0 ? (trial.order[i + 1] ?? null) : null;
+  }
+
   function stepTitle(script: string, index: number, path: string): { name: string; where: string } {
     const item = itemsOf(script)[index];
     if (!item || item.type !== "rule") return { name: t("raw.heading"), where: "" };
@@ -180,7 +186,7 @@
                   </span>
                   {#if items.length || stops(step.actions)}
                     <span class={["pl-5", step.overridden && "line-through decoration-base-content/50 opacity-60"]} title={step.overridden ? t("trial.overridden") : undefined}>
-                      <Outcomes {items} stop={stops(step.actions)} singleFolder={editor.rules.singleFolder} />
+                      <Outcomes {items} stop={stops(step.actions)} singleFolder={editor.rules.singleFolder} next={nextOf(step.script)} />
                     </span>
                     {#if step.overridden}<span class="pl-5 text-[0.8rem] text-base-content/60">{t("trial.overridden")}</span>{/if}
                   {/if}

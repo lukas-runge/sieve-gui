@@ -112,10 +112,10 @@
 </script>
 
 <!-- A case as one line, like on the route; picks it. -->
-{#snippet caseLine(c: Case, list: Case[], pre: string, to: CasePath, color: string, current = false)}
+{#snippet caseLine(c: Case, list: Case[], pre: string, to: CasePath, color: string, context = false)}
   {@const n = label(c, list, pre)}
   <button
-    class={["flex w-full min-w-0 items-start gap-2 rounded-field px-2 py-1.5 text-left", current ? "bg-primary/10 ring-1 ring-primary/35" : "hover:bg-base-200"]}
+    class="flex w-full min-w-0 items-start gap-2 rounded-field px-2 py-1.5 text-left hover:bg-base-200"
     onclick={() => onfocus(to)}
   >
     <span class="flex w-[6.2rem] shrink-0 items-center gap-1.5" style="color: {color}">
@@ -125,8 +125,8 @@
     <span class="grid min-w-0 gap-1">
       {#if c.conditions}<RouteConditions shape={conditionShape(c.conditions, false, 2)} />{:else}<span class="text-base-content/70">{t("route.allOthers")}</span>{/if}
       <RouteOutcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} />
-      {#if c.nested.length}
-        <span class="flex items-center gap-1 text-[0.8rem] text-base-content/65"><Icon name="nested" size={13} />{t("case.hasChecks", { count: c.nested.length })}</span>
+      {#if c.nested.length && !context}
+        <span class="flex items-center gap-1 text-[0.8rem] text-base-content/65"><Icon name="nested" size={13} />{c.nested.length === 1 ? t("case.hasCheck") : t("case.hasChecks", { count: c.nested.length })}</span>
       {/if}
     </span>
   </button>
@@ -149,18 +149,23 @@
   </div>
 {:else}
   <!-- Where the case sits: the cases above it, one line each. -->
+  {#if chain!.length > 1 || cases(rule).length > 1}
   <nav class="mb-4 grid gap-0.5 rounded-box bg-base-200/60 p-1.5" aria-label={t("case.context")}>
-    <button class="flex items-center gap-1.5 rounded-field px-2 py-1 text-left text-[0.8rem] font-medium text-base-content/70 hover:bg-base-200" onclick={() => onfocus("")}>
-      <Icon name="arrowLeft" size={13} />{t("case.all", { count: cases(rule).length })}
-    </button>
+    {#if cases(rule).length > 1}
+      <button class="flex items-center gap-1.5 rounded-field px-2 py-1 text-left text-[0.8rem] font-medium text-base-content/70 hover:bg-base-200" onclick={() => onfocus("")}>
+        <Icon name="arrowLeft" size={13} />{t("case.all", { count: cases(rule).length })}
+      </button>
+    {/if}
     {#each chain!.slice(0, -1) as s, i}
       <div style="padding-left: {i * 0.9}rem">
-        {@render caseLine(s.case, s.list, caseNumber(chain!.slice(0, i)), s.path, `var(--rail-${Math.min(i, 3)})`)}
+        {@render caseLine(s.case, s.list, caseNumber(chain!.slice(0, i)), s.path, `var(--rail-${Math.min(i, 3)})`, true)}
       </div>
     {/each}
   </nav>
+  {/if}
 
   <!-- The case itself. -->
+  {#if !(depth === 0 && step.list.length === 1)}
   <div class="mb-1 flex items-center gap-2" style="color: {rail}">
     {#if label(step.case, step.list, prefix)}
       <span class="rounded-full border-2 px-2 text-[0.9rem] leading-[1.35rem] font-bold" style="border-color: {rail}">{label(step.case, step.list, prefix)}</span>
@@ -186,6 +191,7 @@
       <button class="btn btn-ghost btn-sm gap-1 text-base-content/70" onclick={removeCase}><Icon name="trash" size={14} />{t("case.remove")}</button>
     {/if}
   </div>
+  {/if}
   {#if hint}<p class="mb-4 text-sm text-base-content/70">{hint}</p>{/if}
 
   <div class="grid gap-4">

@@ -39,6 +39,9 @@
   } = $props();
 
   const chain = $derived(caseChain(rule, path));
+  let conditionsEl = $state<HTMLElement>();
+  let actionsEl = $state<HTMLElement>();
+  let checksEl = $state<HTMLElement>();
   const step = $derived(chain?.at(-1) ?? null);
   const depth = $derived((chain?.length ?? 1) - 1);
   const rail = $derived(`var(--rail-${Math.min(depth, 3)})`);
@@ -197,7 +200,19 @@
   {/if}
   {#if hint}<p class="mb-4 text-sm text-base-content/70">{hint}</p>{/if}
 
+  {#if step.case.nested.length}
+    <!-- A long case: jump to its parts. -->
+    <nav class="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap gap-1 bg-base-100 px-1 py-1" aria-label={t("case.parts")}>
+      {#each [{ el: conditionsEl, label: t("conditions.heading") }, { el: actionsEl, label: t("actions.heading") }, { el: checksEl, label: t("case.checkOne") }] as part}
+        {#if part.el}
+          <button class="btn btn-xs btn-soft" onclick={() => part.el?.scrollIntoView({ block: "start", behavior: "smooth" })}>{part.label}</button>
+        {/if}
+      {/each}
+    </nav>
+  {/if}
+
   <div class="grid gap-4">
+    <div bind:this={conditionsEl} class="scroll-mt-12"></div>
     {#if step.case.kind !== "else"}
       <ConditionGroup
         group={step.case.conditions!}
@@ -206,10 +221,11 @@
       />
     {/if}
 
-    <section class="grid gap-1.5" aria-label={t("actions.heading")}>
+    <section class="grid scroll-mt-12 gap-1.5" aria-label={t("actions.heading")} bind:this={actionsEl}>
       <h4 class="text-sm font-semibold text-base-content/75">{t("actions.heading")}</h4>
       {#each step.case.actions as action, i}
         {#if action.type === "if"}
+          {#if checkIndex(step.case.actions, i) === 0}<div bind:this={checksEl} class="scroll-mt-12"></div>{/if}
           {@const j = checkIndex(step.case.actions, i)}
           {@const list = cases(action)}
           {@const inner = `var(--rail-${Math.min(depth + 1, 3)})`}

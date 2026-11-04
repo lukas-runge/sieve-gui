@@ -15,7 +15,7 @@
   import { i18n, t } from "../lib/i18n.svelte";
   import { ROOT_SCRIPT, session } from "../lib/session.svelte";
   import { trial } from "../lib/trial.svelte";
-  import { accountView } from "../lib/scope.svelte";
+  import { accountView, routeNav } from "../lib/scope.svelte";
 
   let accountDialog = $state<{ account: Account | null } | null>(null);
   let deploying = $state(false);
@@ -52,12 +52,6 @@
     const i = root.scripts.indexOf(editor.name);
     return i >= 0 ? (root.scripts[i + 1] ?? null) : null;
   });
-  /** "2nd of 3" when several scripts run in order. */
-  const position = $derived.by(() => {
-    if (!editor || !root || root.scripts.length < 2) return null;
-    const i = root.scripts.indexOf(editor.name);
-    return i >= 0 ? { n: i + 1, count: root.scripts.length } : null;
-  });
   const serverFolders = $derived(
     editor && session.folders[editor.accountId]?.status === "ready" ? session.folders[editor.accountId].folders : null,
   );
@@ -82,7 +76,8 @@
   let sidebarPinned = $state(false);
   /** The floating panel starts below the header, so saving stays in reach. */
   let headerHeight = $state(0);
-  const sidebarShown = $derived(sidebarOpen && (roomy.current || !rightPanel || sidebarPinned));
+  // Without a script open there's no header to bring it back from: it stays.
+  const sidebarShown = $derived(!editor || (sidebarOpen && (roomy.current || !rightPanel || sidebarPinned)));
   $effect(() => {
     if (!rightPanel) sidebarPinned = false;
   });
@@ -183,63 +178,64 @@
 
 <div
   class="grid h-screen"
-  style:grid-template-columns="{sidebarShown ? '16rem' : '0'} minmax(0, 1fr){rightPanel && beside ? ` ${panelWidth}px` : ''}"
+  style:grid-template-columns="{sidebarShown ? '17rem' : '0'} minmax(0, 1fr){rightPanel && beside ? ` ${panelWidth}px` : ''}"
+  style:--header-h={editor && headerHeight ? `${headerHeight}px` : null}
 >
   <aside class="min-h-0 overflow-hidden border-r border-base-300 bg-base-200" inert={!sidebarShown}>
-    <Sidebar onaccount={(account) => (accountDialog = { account })} />
+    <Sidebar onaccount={(account) => (accountDialog = { account })} ontoggle={editor ? toggleSidebar : undefined} />
   </aside>
 
   <main class="flex min-w-0 flex-col overflow-hidden bg-base-200">
     {#if editor}
-      <header bind:clientHeight={headerHeight} class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-base-300 bg-base-100 px-6 py-3">
-        <button
-          class="btn btn-ghost btn-sm btn-square -ml-2 self-start text-base-content/60"
-          aria-pressed={!sidebarShown}
-          aria-label={sidebarShown ? t("sidebar.hide") : t("sidebar.show")}
-          title={sidebarShown ? t("sidebar.hide") : t("sidebar.show")}
-          onclick={toggleSidebar}
-        >
-          <Icon name="panelLeft" size={17} />
-        </button>
-        <div class="min-w-0 grow">
-          <div class="flex min-w-0 items-center gap-3">
-            {#if accountView.active}
-              <!-- Results across scripts: the account is the subject; the script is where "back" leads. -->
-              <h1 class="flex min-w-0 items-baseline gap-2 truncate text-[1.35rem] leading-tight font-semibold">
-                <Icon name="server" size={18} class="self-center text-base-content/70" />{accountLabel}
-                <span class="truncate text-base font-normal text-base-content/75">
-                  {accountView.kind === "dest" ? t("scope.headerDest") : t("scope.headerSearch")}
-                </span>
-              </h1>
-            {:else}
-              <h1 class="truncate text-[1.35rem] leading-tight font-semibold">{editor.name}</h1>
-            {/if}
-            <span
-              hidden={accountView.active}
-              class={[
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.8rem] font-medium",
-                active ? "bg-success/12 text-success" : "bg-base-200 text-base-content/60",
-              ]}
-            >
-              <span class={["size-1.5 rounded-full", active ? "bg-success" : "bg-base-content/40"]}></span>
-              {#if !active}{t("status.off")}{:else if position}{t("status.runsAt", position)}{:else}{t("status.runs")}{/if}
+      <!-- One bar, like a native toolbar: what is open and its state on the left, what to do with it on the right. -->
+      <header
+        bind:offsetHeight={headerHeight}
+        data-tauri-drag-region
+        class={["flex h-13 shrink-0 items-center gap-2 bg-base-100 pr-3 pl-5 shadow-[inset_0_-1px_0_var(--color-base-300)]", !sidebarShown && "traffic-inset"]}
+      >
+        {#if !sidebarShown}
+          <!-- The sidebar's own toggle is gone with it: bring it back from here. -->
+          <button class="btn btn-ghost btn-sm btn-square -ml-2 shrink-0 text-base-content/60" aria-label={t("sidebar.show")} title={t("sidebar.show")} onclick={toggleSidebar}>
+            <Icon name="panelLeft" size={17} />
+          </button>
+        {/if}
+        <!-- Name and save state on one line; the mark sits between cap and x-height centre, so it looks level with any name. -->
+        <div class="flex min-w-0 items-center gap-2" data-tauri-drag-region>
+        {#if accountView.active}
+          <!-- Results across scripts: the account is the subject. -->
+          <h1 class="flex min-w-0 items-center gap-1.5 text-[0.95rem] font-semibold" data-tauri-drag-region>
+            <Icon name="server" size={15} class="shrink-0 text-base-content/60" /><span class="truncate" data-tauri-drag-region>{accountLabel}</span>
+            <span class="truncate font-normal text-base-content/65" data-tauri-drag-region>
+              {accountView.kind === "dest" ? t("scope.headerDest") : accountView.kind === "flow" ? t("scope.headerFlow") : t("scope.headerSearch")}
             </span>
-          </div>
-          <div class="-ml-1 flex items-center gap-0.5 text-sm text-base-content/75">
-            <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
-              <Icon name="undo" size={15} />
-            </button>
-            <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canRedo} onclick={() => editor.redo()} aria-label={t("editor.redo")} title="{t('editor.redo')} (⇧⌘Z)">
-              <Icon name="redo" size={15} />
-            </button>
-            <p class="ml-1 flex items-center gap-1.5 truncate" aria-live="polite">
-              {#if editor.dirty}<span class="size-1.5 rounded-full bg-warning"></span>{t("editor.unsaved")}{:else}{t("editor.saved")}{/if}
-            </p>
-          </div>
+          </h1>
+        {:else}
+          <h1 class="min-w-0 truncate text-[0.95rem] font-semibold" data-tauri-drag-region>{editor.name}</h1>
+        {/if}
+        <!-- Saved: a quiet check; changes: an amber dot that says so. -->
+        <p class="flex shrink-0 items-center gap-1.5 text-[0.8125rem] text-base-content/70" aria-live="polite" data-tauri-drag-region>
+          {#if accountView.active && (editor.dirty || editor.selected)}<span class="font-medium">„{editor.name}“</span>{/if}
+          {#if editor.dirty}
+            <span class="size-1.5 rounded-full bg-warning"></span>{t("editor.unsavedShort")}
+          {:else}
+            <!-- 12px: no taller than a capital. -->
+            <span class="-translate-y-[0.5px] text-base-content/50" title={t("editor.saved")}><Icon name="circleCheck" size={12} /></span><span class="sr-only">{t("editor.saved")}</span>
+          {/if}
+        </p>
         </div>
-        <div class="ml-auto flex items-center gap-1.5">
+        <span class="h-full min-w-4 grow" data-tauri-drag-region></span>
+        <!-- Undo and redo stay put, whatever opens or closes around them; a hairline sets them off from the panels. -->
+        <div class="flex shrink-0 items-center border-r border-base-300 pr-1.5 text-base-content/70">
+          <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
+            <Icon name="undo" size={16} />
+          </button>
+          <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canRedo} onclick={() => editor.redo()} aria-label={t("editor.redo")} title="{t('editor.redo')} (⇧⌘Z)">
+            <Icon name="redo" size={16} />
+          </button>
+        </div>
+        <div class="flex shrink-0 items-center gap-1">
           <button
-            class={["btn btn-ghost btn-sm gap-1.5", trial.open && "btn-active", trial.active && "text-success"]}
+            class={["btn btn-ghost btn-sm gap-1.5 font-medium", trial.open && "btn-active", trial.active && "text-success"]}
             aria-pressed={trial.open}
             title={t("trial.buttonTitle")}
             onclick={toggleTrial}
@@ -249,7 +245,7 @@
           </button>
           <button
             disabled={accountView.active}
-            class={["btn btn-ghost btn-sm gap-1.5", showCode && "btn-active"]}
+            class={["btn btn-ghost btn-sm gap-1.5 font-medium", showCode && "btn-active"]}
             aria-pressed={showCode}
             title={showCode ? t("editor.hideCode") : t("editor.showCode")}
             onclick={toggleCode}
@@ -257,7 +253,7 @@
             <Icon name="code" size={16} />
             <span class="max-xl:sr-only">{t("editor.code")}</span>
           </button>
-          <button class="btn btn-primary btn-sm gap-1.5" disabled={!editor.dirty || accountView.active} onclick={() => (deploying = true)} title="⌘S">
+          <button class="btn btn-primary btn-sm ml-1 gap-1.5" disabled={!editor.dirty} onclick={() => (deploying = true)} title="⌘S">
             <Icon name="save" size={15} />{t("editor.deploy")}
           </button>
         </div>
@@ -269,7 +265,13 @@
           {#if showCode}
             <div class="flex min-h-0 grow flex-col gap-2 p-3">{@render codePanel(editor.code)}</div>
           {:else if editor.selected}
-            <Inspector {editor} extensions={session.extensions} serverFolders={serverFolders} onback={() => backToRoute(editor)} />
+            <Inspector
+              {editor}
+              extensions={session.extensions}
+              serverFolders={serverFolders}
+              backToList={routeNav.accountId === editor.accountId && (!!routeNav.target || routeNav.view === "dest" || (!!routeNav.query.trim() && routeNav.scope !== "script"))}
+              onback={() => backToRoute(editor)}
+            />
           {:else}
             <TrialPanel {editor} {delimiter} keywords={session.keywordNames(editor.accountId)} onback={() => (trial.open = false)} />
           {/if}
@@ -316,11 +318,9 @@
         </div>
       {/if}
     {:else if session.rootView && session.rootSources[session.rootView] !== undefined}
-      <header class="border-b border-base-300 bg-base-100 px-6 py-3">
-        <h1 class="flex items-center gap-2 truncate text-[1.35rem] font-semibold">
-          <Icon name="lock" size={17} />{ROOT_SCRIPT}
-        </h1>
-        <p class="text-sm text-base-content/60">{t("root.viewHint")}</p>
+      <header class="flex h-13 shrink-0 items-center gap-2 bg-base-100 px-5 shadow-[inset_0_-1px_0_var(--color-base-300)]" data-tauri-drag-region>
+        <h1 class="flex shrink-0 items-center gap-1.5 text-[0.95rem] font-semibold" data-tauri-drag-region><Icon name="lock" size={15} />{ROOT_SCRIPT}</h1>
+        <p class="min-w-0 truncate text-[0.8125rem] text-base-content/65" data-tauri-drag-region>{t("root.viewHint")}</p>
       </header>
       <section class="flex min-h-0 grow flex-col p-4" aria-label={ROOT_SCRIPT}>
         <div class="min-h-0 overflow-auto rounded-box border border-base-300 bg-base-100">
@@ -328,7 +328,9 @@
         </div>
       </section>
     {:else}
-      <div class="grid h-full place-items-center p-8">
+      <!-- No bar here, but the top still moves the window. -->
+      <div class="h-13 shrink-0" data-tauri-drag-region></div>
+      <div class="grid min-h-0 grow place-items-center p-8 pt-0">
         {#if session.loadingScript}
           <p class="flex items-center gap-2 text-base-content/70"><span class="loading loading-spinner"></span>{t("editor.loading")}</p>
         {:else}

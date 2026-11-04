@@ -169,6 +169,53 @@ body {
   }
 }
 
+/* macOS: the window controls sit over the top-left corner of the bar
+   (titleBarStyle "Overlay"); whatever starts the bar there leaves them room. */
+.mac-titlebar .traffic-inset {
+  /* The controls end ~76px in (x 18, 12px each, 23px apart): clear of them by 8px plus a button's own margin. */
+  padding-left: 92px;
+}
+/* The sidebar's top row starts its account icons 24px after the controls (they end at ~76px). */
+.mac-titlebar .sidebar-top {
+  padding-left: 96px;
+}
+.fake-lights body::before {
+  content: "";
+  position: fixed;
+  z-index: 100;
+  top: 20px;
+  left: 19px;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #ff5f57;
+  box-shadow:
+    23px 0 0 #febc2e,
+    46px 0 0 #28c840;
+  pointer-events: none;
+}
+
+/* An account as an icon: its initials on a tint of its own hue (--h). */
+.account-icon {
+  background: oklch(0.62 0.12 var(--h) / 0.2);
+  color: oklch(0.45 0.13 var(--h));
+}
+@media (prefers-color-scheme: dark) {
+  .account-icon {
+    background: oklch(0.62 0.12 var(--h) / 0.26);
+    color: oklch(0.84 0.09 var(--h));
+  }
+}
+
+/* A number in a round or square badge: the line trimmed to the height of the
+   digits, so they sit in the middle instead of on the font's line box. */
+.badge-num {
+  display: block;
+  line-height: 1;
+  text-box: trim-both cap alphabetic;
+  font-variant-numeric: tabular-nums;
+}
+
 /* A row of the route: what is tested, and what happens in a column of the
    same width on every row and depth, so destinations line up. */
 .route-sheet {

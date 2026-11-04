@@ -8,6 +8,7 @@
   import { isKeyword } from "../keywords";
   import { session } from "../session.svelte";
   import Icon from "./Icon.svelte";
+  import FolderPicker from "./FolderPicker.svelte";
   import { flagFromText, flagName, labelHue, SYSTEM_FLAG_LIST } from "../rules/route";
 
   let {
@@ -73,21 +74,13 @@
     {@const label = mailboxLabel(action.mailbox)}
     {@const missing = folders.existing !== null && label !== "" && !folderExists(folders.existing, label)}
     <div class="grow min-w-48">
-      <label class={["input input-sm w-full", missing && "input-warning"]}>
-      <Icon name="folder" size={15} class="text-primary" />
-      <input
-        class="grow"
-        aria-label={t("action.folder")}
-        aria-describedby={missing ? `${folderListId}-missing` : undefined}
-        placeholder={t("action.folder")}
-        list={folderListId}
+      <FolderPicker
         value={label}
-        oninput={(e) => onchange({ ...action, mailbox: mailboxRaw(e.currentTarget.value, folders.encoding) }, true)}
+        {folders}
+        {missing}
+        describedby={missing ? `${folderListId}-missing` : undefined}
+        onpick={(name) => onchange({ ...action, mailbox: mailboxRaw(name, folders.encoding) }, false)}
       />
-      </label>
-      <datalist id={folderListId}>
-        {#each folders.labels as folder}<option value={folder}></option>{/each}
-      </datalist>
       {#if missing}
         <div id="{folderListId}-missing" class="mt-1 grid gap-1 text-[0.8rem]">
           <p class="justify-self-start rounded-field border border-warning/40 bg-warning/10 px-2 py-0.5">{t("action.folderMissing")}</p>

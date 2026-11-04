@@ -189,6 +189,9 @@ export function installMock() {
       case "get_script":
         return source(server, a.name) ?? "";
       case "import_rules_single_folder":
+      case "script_content":
+        // Rough stand-in: without comments and blank lines.
+        return (a.source as string).split("\n").map((l) => l.replace(/#.*$/, "").trim()).filter(Boolean).join("\n");
       case "import_rules": {
         const hit = allFixtures.find((s) => s.source === a.source)?.rules ?? generated.get(a.source);
         return hit ? structuredClone(hit) : { preamble: null, requires: [], singleFolder: false, items: [] };

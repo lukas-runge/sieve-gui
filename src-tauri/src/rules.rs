@@ -7,6 +7,14 @@ use sieve_core::PrintOptions;
 
 use crate::error::AppResult;
 
+/// What the script does, without comments, layout and equal spellings (see
+/// `sieve_core::content`), to show only the changes that matter; `None` if
+/// it doesn't parse.
+#[tauri::command]
+pub fn script_content(source: String) -> Option<String> {
+    sieve_core::content(&source)
+}
+
 /// Parses a script into rule cards.
 #[tauri::command]
 pub fn import_rules(source: String) -> AppResult<RuleSet> {

@@ -22,12 +22,15 @@
     extensions,
     serverFolders,
     onback,
+    backToList = false,
   }: {
     editor: ScriptEditor;
     extensions: string[];
     serverFolders: Folder[] | null;
     /** In narrow windows the inspector replaces the route: back to it. */
     onback?: () => void;
+    /** The rule was opened from a list (search, folder, label): back leads there. */
+    backToList?: boolean;
   } = $props();
 
   // Case summaries read like the route.
@@ -115,8 +118,8 @@
   <aside class="flex h-full min-w-0 flex-col border-l border-base-300 bg-base-100" aria-label={t("inspector.label")} data-inspector>
     <header class="flex items-start gap-2 border-b border-base-300 px-4 pt-3 pb-2.5">
       {#if onback}
-        <button class="btn btn-ghost btn-sm -ml-1.5 gap-1" title={t("inspector.back")} onclick={onback}>
-          <Icon name="arrowLeft" size={16} />{t("inspector.backShort")}
+        <button class="btn btn-ghost btn-sm -ml-1.5 gap-1" title={backToList ? t("inspector.backList") : t("inspector.back")} onclick={onback}>
+          <Icon name="arrowLeft" size={16} />{backToList ? t("inspector.backListShort") : t("inspector.backShort")}
         </button>
       {/if}
       <div class="min-w-0 grow">

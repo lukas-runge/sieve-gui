@@ -13,16 +13,16 @@
     scripts,
     delimiter,
     keywords,
+    onadd,
     onpick,
-    ontest,
   }: {
     /** The running scripts, in order. */
     scripts: { name: string; items: RuleItem[] }[];
     delimiter: string | null;
     keywords: Record<string, string>;
+    /** Adds a rule that files into the folder, to the open script. */
+    onadd?: (target: Target & { text: string; folder: boolean }) => void;
     onpick: (target: Target & { text: string; folder: boolean }) => void;
-    /** Opens the test, to see where a message really ends up. */
-    ontest?: () => void;
   } = $props();
 
   interface Folder {
@@ -95,8 +95,9 @@
         ><Icon name={closed.has(f.raw) ? "chevronRight" : "chevronDown"} size={13} /></button
       >
     {/if}
+    <div class="group/row flex items-center gap-1">
     <button
-      class="flex w-full items-center gap-2 rounded-field py-1 pr-2 text-left hover:bg-base-200"
+      class="flex min-w-0 grow items-center gap-2 rounded-field py-1 pr-2 text-left hover:bg-base-200"
       style="padding-left: {0.5 + depth * 1.25}rem"
       title={t("target.title", { name: f.path.join(" / ") })}
       onclick={() => onpick({ kind: "folder", key: f.raw, subfolders: f.rules.size === 0, text: f.path.join(" / "), folder: true })}
@@ -105,9 +106,19 @@
       <span class={["truncate", f.rules.size ? "font-semibold" : "text-base-content/75"]}>{f.name}</span>
       <span class="h-px grow"></span>
       <span class="shrink-0 text-[0.8125rem] text-base-content/70">
-        {#if f.rules.size}{t("dest.direct", { rules: count(f.rules.size) })}{/if}{#if f.rules.size && f.all.size > f.rules.size} · {/if}{#if f.all.size > f.rules.size}{t("dest.below", { count: f.all.size - f.rules.size })}{/if}
+        {[f.rules.size ? t("dest.direct", { rules: count(f.rules.size) }) : "", f.all.size > f.rules.size ? t("dest.below", { count: f.all.size - f.rules.size }) : ""].filter(Boolean).join(" · ")}
       </span>
     </button>
+    {#if onadd}
+      <!-- Thinking by destination: a new rule for this folder, right here. -->
+      <button
+        class="grid size-7 shrink-0 place-items-center rounded-field text-base-content/70 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 hover:bg-base-200 hover:text-base-content"
+        aria-label={t("dest.addFor", { name: f.path.join(" / ") })}
+        title={t("dest.addFor", { name: f.path.join(" / ") })}
+        onclick={() => onadd({ kind: "folder", key: f.raw, subfolders: false, text: f.path.join(" / "), folder: true })}><Icon name="plus" size={15} /></button
+      >
+    {/if}
+    </div>
     {#if f.children.size && !closed.has(f.raw)}
       <ul>
         {#each sorted(f) as child (child.name)}{@render folder(child, depth + 1)}{/each}
@@ -117,13 +128,6 @@
 {/snippet}
 
 <div class="grid gap-5 py-4 pr-3 pl-6">
-  <div class="grid gap-1.5 px-1">
-    <p class="text-sm text-base-content/75">{t("dest.intro", { count: scripts.length })}</p>
-    <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] text-base-content/70">
-      <Icon name="info" size={14} class="text-primary" />{t("dest.notFinal")}
-      {#if ontest}<button class="btn btn-xs btn-soft gap-1" onclick={ontest}><Icon name="flask" size={13} />{t("dest.test")}</button>{/if}
-    </p>
-  </div>
   {#if tree.labels.length}
     <section aria-label={t("dest.labels")}>
       <h3 class="mb-2 px-1 text-[0.8125rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.labels")}</h3>
@@ -147,8 +151,9 @@
     <h3 class="mb-1 px-1 text-[0.8125rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.folders")}</h3>
     <ul class="grid">
       {#each sorted(tree.root) as f (f.name)}{@render folder(f, 0)}{/each}
-      <li class="flex items-center gap-2 py-1 pr-2 pl-2 text-base-content/70">
-        <Icon name="inbox" size={15} />{t("dest.inbox")}
+      <!-- Right edge in line with the counts above (which leave room for their "+"). -->
+      <li class={["flex items-center gap-2 py-1 pl-2 text-base-content/70", onadd ? "pr-10" : "pr-2"]} title={t("dest.inbox")}>
+        <Icon name="inbox" size={15} />{t("dest.inboxShort")}<span class="h-px grow"></span><span class="text-[0.8125rem]">{t("dest.inboxRest")}</span>
       </li>
     </ul>
   </section>

@@ -8,7 +8,7 @@
   import { t } from "../../i18n.svelte";
   import type { Branches } from "../../rules/view";
   import { folds, toggleFold } from "../../folds.svelte";
-  import { blockOutcomes, caseMatches, cases, nestedOutcomes, possibleHeading, unreachable, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
+  import { blockOutcomes, caseMatches, cases, unreachable, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
   import Conditions from "./Conditions.svelte";
   import { SvelteSet } from "svelte/reactivity";
   import Icon from "../Icon.svelte";
@@ -25,6 +25,7 @@
     words = [],
     picked = null,
     hideParent = false,
+    section = null,
     trial = null,
     filter = null,
     compact = false,
@@ -44,6 +45,8 @@
     picked?: CasePath | null;
     /** The folder path is shown once above a run of rules filing into the same parent. */
     hideParent?: boolean;
+    /** The folder of the section the rule sits in (see `hideParent`). */
+    section?: string | null;
     /** A sample message's way: the cases that applied to it. */
     trial?: { hits: CasePath[]; misses: CasePath[]; reached: boolean } | null;
     /** Only cases this accepts are shown at full strength (e.g. those filing into a folder). */
@@ -106,11 +109,11 @@
       <!-- Applies to the test message: the number stays, on green. -->
       <span
         class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full bg-success px-[0.3rem] text-[0.8125rem] font-bold text-success-content"
-        title={t("trial.applies")}><span class="flex items-center gap-0.5"><Icon name="check" size={12} />{#if num}{num}{/if}</span></span
+        title={t("trial.applies")}><span class="flex items-center gap-0.5"><Icon name="check" size={12} />{#if num}<span class="badge-num">{num}</span>{/if}</span></span
       >
     {:else if num}
       <span class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full border-2 px-[0.3rem] text-[0.8125rem] font-bold" style="border-color: var(--rail)"
-        >{num}</span
+        ><span class="badge-num">{num}</span></span
       >
     {/if}
     <span class="text-[0.875rem] font-semibold whitespace-nowrap">
@@ -184,16 +187,8 @@
         <Icon name="chevronDown" size={14} class="mt-0.5 shrink-0" />{inner > 1 ? t("route.thenCases", { count: inner }) : t("route.thenCheck")}
       </span>
     {:else}
-      <span class="grid gap-0.5">
-        <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
-        {#if c.nested.length}
-          <!-- What the added check may add on top. -->
-          <span class="flex flex-wrap items-center gap-x-1.5 text-[0.8125rem] text-base-content/75">
-            <span class="font-medium">{t("route.maybeAlso")}</span>
-            <Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} />
-          </span>
-        {/if}
-      </span>
+      <!-- What an added check may add on top is in its box right below, not repeated here. -->
+      <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
     {/if}
   </button>
 {/snippet}
@@ -229,8 +224,8 @@
                   }}><Icon name={folded ? "chevronRight" : "chevronDown"} size={14} /></button
                 >
               {/if}
-              <span>
-                {#if !decides}<span class="mr-1 inline-grid size-4 place-items-center rounded-full text-[0.75rem] font-bold text-base-100" style="background: {color}" aria-hidden="true">+</span>{/if}
+              <span class="pt-0.5">
+                {#if !decides}<span class="mr-1 inline-grid size-4 place-items-center rounded-full align-[-0.2em] text-base-100" style="background: {color}" aria-hidden="true"><Icon name="plus" size={11} class="[stroke-width:3]" /></span>{/if}
                 <span class="font-semibold" style="color: {color}">
                   {#if decides}{own ? t("route.chainIn", { n: own }) : t("route.chain")}{:else if own}{t("route.extraIn", { n: own })}{:else if c.kind === "else"}{t(
                       "route.extraInOtherwise",
@@ -323,7 +318,7 @@
         {#if rule.name}<span class="font-semibold"><Mark text={rule.name} {words} /></span>{/if}
         <Conditions shape={conditionShape(rule.conditions, false, picked === "" ? Infinity : 3)} {words} />
       </span>
-      <Outcomes items={outcomes(rule.actions, keywords, delimiter)} stop={stops(rule.actions)} {singleFolder} {next} {words} {hideParent} {ontarget} />
+      <Outcomes items={outcomes(rule.actions, keywords, delimiter)} stop={stops(rule.actions)} {singleFolder} {next} {words} {hideParent} {section} {ontarget} />
     </span>
   </button>
 {:else}

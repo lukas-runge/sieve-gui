@@ -5,7 +5,9 @@
   // a square for code sieve-gui shows as written. Clicking a rule opens it in
   // the inspector.
   import { flip } from "svelte/animate";
-  import type { Action, RuleItem } from "#tauri/types";
+  import { folds, toggleFold } from "../../folds.svelte";
+  import { untrack } from "svelte";
+  import type { Action, RuleItem, RuleSet } from "#tauri/types";
   import { session } from "../../session.svelte";
   import type { ScriptEditor } from "../../editor.svelte";
   import { uid, type EditorItem } from "../../editor.svelte";
@@ -16,7 +18,7 @@
   import { caseGoesTo, caseMatches, cases, type Outcome } from "../../rules/route";
   import type { ScriptRun } from "../../rules/simulate";
   import { trial as sample } from "../../trial.svelte";
-  import { accountView } from "../../scope.svelte";
+  import { accountView, flowView, routeNav, type ShownTarget } from "../../scope.svelte";
   import { newRule } from "../../rules/view";
   import { addresses } from "../../rules/simulate";
   import { templateRule, type TemplateKind } from "../../rules/templates";
@@ -64,7 +66,9 @@
     };
   }
 
-  let query = $state("");
+  // Picked up where it was left, if it was this account.
+  const resume = untrack(() => routeNav.accountId === editor.accountId);
+  let query = $state(resume ? routeNav.query : "");
   const words = $derived(queryWords(query));
   /** While searching, only matching items show and the order can't change. */
   const searching = $derived(words.length > 0);
@@ -75,14 +79,30 @@
    * shows once above them ("Accounts / Travel"), each row only the last folder.
    */
   const groups = $derived.by(() => {
-    const parents = editor.rules.items.map((item) => {
+    /** Where each simple rule files: the folder and its parent ("Accounts / Shop", "Accounts"). */
+    const targets = editor.rules.items.map((item) => {
       if (searching || item.type !== "rule" || !isSimple(item)) return null;
       const moves = outcomes(item.actions, {}, delimiter).filter((o) => o.kind === "move");
-      return moves.length === 1 && moves[0].path.length > 1 ? moves[0].path.slice(0, -1).join(" / ") : null;
+      if (moves.length !== 1 || moves[0].path.length < 1) return null;
+      const path = moves[0].path;
+      return { folder: path.join(" / "), parent: path.length > 1 ? path.slice(0, -1).join(" / ") : null };
+    });
+    // A rule joins the section of the folder it files into: by its parent,
+    // or by the folder itself when the rules next to it file below that folder
+    // ("online shops → Versand" right before "Amazon → Versand / Amazon").
+    const parents = targets.map((t, i) => {
+      if (!t) return null;
+      if (targets[i + 1]?.parent === t.folder || targets[i - 1]?.parent === t.folder) return t.folder;
+      return t.parent;
     });
     const head: (string | null)[] = parents.map(() => null);
     const size: number[] = parents.map(() => 0);
     const grouped: boolean[] = parents.map(() => false);
+    /** For a rule in a run: where the run starts. */
+    const start: number[] = parents.map(() => -1);
+    /** For the start of a run: what it folds under (the folder, and which run of it). */
+    const key: string[] = parents.map(() => "");
+    const seen = new Map<string, number>();
     for (let i = 0; i < parents.length; ) {
       let j = i;
       while (parents[i] && parents[j + 1] === parents[i]) j++;
@@ -90,34 +110,51 @@
         head[i] = parents[i];
         size[i] = j - i + 1;
         grouped.fill(true, i, j + 1);
+        start.fill(i, i, j + 1);
+        const n = seen.get(parents[i]!) ?? 0;
+        seen.set(parents[i]!, n + 1);
+        key[i] = `group|${editor.accountId}|${editor.name}|${parents[i]}|${n}`;
       }
       i = j + 1;
     }
     // A rule right after a run, outside it: the section visibly ends.
     const ends = parents.map((_, i) => i > 0 && grouped[i - 1] && !grouped[i]);
-    return { head, grouped, size, ends };
+    return { head, grouped, size, ends, start, key };
   });
+  /**
+   * Runs folded to their heading. One opens again on its own while a rule in
+   * it is open in the inspector or applies to the test message.
+   */
+  function groupFolded(at: number): boolean {
+    const key = groups.key[at];
+    if (!key || !folds.has(key)) return false;
+    for (let i = at; i < at + groups.size[at]; i++) {
+      if (editor.rules.items[i]?.uid === editor.selected || trialAt(i)?.hits.length) return false;
+    }
+    return true;
+  }
+  /** The last folders of a folded run: what it files into, in a line. */
+  function groupTargets(at: number): string[] {
+    return editor.rules.items.slice(at, at + groups.size[at]).flatMap((item) => {
+      if (item.type !== "rule") return [];
+      const move = outcomes(item.actions, {}, delimiter).find((o) => o.kind === "move");
+      return move ? [move.path.at(-1) ?? move.text] : [];
+    });
+  }
+
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
 
+  /** The running script before this one: where its mail comes from. */
+  const prev = $derived(running ? (order[order.indexOf(editor.name) - 1] ?? null) : null);
+
   const accountLabel = $derived(session.accounts.find((a) => a.id === editor.accountId)?.label ?? "");
 
-  let why = $state(false);
-  /** The provisional note, once read, can be put away for good. */
-  let whyDismissed = $state(localStorage.getItem("whyDismissed") === "1");
-  /** Whether a script running after this one moves mail too (so folders here are provisional). */
-  const laterMoves = $derived.by(() => {
-    const i = order.indexOf(editor.name);
-    if (i < 0 || !others) return false;
-    const moves = (actions: Action[]): boolean =>
-      actions.some((a) => (a.type === "fileInto" && !a.copy) || (a.type === "if" && [a.actions, ...a.elsif.map((e) => e.actions), a.otherwise ?? []].some(moves)));
-    return order
-      .slice(i + 1)
-      .some((n) => others?.find((o) => o.name === n)?.rules.items.some((it) => it.type === "rule" && it.enabled && [it.actions, ...it.elsif.map((e) => e.actions), it.otherwise ?? []].some(moves)));
-  });
-
   /** The route, or where mail goes ("destinations"). */
-  let view = $state<"route" | "dest">("route");
+  // The user's choice, kept across scripts and sessions: thinking along the
+  // route, or by destination.
+  let view = $state<"route" | "dest">(localStorage.getItem("routeView") === "dest" ? "dest" : "route");
+  $effect(() => localStorage.setItem("routeView", view));
   /** The running scripts with their rules, the open one with its edits. */
   const runningScripts = $derived(
     order.length
@@ -125,21 +162,44 @@
       : [{ name: editor.name, items: editor.rules.items }],
   );
 
+
   /** Search this script, or every script of the account. */
   // "Where do mails from X go?" spans scripts, so searching starts there.
-  let scope = $state<"running" | "all" | "script">("running");
+  let scope = $state<"running" | "all" | "script">(resume ? routeNav.scope : "running");
   /** A folder or label clicked on the route: everything that goes there, in every script. */
-  let target = $state<(Target & { text: string; folder: boolean }) | null>(null);
-  let others = $state<{ name: string; rules: { items: RuleItem[] } }[] | null>(null);
-  let withInactive = $state(false);
+  let target = $state<ShownTarget | null>(resume ? routeNav.target : null);
+  let others = $state<{ name: string; rules: RuleSet }[] | null>(null);
+  let withInactive = $state(resume ? routeNav.withInactive : false);
+  /**
+   * The route, destinations and folder lists cover the open script, or every
+   * running one ("Alle laufenden Skripte" in the sidebar).
+   */
+  const wide = $derived(flowView.account === editor.accountId && order.length > 1);
+  /**
+   * The whole flow on the route: every running script in order, the open one
+   * editable, the others to read and open. Only for a script that runs.
+   */
+  const flowRoute = $derived(wide && running && order.includes(editor.name));
+  const flow = $derived(
+    order.map((name, i) => ({
+      name,
+      n: i + 1,
+      next: order[i + 1] ?? null,
+      rules: name === editor.name ? editor.rules : (others?.find((o) => o.name === name)?.rules ?? null),
+    })),
+  );
+  const flowAt = $derived(order.indexOf(editor.name));
+  $effect(() => {
+    Object.assign(routeNav, { accountId: editor.accountId, view, target, query, scope, withInactive });
+  });
   /** Scripts that don't run but would file there too. */
   const inactiveTargets = $derived.by(() => {
-    if (!target || withInactive || !others) return 0;
+    if (!target || !wide || withInactive || !others) return 0;
     const t = target;
     return others.filter((o) => !session.runs(editor.accountId, o.name) && o.rules.items.some((item) => goesTo(item, t))).length;
   });
   $effect(() => {
-    if (!searching && !target && view !== "dest" && !next) return;
+    if (!searching && !target && view !== "dest" && !next && !wide) return;
     const id = editor.accountId;
     void session.allRules(id).then((list) => {
       if (editor.accountId === id) others = list;
@@ -158,7 +218,9 @@
       })
       .filter((r) => r.hits.length > 0)
       // Where mail actually goes: what runs, unless asked for more.
-      .filter((r) => (target ? withInactive : scope === "all") || session.runs(editor.accountId, r.name));
+      .filter((r) =>
+        target && !wide ? r.name === editor.name : (target ? withInactive : scope === "all") || session.runs(editor.accountId, r.name),
+      );
   });
   /** Showing matches of all scripts instead of the route. */
   const listing = $derived(!!target || (scope !== "script" && searching));
@@ -205,50 +267,74 @@
 
   // Account-wide results: the page header says so instead of the script's name.
   $effect(() => {
-    accountView.active = listing || view === "dest";
-    accountView.kind = view === "dest" && !target ? "dest" : "search";
+    accountView.active = wide || (searching && scope !== "script" && !target);
+    accountView.kind = searching && !target && scope !== "script" ? "search" : view === "dest" || target ? "dest" : "flow";
     return () => (accountView.active = false);
   });
 
-  // Another script opened: start over.
+  // Another script opened: start over, unless it was opened from a result,
+  // whose list stays in view.
   let shownFor: string | null = null;
+  let keepList = false;
   $effect(() => {
     const name = editor.name;
-    if (shownFor !== null && name !== shownFor) {
+    if (shownFor !== null && name !== shownFor && !keepList) {
       target = null;
       query = "";
       scope = "running";
     }
+    keepList = false;
     shownFor = name;
   });
 
   function showTarget(o: Outcome) {
-    view = "route";
     if (!o.target) return;
     withInactive = false;
     target = { ...o.target, text: o.kind === "move" || o.kind === "copy" ? o.path.join(" / ") : o.text, folder: o.target.kind === "folder" };
     query = "";
   }
 
-  /** Opens a match: in this script right away, in another one after leaving this. */
+  /**
+   * Opens a match in the inspector; the list stays. A match in another script
+   * opens that script (after leaving this one) for the inspector to edit it.
+   */
   async function openMatch(name: string, index: number, path: string) {
     if (name === editor.name) {
-      scope = "script";
-      target = null;
       const item = editor.rules.items[index];
       if (item) pick(item.uid, path);
       return;
     }
     if (!(await session.confirmLeave())) return;
+    keepList = true;
     await session.openScript(editor.accountId, name);
     const next = session.editor;
     const item = next?.rules.items[index];
     if (next && item) {
       next.selected = item.uid;
       next.focus = path;
+    } else keepList = false;
+  }
+
+  /** Leaves the flow for one script alone. */
+  function openAlone(name: string) {
+    if (name === editor.name) flowView.account = null;
+    else {
+      flowView.account = null;
+      onopen?.(name);
     }
-    scope = "script";
+  }
+
+  /** The list's way back: to the view it was opened from ("Ziele" or the route). */
+  function back() {
     target = null;
+    query = "";
+  }
+
+  /** A new rule that files into the folder (or sets the label), in the open script. */
+  function addFor(tg: ShownTarget) {
+    const rule = newRule(t("rule.new"));
+    rule.actions = [tg.folder ? { type: "fileInto", mailbox: tg.key, copy: false, create: false, flags: null } : { type: "flags", op: "add", flags: [tg.key] }];
+    insert({ type: "rule", ...rule, uid: uid() }, true);
   }
 
   function move(from: number, to: number) {
@@ -286,7 +372,7 @@
   }
 
   /** New items go after the picked rule (after its folder section), or at the end. */
-  function insert(item: EditorItem) {
+  function insert(item: EditorItem, keepTarget = false) {
     editor.focus = "";
     let at = editor.rules.items.findIndex((i) => i.uid === editor.selected);
     while (at >= 0 && groups.grouped[at + 1] && !groups.head[at + 1]) at++;
@@ -294,7 +380,7 @@
       rules.items.splice(at >= 0 ? at + 1 : rules.items.length, 0, item);
     });
     query = "";
-    target = null;
+    if (!keepTarget) target = null;
     editor.selected = item.uid;
     fresh = item.uid;
     // Straight to the first thing to fill in.
@@ -350,27 +436,79 @@
   }
 </script>
 
+<!-- A running script to go to: its number in the run order and its name. -->
+{#snippet scriptPill(name: string, back: boolean)}
+  <button
+    class={["inline-flex h-6 items-center gap-1.5 rounded-full bg-base-content/[0.06] font-medium text-base-content/85 hover:bg-base-content/12", back ? "pr-2.5 pl-1.5" : "pr-1.5 pl-[3px]"]}
+    onclick={() => onopen?.(name)}
+  >
+    {#if back}<Icon name="chevronLeft" size={14} class="-mr-0.5 text-base-content/60" />{/if}
+    <span class="grid size-[1.125rem] place-items-center rounded-full bg-base-content/12 text-[0.75rem] font-semibold"><span class="badge-num">{order.indexOf(name) + 1}</span></span>{name}
+    {#if !back}<Icon name="chevronRight" size={14} class="-ml-0.5 text-base-content/60" />{/if}
+  </button>
+{/snippet}
+
+<!-- The whole flow: where a script starts on the line. -->
+{#snippet flowHead(s: { name: string; n: number; rules: RuleSet | null })}
+  <li class="route-item scroll-mt-14 pt-4 pb-1" data-flow={s.name}>
+    <span></span>
+    <span class="route-node grid place-items-center pt-0.5">
+      <span class="grid size-[1.25rem] place-items-center rounded-full bg-base-300 text-[0.75rem] font-bold text-base-content"><span class="badge-num">{s.n}</span></span>
+    </span>
+    <div class="flex min-w-0 items-center gap-2 px-2.5">
+      <span class="truncate font-semibold">{s.name}</span>
+      <!-- To this script alone (the sidebar shows it picked). -->
+      <button class="btn btn-ghost btn-xs shrink-0 gap-1 text-base-content/75" onclick={() => openAlone(s.name)}>{t("route.flowOpenScript")}<Icon name="chevronRight" size={13} /></button>
+      <span class="h-px grow bg-base-300"></span>
+      {#if s.rules}<span class="shrink-0 text-[0.8125rem] text-base-content/70">{s.rules.items.length === 1 ? t("search.hitOne") : t("search.hits", { count: s.rules.items.length })}</span>{/if}
+    </div>
+  </li>
+{/snippet}
+
+<!-- Another running script in the flow: its rules to read; picking one opens it there. -->
+{#snippet flowScript(s: { name: string; n: number; next: string | null; rules: RuleSet | null })}
+  {@render flowHead(s)}
+  {#if !s.rules}
+    <li class="route-item"><span></span><span></span><p class="px-2.5 py-2 text-sm text-base-content/70">{t("search.loading")}</p></li>
+  {:else}
+    {#each s.rules.items as item, index (index)}
+      {@const shape = item.type === "raw" ? "square" : cases(item).length === 1 ? "dot" : "diamond"}
+      <li class={["route-item group relative", item.type === "rule" && !item.enabled && "route-off"]}>
+        <span></span>
+        <span class="route-node grid place-items-center pt-[0.95rem]" title={t(`route.shape.${shape}`)}>
+          <span class="route-mark route-mark-{shape}"></span>
+        </span>
+        <div class="my-0.5 min-w-0 rounded-field px-2.5 py-2 hover:bg-base-200/50">
+          {#if item.type === "rule"}
+            <RouteRule
+              rule={item}
+              {delimiter}
+              {keywords}
+              singleFolder={s.rules.singleFolder}
+              {words}
+              id="{s.name}:{index}"
+              ontarget={showTarget}
+              next={s.next}
+              onpick={(path) => openMatch(s.name, index, path)}
+            />
+          {:else}
+            <button class="w-full rounded-field border border-dashed border-base-content/30 bg-base-200/60 px-2.5 py-1.5 text-left" onclick={() => openMatch(s.name, index, "")}>
+              <span class="flex items-center gap-1.5 font-semibold"><Icon name="code" size={14} />{t("raw.heading")}</span>
+              <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] leading-snug whitespace-pre-wrap text-base-content/75 [overflow-wrap:break-word]">{item.code.trim() || "…"}</pre>
+            </button>
+          {/if}
+        </div>
+      </li>
+    {:else}
+      <li class="route-item"><span></span><span></span><p class="px-2.5 py-2 text-sm text-base-content/70">{t("route.empty")}</p></li>
+    {/each}
+  {/if}
+{/snippet}
+
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions: arrow keys move between the rule buttons inside -->
 <section class="route-sheet rounded-box border border-base-300 bg-base-100" aria-label={t("route.heading")} bind:this={sheet} onkeydown={navigate}>
   <!-- Search: sticks to the top while the list scrolls. -->
-  <div class="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-t-box border-b border-base-300 bg-base-100 px-3 py-2">
-    <div class="join" role="group" aria-label={t("dest.view")}>
-      <button class={["btn btn-sm join-item gap-1.5", view === "route" ? "btn-active" : "btn-ghost"]} aria-pressed={view === "route"} onclick={() => (view = "route")}>
-        <Icon name="route" size={15} />{t("dest.route")}
-      </button>
-      <button
-        class={["btn btn-sm join-item gap-1.5", view === "dest" ? "btn-active" : "btn-ghost"]}
-        aria-pressed={view === "dest"}
-        title={t("dest.title")}
-        onclick={() => {
-          view = "dest";
-          target = null;
-          query = "";
-        }}
-      >
-        <Icon name="folder" size={15} />{t("dest.button")}
-      </button>
-    </div>
+  <div class="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-t-box border-b border-base-300 bg-base-100 p-3">
     {#if target}
       <div class="flex min-w-0 grow items-center gap-2 px-1.5 py-1 text-sm">
         <span class="whitespace-nowrap text-base-content/70">{target.folder ? t("target.headingFolder") : t("target.headingLabel")}</span>
@@ -385,14 +523,17 @@
             <input type="checkbox" class="checkbox checkbox-sm rounded" bind:checked={target.subfolders} />{t("target.subfolders")}
           </label>
         {/if}
-        <span class="whitespace-nowrap text-[0.8125rem] text-base-content/70" role="status">{withInactive
+        <span class="whitespace-nowrap text-[0.8125rem] text-base-content/70" role="status">{!wide
+            ? t(resultCount === 1 ? "target.countScriptOne" : "target.countScript", { count: resultCount })
+            : withInactive
             ? t(resultCount === 1 ? "search.hitOne" : "search.countAll", { count: resultCount })
             : t(resultCount === 1 ? "target.countOne" : "target.count", { count: resultCount })}{caseCount > resultCount
             ? " · " + t("search.cases", { count: caseCount })
             : ""}</span>
       </div>
     {:else}
-    <label class="flex min-w-64 grow basis-72 items-center gap-2 rounded-field px-1.5 py-1 focus-within:bg-base-200">
+    <!-- A tinted surface instead of a frame; typing lifts it and marks it. -->
+    <label class="flex h-8 min-w-44 grow basis-52 items-center gap-2 rounded-field bg-base-content/[0.07] px-2.5 transition-colors hover:bg-base-content/[0.09] focus-within:bg-base-100 focus-within:ring-2 focus-within:ring-primary/45">
       <Icon name="search" size={15} class="text-base-content/70" />
       <input
         id="rule-search"
@@ -424,9 +565,31 @@
         >
       {/each}
     </div>
+    <!-- How to look at the rules, next to adding one: along the route or by destination. -->
+    <!-- A segmented control: a tinted track, the picked choice raised on it. -->
+    <div class="ml-auto flex h-8 items-center rounded-field bg-base-content/[0.07] p-[3px]" role="group" aria-label={t("dest.view")}>
+      <button class={["seg", view === "route" && !target && "seg-on"]} aria-pressed={view === "route" && !target} onclick={() => {
+        view = "route";
+        target = null;
+      }}>
+        <Icon name="route" size={15} />{t("dest.route")}
+      </button>
+      <button
+        class={["seg", view === "dest" && "seg-on"]}
+        aria-pressed={view === "dest"}
+        title={t("dest.title")}
+        onclick={() => {
+          view = "dest";
+          target = null;
+          query = "";
+        }}
+      >
+        <Icon name="folder" size={15} />{t("dest.button")}
+      </button>
+    </div>
     <!-- While results span scripts, the search gets the room. -->
-    <div class={["join", (listing || view === "dest") && "hidden"]}>
-      <button class="btn btn-primary btn-sm join-item gap-1" onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
+    <div class={["join", listing && "hidden"]}>
+      <button class="btn btn-primary btn-sm join-item gap-1" title={wide ? t("target.addTitle", { name: editor.name }) : undefined} onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
       <div class="dropdown dropdown-end">
         <div tabindex="0" role="button" class="btn btn-primary btn-sm join-item border-l-primary-content/25 px-1.5" aria-label={t("route.moreAdd")}>
           <Icon name="chevronDown" size={15} />
@@ -470,8 +633,12 @@
     </div>
   {/if}
 
-  {#if view === "dest" && !target}
-    <Destinations scripts={runningScripts} {delimiter} {keywords} ontest={trialOpen ? undefined : onshowtrial} onpick={(tg) => {
+  {#if view === "dest" && !target && !searching}
+    <Destinations
+      scripts={wide ? runningScripts : [{ name: editor.name, items: editor.rules.items }]}
+      onadd={addFor}
+      {delimiter}
+      {keywords} onpick={(tg) => {
       withInactive = false;
       target = tg;
     }} />
@@ -480,19 +647,23 @@
     <div class="grid gap-4 px-3 py-3">
       <!-- Account-wide: said as a heading, so the script's title above doesn't suggest otherwise. -->
       <div class="flex flex-wrap items-baseline gap-x-2 border-b border-base-300 px-1 pb-2">
-        <button
-          class="btn btn-ghost btn-sm -ml-2 gap-1 self-center"
-          onclick={() => {
-            target = null;
-            query = "";
-            view = "route";
-          }}><Icon name="arrowLeft" size={15} />{t("scope.back", { name: editor.name })}</button
+        <button class="btn btn-ghost btn-sm -ml-2 gap-1 self-center" onclick={back}
+          ><Icon name="arrowLeft" size={15} />{view === "dest" ? t("scope.backDest") : t("scope.back", { name: editor.name })}</button
         >
-        <h2 class="flex items-center gap-1.5 font-semibold"><Icon name="server" size={15} class="text-base-content/70" />{t("scope.account", { account: accountLabel })}</h2>
-        <span class="text-[0.8125rem] text-base-content/75">
-          {(target ? !withInactive : scope === "running") ? t("scope.runningShort") : t("scope.allShort")}
-          {#if target}· {t("dest.notFinal")}{/if}
-        </span>
+        <!-- One script: the page header already names it. -->
+        {#if !(target && !wide)}
+          <h2 class="flex items-center gap-1.5 font-semibold"><Icon name="server" size={15} class="text-base-content/70" />{t("scope.account", { account: accountLabel })}</h2>
+        {/if}
+        {#if !target}
+          <!-- A search across scripts: say which ones. -->
+          <span class="text-[0.8125rem] text-base-content/75">{scope === "running" ? t("scope.runningShort") : t("scope.allShort")}</span>
+        {/if}
+        {#if target}
+          {@const tg = target}
+          <button class="btn btn-soft btn-primary btn-sm ml-auto gap-1 self-center" title={t("target.addTitle", { name: editor.name })} onclick={() => addFor(tg)}
+            ><Icon name="plus" size={15} />{tg.folder ? t("target.addFolder") : t("target.addLabel")}</button
+          >
+        {/if}
       </div>
       {#each results as r (r.name)}
         <section class="grid gap-1" aria-label={r.name}>
@@ -504,7 +675,9 @@
             <span class="font-normal text-base-content/70">{r.hits.length === 1 ? t("search.hitOne") : t("search.hits", { count: r.hits.length })}</span>
           </h3>
           {#each r.hits as hit (hit.index)}
-            <div class="rounded-field px-2.5 py-2 hover:bg-base-200/50">
+            {@const open = r.name === editor.name && editor.selected === editor.rules.items[hit.index]?.uid}
+            <!-- The rule open in the inspector is framed, like on the route. -->
+            <div class={["rounded-field px-2.5 py-2", open ? "ring-2 ring-primary/60" : "hover:bg-base-200/50"]}>
               {#if hit.item.type === "rule"}
                 <RouteRule
                   rule={hit.item}
@@ -514,6 +687,7 @@
                   {words}
                   filter={caseFilter}
                   compact
+                  picked={open ? editor.focus : null}
                   ontarget={showTarget}
                   onpick={(path) => openMatch(r.name, hit.index, path)}
                 />
@@ -542,66 +716,20 @@
     <li class="route-item text-[0.875rem] text-base-content/70">
       <span></span>
       <span class="route-node grid place-items-center"><Icon name="mail" size={15} /></span>
-      <span class="flex flex-wrap items-center gap-x-1.5 gap-y-1 py-2">
-        {#if order.length > 1}
-          <!-- Every mail passes the running scripts in this order. -->
-          <span>{t("route.entryOrder")}</span>
-          {#each order as name, i (name)}
-            {#if i > 0}<Icon name="chevronRight" size={13} class="text-base-content/45" />{/if}
-            {#if name === editor.name}
-              <span class="inline-flex items-center gap-1 rounded-full bg-primary/12 py-0.5 pr-2 pl-0.5 font-semibold text-primary" aria-current="step">
-                <span class="grid size-[1.1rem] place-items-center rounded bg-primary text-[0.75rem] text-primary-content">{i + 1}</span>{name}
-              </span>
-            {:else}
-              <button class="inline-flex items-center gap-1 rounded-full py-0.5 pr-2 pl-0.5 hover:bg-base-200" onclick={() => onopen?.(name)}>
-                <span class="grid size-[1.1rem] place-items-center rounded bg-base-content/10 text-[0.75rem] font-semibold">{i + 1}</span>{name}
-              </button>
-            {/if}
-          {/each}
+      <!-- Where the mail comes from: the script before (one click back), or the outside. -->
+      <!-- min-h-10 = py-2 + a 1.5rem line, with or without the pill: the icon is centred on that line. -->
+      <span class="flex min-h-10 flex-wrap items-center gap-x-1.5 gap-y-1 py-2">
+        {#if prev && !flowRoute}
+          {t("route.entryAfter")}{@render scriptPill(prev, true)}
         {:else}
           {t("route.entry")}
         {/if}
       </span>
     </li>
-    {#if running && next && laterMoves && !whyDismissed}
-      <!-- What's shown here isn't necessarily the end of the story. -->
-      <li class="route-item text-[0.8125rem] text-base-content/75">
-        <span></span><span></span>
-        <div class="-mt-1 mb-1 px-0.5">
-          <p class="flex flex-wrap items-center gap-x-1.5">
-            <Icon name="info" size={14} class="shrink-0 text-primary" />{t("route.provisionalShort")}
-            <button class="font-medium text-primary hover:underline" aria-expanded={why} onclick={() => (why = !why)}>{t("route.why")}</button>
-          </p>
-          {#if why}
-            <p class="mt-0.5 pl-5">
-              <button
-                class="float-right ml-2 text-[0.8125rem] text-base-content/70 hover:underline"
-                onclick={() => {
-                  whyDismissed = true;
-                  localStorage.setItem("whyDismissed", "1");
-                }}>{t("route.whyDismiss")}</button
-              >{editor.rules.singleFolder ? t("route.provisional", { name: next }) : t("route.provisionalMore", { name: next })}</p>
-          {/if}
-        </div>
-      </li>
+    {#if flowRoute}
+      {#each flow.slice(0, flowAt) as s (s.name)}{@render flowScript(s)}{/each}
+      {@render flowHead(flow[flowAt])}
     {/if}
-    <!-- What the right column means, once. -->
-    <li class="route-item pt-1" hidden={searching}>
-      <span></span><span></span>
-      <span class="route-row px-2.5 text-[0.75rem] font-semibold tracking-wide text-base-content/70 uppercase">
-        <span class="flex flex-wrap items-center gap-x-3">
-          {t("route.colIf")}
-          <!-- What the marks on the line mean. -->
-          <span class="flex items-center gap-2.5 font-normal tracking-normal normal-case">
-            <span class="flex items-center gap-1"><span class="route-mark route-mark-dot"></span>{t("route.legendRule")}</span>
-            <span class="flex items-center gap-1"><span class="route-mark route-mark-diamond scale-75"></span>{t("route.legendCases")}</span>
-            <span class="flex items-center gap-1"><span class="route-mark route-mark-square"></span>{t("route.legendCode")}</span>
-          </span>
-        </span>
-        <span>{t("route.colDoes")}</span>
-      </span>
-    </li>
-
     {#each editor.rules.items as item, index (item.uid)}
       {@const selected = editor.selected === item.uid}
       {@const shape = item.type === "raw" ? "square" : cases(item).length === 1 ? "dot" : "diamond"}
@@ -609,7 +737,7 @@
       <li
         data-uid={item.uid}
         animate:flip={{ duration: 150 }}
-        hidden={!shown[index]}
+        hidden={!shown[index] || (groups.start[index] >= 0 && groups.start[index] !== index && groupFolded(groups.start[index]))}
         class={[
           "route-item group relative",
           dragFrom === index && "opacity-40",
@@ -635,19 +763,38 @@
           </div>
         {/if}
         {#if groups.head[index]}
-          <!-- The folder a run of rules files into, once. -->
-          <!-- A section: the folder a run of rules files into, said once. -->
-          <div class="col-span-3 grid grid-cols-subgrid pt-3 pb-0.5">
+          <!-- A section: the folder a run of rules files into, said once. It
+               folds to a line of where they file, like a table of contents. -->
+          {@const folded = groupFolded(index)}
+          <!-- The toggle sits on the line, the heading flush with the rules;
+               the rules under it are indented one step, joined by a guide. -->
+          <div class="col-span-3 grid grid-cols-subgrid pt-3">
             <span></span>
-            <span class="route-node grid place-items-center"><span class="size-1.5 rounded-full bg-[var(--spine)]"></span></span>
-            <div class="flex items-center gap-2 px-2.5 text-[0.875rem]">
-              <span class="text-[0.8125rem] text-base-content/70">{t("route.groupHead")}</span>
-              <span class="font-semibold text-base-content/90" title={t("route.groupTitle")}>{groups.head[index]}</span>
-              <span class="h-px grow bg-base-300"></span>
-              <span class="pr-2 text-[0.8125rem] text-base-content/70">{t("route.groupCount", { count: groups.size[index] })}</span>
-            </div>
+            <button
+              class="group/head col-span-2 grid grid-cols-subgrid items-center text-left"
+              aria-expanded={!folded}
+              title={t("route.groupTitle")}
+              onclick={() => toggleFold(groups.key[index])}
+            >
+              <span class="route-node grid place-items-center">
+                <span class="grid size-5 place-items-center rounded-full border border-base-300 bg-base-100 text-base-content/75 group-hover/head:border-base-content/40 group-hover/head:text-base-content">
+                  <Icon name={folded ? "chevronRight" : "chevronDown"} size={13} />
+                </span>
+              </span>
+              <span class="flex min-w-0 items-center gap-2 rounded-field px-2.5 pt-1 pb-0.5 text-[0.875rem] group-hover/head:bg-base-200/70">
+                <Icon name="folder" size={15} class="shrink-0 text-base-content/70" />
+                <span class="shrink-0 font-semibold text-base-content/90">{groups.head[index]}</span>
+                {#if folded}
+                  <span class="min-w-0 truncate text-[0.8125rem] text-base-content/75">→ {groupTargets(index).join(", ")}</span>
+                {/if}
+                <span class="h-px min-w-4 grow bg-base-300"></span>
+                <span class="shrink-0 text-[0.8125rem] text-base-content/70">{t("route.groupCount", { count: groups.size[index] })}</span>
+              </span>
+            </button>
           </div>
         {/if}
+        <!-- Folded: the heading stands for the run, its first rule included. -->
+        {#if !(groups.head[index] && groupFolded(index))}
         {#if searching}
           <span></span>
         {:else}
@@ -667,9 +814,21 @@
             <Icon name="grip" size={14} />
           </button>
         {/if}
-        <span class="route-node grid place-items-center pt-[0.95rem]" title={t(`route.shape.${shape}`)}>
-          <span class="route-mark route-mark-{shape}" class:selected class:trial-hit={!!tr?.hits.length}></span>
-        </span>
+        {#if groups.grouped[index]}
+          <!-- In a folder section the main line passes by; the rule's mark sits on the section's branch. -->
+          <span></span>
+        {:else}
+          <span class="route-node grid place-items-center pt-[0.95rem]" title={t(`route.shape.${shape}`)}>
+            <span class="route-mark route-mark-{shape}" class:selected class:trial-hit={!!tr?.hits.length}></span>
+          </span>
+        {/if}
+        <!-- A folder section branches off the line at its folder: its rules hang on that branch. -->
+        <div class={["min-w-0", groups.grouped[index] && "group-branch", groups.grouped[index] && index === groups.start[index] && "first", groups.grouped[index] && index === groups.start[index] + groups.size[groups.start[index]] - 1 && "last"]}>
+          {#if groups.grouped[index]}
+            <span class="absolute top-[0.95rem] left-px z-[1] -translate-x-1/2" title={t(`route.shape.${shape}`)}>
+              <span class="route-mark route-mark-{shape}" class:selected class:trial-hit={!!tr?.hits.length}></span>
+            </span>
+          {/if}
         <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected && (!editor.focus || (item.type === "rule" && cases(item).length === 1)) ? "ring-2 ring-primary/60" : selected ? "ring-1 ring-primary/20" : "hover:bg-base-200/50"]}>
           <div class="min-w-0 grow rounded-field px-2.5 py-2">
             {#if item.type === "rule"}
@@ -681,6 +840,7 @@
                 {words}
                 picked={selected ? editor.focus : null}
                 hideParent={groups.grouped[index]}
+                section={groups.grouped[index] ? groups.head[groups.start[index]] : null}
                 id={item.uid}
                 ontarget={showTarget}
                 {next}
@@ -744,6 +904,8 @@
             </div>
           </div>
         </div>
+        </div>
+        {/if}
         {#if dropAt === index + 1 && index === editor.rules.items.length - 1 && dragFrom !== null}
           <div class="absolute right-2 -bottom-px left-8 z-10 h-0.5 rounded bg-primary"></div>
         {/if}
@@ -780,15 +942,18 @@
       </li>
     {/if}
 
+    {#if flowRoute}
+      {#each flow.slice(flowAt + 1) as s (s.name)}{@render flowScript(s)}{/each}
+    {/if}
+
     <!-- Where the mail goes when no rule kept it. -->
     <li class="route-item route-end text-[0.875rem] text-base-content/70" hidden={searching}>
       <span></span>
-      <span class="route-node grid place-items-center pt-0.5"><span class="route-mark route-mark-end"></span></span>
-      <span class="py-2">
-        {#if !running}{t("route.exitOff")}{:else if next}
-          <button class="inline-flex items-center gap-1.5 rounded-full bg-base-200 px-2.5 py-0.5 font-medium text-base-content/80 hover:bg-base-300" onclick={() => onopen?.(next)}>
-            {t("route.exitNext", { name: next })}<Icon name="chevronRight" size={14} />
-          </button>
+      <!-- The line ends level with the text (py-2, a 1.5rem line). -->
+      <span class="route-node grid place-items-center pt-[calc(1.25rem-1px)]"><span class="route-mark route-mark-end"></span></span>
+      <span class="flex min-h-6 items-center py-2 box-content">
+        {#if !running}{t("route.exitOff")}{:else if next && !flowRoute}
+          <span class="flex flex-wrap items-center gap-1.5">{t("route.exitThen")}{@render scriptPill(next, false)}</span>
         {:else}{t("route.exitInbox")}{/if}
       </span>
     </li>
@@ -798,6 +963,34 @@
 
 <style>
   /* The line every rule sits on: handle | line with the rule's mark | rule. */
+  .seg {
+    display: inline-flex;
+    height: 100%;
+    align-items: center;
+    gap: 0.375rem;
+    border-radius: calc(var(--radius-field) - 2px);
+    padding-inline: 0.625rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: color-mix(in oklab, var(--color-base-content) 72%, transparent);
+  }
+  /* Dark: the card colour would sink into the frame; a touch lighter stands out. */
+  @media (prefers-color-scheme: dark) {
+    .seg-on {
+      background: color-mix(in oklab, var(--color-base-content) 14%, var(--color-base-100)) !important;
+    }
+  }
+  .seg:hover {
+    color: var(--color-base-content);
+  }
+  .seg-on {
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    font-weight: 600;
+    box-shadow:
+      0 1px 2px rgb(0 0 0 / 0.14),
+      0 1px 1px rgb(0 0 0 / 0.06);
+  }
   .route-item {
     display: grid;
     grid-template-columns: 1.4rem 1.5rem minmax(0, 1fr);
@@ -807,9 +1000,36 @@
     content: "";
     position: absolute;
     top: 1.25rem;
-    bottom: 1.4rem;
+    /* Down to the end mark: list padding 0.25rem + half the last row (2.5rem). */
+    bottom: 1.5rem;
     left: calc(1.4rem + 0.75rem - 1px);
     border-left: 2px solid var(--spine);
+  }
+  /* The branch of a folder section: under the folder icon of its heading
+     (heading padding 0.625rem + half the 15px icon), ending at its last mark. */
+  .group-branch {
+    position: relative;
+    margin-left: calc(0.625rem + 7.5px - 1px);
+    padding-left: 0.85rem;
+  }
+  .group-branch::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-left: 2px solid var(--spine);
+  }
+  /* It starts right under the icon (which sits ~5px above the rule). */
+  .group-branch.first::before {
+    top: -5px;
+  }
+  .group-branch.last::before {
+    bottom: auto;
+    height: calc(0.95rem + 0.36rem);
+  }
+  .group-branch.first.last::before {
+    height: calc(0.95rem + 0.36rem + 5px);
   }
   .route-node {
     position: relative;
@@ -818,7 +1038,8 @@
     color: var(--color-base-content);
   }
   .route-item:first-child .route-node {
-    padding-top: 0.45rem;
+    /* Centered on the first line of the text beside it (py-2, 1.5rem high). */
+    padding-top: calc(0.5rem + 0.75rem - 7.5px);
     background: var(--color-base-100);
     height: fit-content;
     border-radius: 999px;

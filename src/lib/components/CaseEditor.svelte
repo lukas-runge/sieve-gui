@@ -167,7 +167,7 @@
     onclick={() => onfocus(to)}
   >
     <span class="flex w-[7rem] shrink-0 items-center gap-1.5" style="color: {color}">
-      {#if n}<span class="rounded-full border-2 px-1.5 text-[0.8125rem] leading-[1.05rem] font-bold" style="border-color: {color}">{n}</span>{/if}
+      {#if n}<span class="grid h-[1.25rem] min-w-[1.25rem] place-items-center rounded-full border-2 px-[0.3rem] text-[0.8125rem] font-bold" style="border-color: {color}"><span class="badge-num">{n}</span></span>{/if}
       <span class="text-[0.875rem] font-semibold whitespace-nowrap">{word(c, list.length === 1)}</span>
     </span>
     <span class="grid min-w-0 gap-1">

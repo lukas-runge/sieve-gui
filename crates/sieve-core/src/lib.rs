@@ -9,6 +9,7 @@
 
 pub mod ast;
 pub mod compat;
+mod content;
 pub mod export;
 pub mod import;
 mod lexer;
@@ -19,6 +20,7 @@ pub mod printer;
 pub mod root;
 pub mod span;
 
+pub use content::content;
 pub use export::export;
 pub use import::{import, import_single_folder};
 pub use parser::parse;

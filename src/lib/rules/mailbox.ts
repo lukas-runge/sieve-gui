@@ -17,6 +17,8 @@ export interface ScriptFolders {
   encoding: MailboxEncoding;
   /** Readable names of the folders on the server; null if unknown. */
   existing: Set<string> | null;
+  /** What separates a folder from its parent on the server ("/", "."); null if unknown. */
+  delimiter: string | null;
 }
 
 /**
@@ -132,7 +134,8 @@ export function scriptFolders(raw: string[], server: Folder[] | null): ScriptFol
   const onServer = server?.filter((f) => f.selectable).map((f) => mailboxLabel(f.name)) ?? [];
   const existing = server ? new Set(onServer) : null;
   const fromScript = [...new Set(raw.map(mailboxLabel))].filter((l) => !folderExists(existing, l)).sort();
-  return { labels: [...onServer, ...fromScript], encoding: detectMailboxEncoding(raw), existing };
+  const delimiter = server?.find((f) => f.delimiter)?.delimiter ?? null;
+  return { labels: [...onServer, ...fromScript], encoding: detectMailboxEncoding(raw), existing, delimiter };
 }
 
 /** Whether `label` is a known server folder (INBOX is case-insensitive). */

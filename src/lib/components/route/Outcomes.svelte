@@ -12,6 +12,7 @@
     singleFolder = false,
     words = [],
     hideParent = false,
+    section = null,
     next = null,
     fullPath = false,
     ontarget,
@@ -21,6 +22,8 @@
     singleFolder?: boolean;
     words?: string[];
     hideParent?: boolean;
+    /** The folder of the section this sits in: filing right there reads "direkt in …", not like a subfolder. */
+    section?: string | null;
     /** The script that runs next: a stop in single-folder mode continues there. */
     next?: string | null;
     /** The whole folder path, not just the parent. */
@@ -82,6 +85,9 @@
                   {words}
                 />{/if}&nbsp;/&nbsp;</span
             >
+          {/if}
+          {#if section && o.path.join(" / ") === section}
+            <span class="text-[0.875rem] whitespace-nowrap text-base-content/70">{t("route.directIn")}&nbsp;</span>
           {/if}
           {#if o.text === ""}
             <span class="text-[0.875rem] text-base-content/70 italic">{t("route.noFolder")}</span>

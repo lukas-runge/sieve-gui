@@ -269,8 +269,7 @@
   </div>
   {#if folded}
     <!-- Folded: where its mail can go, in one line. -->
-    <button class="route-row mt-1 w-full rounded-field py-1 pl-6 text-left hover:bg-base-content/[0.04]" onclick={() => onpick("")}>
-      <span></span>
+    <button class="mt-1 ml-6 block max-w-[40rem] rounded-field py-1 text-left hover:bg-base-content/[0.04]" onclick={() => onpick("")}>
       <Possible items={blockOutcomes(rule, keywords, delimiter)} heading={t("route.foldedSummary")} {words} />
     </button>
   {:else}

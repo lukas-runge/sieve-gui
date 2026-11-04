@@ -132,23 +132,23 @@
         </label>
       {/each}
     </div>
-    <button class="mt-2 flex items-center gap-1 text-[0.8rem] font-medium text-base-content/70 hover:text-base-content" aria-expanded={more} onclick={() => (more = !more)}>
+    <button class="mt-2 flex items-center gap-1 text-[0.8125rem] font-medium text-base-content/70 hover:text-base-content" aria-expanded={more} onclick={() => (more = !more)}>
       <Icon name={more ? "chevronDown" : "chevronRight"} size={14} />{t("trial.more")}
     </button>
     {#if more}
       <div class="mt-2 grid gap-2">
         <label class="grid gap-1">
-          <span class="text-[0.8rem] text-base-content/70">{t("trial.headers")}</span>
-          <textarea class="textarea textarea-sm min-h-16 w-full font-mono text-[0.8rem]" placeholder="X-Spam-Flag: YES" bind:value={trial.mail.headers} {onpaste}></textarea>
+          <span class="text-[0.8125rem] text-base-content/70">{t("trial.headers")}</span>
+          <textarea class="textarea textarea-sm min-h-16 w-full font-mono text-[0.8125rem]" placeholder="X-Spam-Flag: YES" bind:value={trial.mail.headers} {onpaste}></textarea>
         </label>
         <label class="grid gap-1">
-          <span class="text-[0.8rem] text-base-content/70">{t("trial.body")}</span>
+          <span class="text-[0.8125rem] text-base-content/70">{t("trial.body")}</span>
           <textarea class="textarea textarea-sm min-h-16 w-full" bind:value={trial.mail.body} {onpaste}></textarea>
         </label>
       </div>
     {/if}
     {#if !trial.active}
-      <p class="mt-3 flex gap-2 text-[0.8rem] text-base-content/70"><Icon name="info" size={14} class="mt-0.5" />{t("trial.pasteTip")}</p>
+      <p class="mt-3 flex gap-2 text-[0.8125rem] text-base-content/70"><Icon name="info" size={14} class="mt-0.5" />{t("trial.pasteTip")}</p>
     {/if}
 
     {#if result}
@@ -160,7 +160,7 @@
 
       <!-- Where it ends up. -->
       <section class="mt-4 rounded-box border border-success/35 bg-success/[0.07] px-3.5 py-3" aria-live="polite">
-        <h3 class="mb-1.5 text-[0.8rem] font-semibold tracking-wide text-success uppercase">{t("trial.result")}</h3>
+        <h3 class="mb-1.5 text-[0.8125rem] font-semibold tracking-wide text-success uppercase">{t("trial.result")}</h3>
         <div class="text-[1.05rem]"><Outcomes items={delivery} fullPath /></div>
         {#if contributions.length > 1}
           <!-- Several scripts had a hand in it: which did what. -->
@@ -179,19 +179,19 @@
           </ul>
         {/if}
         {#if result.uncertain}
-          <p class="mt-2 flex items-start gap-1.5 text-[0.8rem] text-base-content/75">
+          <p class="mt-2 flex items-start gap-1.5 text-[0.8125rem] text-base-content/75">
             <Icon name="alert" size={14} class="mt-0.5 text-warning" />{t("trial.uncertain")}
           </p>
         {/if}
       </section>
 
       <!-- Its way: every script in order, the cases that applied. -->
-      <h3 class="mt-5 mb-2 text-[0.8rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("trial.way")}</h3>
+      <h3 class="mt-5 mb-2 text-[0.8125rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("trial.way")}</h3>
       <ol class="grid gap-3">
         {#each result.scripts as run, i (run.name)}
           {@const steps = result.steps.filter((s) => s.script === run.name)}
           <li class="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2">
-            <span class="grid size-6 place-items-center rounded-full bg-primary/12 text-[0.8rem] font-bold text-primary">{i + 1}</span>
+            <span class="grid size-6 place-items-center rounded-full bg-primary/12 text-[0.8125rem] font-bold text-primary">{i + 1}</span>
             <p class={["pt-0.5 font-semibold", run.name === editor.name && "text-primary"]}>{run.name}</p>
             <span></span>
             <div class="grid gap-1 pt-1">
@@ -214,7 +214,7 @@
                   </span>
                   {#if title.conditions && title.conditions.items.length}
                     <span class="pl-5 text-[0.875rem]" title={t("trial.because")}>
-                      <span class="text-[0.8rem] text-base-content/70">{t("trial.because")}</span>
+                      <span class="text-[0.8125rem] text-base-content/70">{t("trial.because")}</span>
                       <RouteConditions shape={conditionShape(title.conditions, false, 2)} />
                     </span>
                   {/if}
@@ -222,7 +222,7 @@
                     <span class={["pl-5", step.overridden && "line-through decoration-base-content/50 opacity-60"]} title={step.overridden ? t("trial.overridden") : undefined}>
                       <Outcomes {items} stop={stops(step.actions)} singleFolder={editor.rules.singleFolder} next={nextOf(step.script)} />
                     </span>
-                    {#if step.overridden}<span class="pl-5 text-[0.8rem] text-base-content/70">{t("trial.overridden")}</span>{/if}
+                    {#if step.overridden}<span class="pl-5 text-[0.8125rem] text-base-content/70">{t("trial.overridden")}</span>{/if}
                   {/if}
                 </button>
               {/each}

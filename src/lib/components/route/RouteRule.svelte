@@ -95,7 +95,7 @@
         ><Icon name="x" size={12} /></span
       >
     {:else if num}
-      <span class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full border-2 px-[0.2rem] text-[0.8rem] font-bold" style="border-color: var(--rail)"
+      <span class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full border-2 px-[0.3rem] text-[0.8125rem] font-bold" style="border-color: var(--rail)"
         >{num}</span
       >
     {/if}
@@ -130,7 +130,7 @@
         {#if c.conditions}
           <Conditions shape={conditionShape(c.conditions, false, picked === path ? Infinity : 3)} {words} />
           {#if dead}
-            <span class="mt-0.5 flex items-center gap-1 text-[0.8rem] font-medium text-base-content">
+            <span class="mt-0.5 flex items-center gap-1 text-[0.8125rem] font-medium text-base-content">
               <span class="inline-flex items-center gap-1 rounded-full bg-warning/25 px-2"><Icon name="alert" size={13} />{t("route.unreachable")}</span>
             </span>
           {/if}
@@ -141,7 +141,15 @@
     </span>
     {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && c.nested.length}
       <!-- Nothing of its own: what happens is in the check below. -->
-      <Possible items={nestedOutcomes(c, keywords, delimiter)} heading={t("route.seeBelow")} {words} />
+      {@const innerCases = c.nested.length === 1 ? cases(c.nested[0]) : []}
+      {@const numbered = innerCases.filter((x) => x.kind !== "else").length}
+      <Possible
+        items={nestedOutcomes(c, keywords, delimiter)}
+        heading={innerCases.length > 1 && num
+          ? t(innerCases.length > numbered ? "route.dependsOnElse" : "route.dependsOn", { from: `${num}.1`, to: `${num}.${numbered}` })
+          : t("route.dependsOnCheck")}
+        {words}
+      />
     {:else}
       <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
     {/if}
@@ -174,6 +182,8 @@
       {@const num = single || c.kind === "else" ? null : pre ? `${pre}.${c.number}` : String(c.number)}
       {@const own = single ? pre : pre ? `${pre}.${c.number}` : String(c.number)}
       <li>
+        <!-- A case with checks inside: row and checks in one frame, so they read as one. -->
+        <div class={c.nested.length > 0 ? "case-frame" : undefined}>
         {@render caseRow(c, num, path, dead.has(i))}
         {#each c.nested as n, j}
           {@const multi = cases(n).length > 1}
@@ -183,8 +193,8 @@
           <!-- A check inside this case: a box of its own, one rail deeper, saying whose it is. -->
           <!-- Hangs off its case's number by an elbow, indented: a child, not a sibling. -->
           <div
-            class="nested-box relative mt-0.5 mb-1.5 ml-[1.6rem] rounded-field border-l-2 py-1.5 pr-1.5 pl-2"
-            style="--box: {color}; border-color: {color}; background: color-mix(in oklab, {color} 6%, transparent)"
+            class="nested-box relative mx-1 mt-0.5 mb-1 ml-[1.6rem] rounded-field border-l-2 py-1.5 pr-1.5 pl-2"
+            style="--box: {color}; border-color: {color}; background: color-mix(in oklab, {color} var(--nest-tint), transparent)"
           >
             <p class={["flex items-start gap-1 pl-0.5 text-[0.875rem] text-base-content/75", !folded && "mb-1", applies(path) === false && "opacity-70"]}>
               {#if fold}
@@ -213,6 +223,7 @@
             {/if}
           </div>
         {/each}
+        </div>
       </li>
       {/if}
     {/each}

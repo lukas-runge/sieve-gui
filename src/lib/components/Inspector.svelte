@@ -127,13 +127,17 @@
           {/if}
         </p>
         {#if item.type === "rule"}
+          <!-- The name edits in place: a pencil and a hover frame say so. -->
+          <label class="group/name flex items-center gap-1.5 rounded-field px-1 -mx-1 hover:bg-base-200 focus-within:bg-base-200">
           <input
-            class="w-full rounded-field bg-transparent text-lg font-semibold outline-none placeholder:font-normal placeholder:text-base-content/65 focus:bg-base-200 focus:px-1.5"
+            class="w-full bg-transparent text-lg font-semibold outline-none placeholder:font-normal placeholder:text-base-content/65"
             aria-label={t("rule.name")}
             placeholder={t("inspector.namePlaceholder")}
             value={item.name}
             oninput={(e) => change((r) => (r.name = e.currentTarget.value), true)}
           />
+          <Icon name="pencil" size={14} class="shrink-0 text-base-content/50 group-hover/name:text-base-content/80" />
+          </label>
         {/if}
       </div>
       <div class="dropdown dropdown-end">

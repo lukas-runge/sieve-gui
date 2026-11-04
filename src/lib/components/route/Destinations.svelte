@@ -90,7 +90,7 @@
       <Icon name="folder" size={15} class={f.rules.size ? "text-primary" : "text-base-content/50"} />
       <span class={["truncate", f.rules.size ? "font-semibold" : "text-base-content/75"]}>{f.name}</span>
       <span class="h-px grow"></span>
-      <span class="shrink-0 text-[0.8rem] text-base-content/70">
+      <span class="shrink-0 text-[0.8125rem] text-base-content/70">
         {#if f.rules.size}{count(f.rules.size)}{:else}{t("dest.below", { count: f.all.size })}{/if}
       </span>
     </button>
@@ -111,7 +111,7 @@
     </p>
   </div>
   <section aria-label={t("dest.folders")}>
-    <h3 class="mb-1 px-1 text-[0.8rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.folders")}</h3>
+    <h3 class="mb-1 px-1 text-[0.8125rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.folders")}</h3>
     <ul class="grid">
       {#each sorted(tree.root) as f (f.name)}{@render folder(f, 0)}{/each}
       <li class="flex items-center gap-2 py-1 pr-2 pl-2 text-base-content/70">
@@ -121,7 +121,7 @@
   </section>
   {#if tree.labels.length}
     <section aria-label={t("dest.labels")}>
-      <h3 class="mb-2 px-1 text-[0.8rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.labels")}</h3>
+      <h3 class="mb-2 px-1 text-[0.8125rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.labels")}</h3>
       <div class="flex flex-wrap gap-2 px-1">
         {#each tree.labels as l (l.key)}
           {@const h = labelHue(l.text)}

@@ -14,13 +14,13 @@
 </script>
 
 <span class="grid gap-1 rounded-field border border-dashed border-base-content/25 px-2 py-1.5 text-[0.875rem]">
-  <span class="text-[0.8rem] font-medium text-base-content/70">{heading}</span>
+  <span class="text-[0.8125rem] font-medium text-base-content/70">{heading}</span>
   <span class="grid gap-1 opacity-85">
     {#if folders.length}
-      <span class="flex flex-wrap items-baseline gap-x-2"><span class="text-[0.8rem] text-base-content/70">{t("route.possibleFolders")}</span><Outcomes items={folders} {words} /></span>
+      <span class="flex flex-wrap items-baseline gap-x-2"><span class="text-[0.8125rem] text-base-content/70">{t("route.possibleFolders")}</span><Outcomes items={folders} {words} /></span>
     {/if}
     {#if labels.length}
-      <span class="flex flex-wrap items-baseline gap-x-2"><span class="text-[0.8rem] text-base-content/70">{t("route.possibleLabels")}</span><Outcomes items={labels} {words} /></span>
+      <span class="flex flex-wrap items-baseline gap-x-2"><span class="text-[0.8125rem] text-base-content/70">{t("route.possibleLabels")}</span><Outcomes items={labels} {words} /></span>
     {/if}
     {#if rest.length}<Outcomes items={rest} {words} />{/if}
   </span>

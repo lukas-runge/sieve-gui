@@ -5,7 +5,7 @@
   // a square for code sieve-gui shows as written. Clicking a rule opens it in
   // the inspector.
   import { flip } from "svelte/animate";
-  import type { RuleItem } from "#tauri/types";
+  import type { Action, RuleItem } from "#tauri/types";
   import { session } from "../../session.svelte";
   import type { ScriptEditor } from "../../editor.svelte";
   import { uid, type EditorItem } from "../../editor.svelte";
@@ -101,6 +101,18 @@
 
   const accountLabel = $derived(session.accounts.find((a) => a.id === editor.accountId)?.label ?? "");
 
+  let why = $state(false);
+  /** Whether a script running after this one moves mail too (so folders here are provisional). */
+  const laterMoves = $derived.by(() => {
+    const i = order.indexOf(editor.name);
+    if (i < 0 || !others) return false;
+    const moves = (actions: Action[]): boolean =>
+      actions.some((a) => (a.type === "fileInto" && !a.copy) || (a.type === "if" && [a.actions, ...a.elsif.map((e) => e.actions), a.otherwise ?? []].some(moves)));
+    return order
+      .slice(i + 1)
+      .some((n) => others?.find((o) => o.name === n)?.rules.items.some((it) => it.type === "rule" && it.enabled && [it.actions, ...it.elsif.map((e) => e.actions), it.otherwise ?? []].some(moves)));
+  });
+
   /** The route, or where mail goes ("destinations"). */
   let view = $state<"route" | "dest">("route");
   /** The running scripts with their rules, the open one with its edits. */
@@ -111,7 +123,8 @@
   );
 
   /** Search this script, or every script of the account. */
-  let scope = $state<"script" | "all">("script");
+  // "Where do mails from X go?" spans scripts, so searching starts there.
+  let scope = $state<"script" | "all">("all");
   /** A folder or label clicked on the route: everything that goes there, in every script. */
   let target = $state<(Target & { text: string; folder: boolean }) | null>(null);
   let others = $state<{ name: string; rules: { items: RuleItem[] } }[] | null>(null);
@@ -123,7 +136,7 @@
     return others.filter((o) => !session.runs(editor.accountId, o.name) && o.rules.items.some((item) => goesTo(item, t))).length;
   });
   $effect(() => {
-    if (!searching && !target && view !== "dest") return;
+    if (!searching && !target && view !== "dest" && !next) return;
     const id = editor.accountId;
     void session.allRules(id).then((list) => {
       if (editor.accountId === id) others = list;
@@ -180,7 +193,7 @@
     if (shownFor !== null && name !== shownFor) {
       target = null;
       query = "";
-      scope = "script";
+      scope = "all";
     }
     shownFor = name;
   });
@@ -342,7 +355,7 @@
             <input type="checkbox" class="checkbox checkbox-xs" bind:checked={target.subfolders} />{t("target.subfolders")}
           </label>
         {/if}
-        <span class="whitespace-nowrap text-[0.8rem] text-base-content/70" role="status">{withInactive
+        <span class="whitespace-nowrap text-[0.8125rem] text-base-content/70" role="status">{withInactive
             ? t(resultCount === 1 ? "search.hitOne" : "search.countAll", { count: resultCount })
             : t(resultCount === 1 ? "target.countOne" : "target.count", { count: resultCount })}</span>
       </div>
@@ -359,7 +372,7 @@
         onkeydown={(e) => e.key === "Escape" && (query = "")}
       />
       {#if searching}
-        <span class="text-[0.8rem] whitespace-nowrap text-base-content/70" role="status">
+        <span class="text-[0.8125rem] whitespace-nowrap text-base-content/70" role="status">
           {scope === "all"
             ? resultCount === 1 ? t("search.hitOne") : t("search.countAll", { count: resultCount })
             : t("search.count", { shown: shownCount, total: editor.rules.items.length })}
@@ -368,13 +381,15 @@
     </label>
     {/if}
     <!-- Where to search: only while searching. -->
-    <div class={["join", (target || !searching) && "hidden"]} role="group" aria-label={t("search.scope")}>
-      <button class={["btn btn-xs join-item", scope === "script" ? "btn-active" : "btn-ghost"]} aria-pressed={scope === "script"} onclick={() => (scope = "script")}>
-        {t("search.thisScript")}
-      </button>
-      <button class={["btn btn-xs join-item", scope === "all" ? "btn-active" : "btn-ghost"]} aria-pressed={scope === "all"} onclick={() => (scope = "all")}>
-        {t("search.allScripts")}
-      </button>
+    <!-- Where to search, as a segmented control: only while searching. -->
+    <div class={["flex rounded-field bg-base-200 p-0.5", (target || !searching) && "hidden"]} role="group" aria-label={t("search.scope")}>
+      {#each [["all", t("search.allScripts")], ["script", t("search.thisScript")]] as [value, label] (value)}
+        <button
+          class={["rounded-[calc(var(--radius-field)-2px)] px-2.5 py-1 text-[0.8125rem] font-medium", scope === value ? "bg-base-100 shadow-sm" : "text-base-content/70 hover:text-base-content"]}
+          aria-pressed={scope === value}
+          onclick={() => (scope = value as "all" | "script")}>{label}</button
+        >
+      {/each}
     </div>
     <div class={["join", target && "hidden"]}>
       <button class="btn btn-primary btn-sm join-item gap-1" onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
@@ -403,7 +418,7 @@
           <li class="mt-1 border-t border-base-300 pt-1">
             <button class="flex flex-col items-start gap-0.5 text-left" onclick={addCode}>
               <span class="flex items-center gap-2 font-medium"><Icon name="code" size={15} />{t("route.addCodeBlock")}</span>
-              <span class="text-[0.8rem] text-base-content/70">{t("route.addCodeHint")}</span>
+              <span class="text-[0.8125rem] text-base-content/70">{t("route.addCodeHint")}</span>
             </button>
           </li>
         </ul>
@@ -438,12 +453,12 @@
           <h3 class="flex items-center gap-2 px-1 text-[0.875rem] font-semibold">
             <Icon name="text" size={15} class="text-base-content/70" />{r.name}
             {#if !session.runs(editor.accountId, r.name)}
-              <span class="rounded-full bg-base-200 px-2 text-[0.8rem] leading-5 font-medium text-base-content/70">{t("status.off")}</span>
+              <span class="rounded-full bg-base-200 px-2 text-[0.8125rem] leading-5 font-medium text-base-content/70">{t("status.off")}</span>
             {/if}
             <span class="font-normal text-base-content/70">{r.hits.length === 1 ? t("search.hitOne") : t("search.hits", { count: r.hits.length })}</span>
           </h3>
           {#each r.hits as hit (hit.index)}
-            <div class="rounded-field px-2.5 py-2 ring-1 ring-base-300 hover:bg-base-200/50">
+            <div class="rounded-field border-l-2 border-base-300 px-2.5 py-2 hover:border-primary/50 hover:bg-base-200/50">
               {#if hit.item.type === "rule"}
                 <RouteRule
                   rule={hit.item}
@@ -459,8 +474,8 @@
               {:else}
                 <button class="w-full text-left" onclick={() => openMatch(r.name, hit.index, "")}>
                   <span class="font-semibold">{t("raw.heading")}</span>
-                  <span class="text-[0.8rem] text-base-content/70">{t("route.codeNote")}</span>
-                  <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8rem] text-base-content/70">{hit.item.code.trim()}</pre>
+                  <span class="text-[0.8125rem] text-base-content/70">{t("route.codeNote")}</span>
+                  <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] text-base-content/70">{hit.item.code.trim()}</pre>
                 </button>
               {/if}
             </div>
@@ -502,14 +517,19 @@
         {/if}
       </span>
     </li>
-    {#if running && next}
+    {#if running && next && laterMoves}
       <!-- What's shown here isn't necessarily the end of the story. -->
       <li class="route-item text-[0.8125rem] text-base-content/75">
         <span></span><span></span>
-        <p class="-mt-1 mb-1 flex items-start gap-1.5 px-0.5">
-          <Icon name="info" size={14} class="mt-0.5 shrink-0 text-primary" />
-          {editor.rules.singleFolder ? t("route.provisional", { name: next }) : t("route.provisionalMore", { name: next })}
-        </p>
+        <div class="-mt-1 mb-1 px-0.5">
+          <p class="flex flex-wrap items-center gap-x-1.5">
+            <Icon name="info" size={14} class="shrink-0 text-primary" />{t("route.provisionalShort")}
+            <button class="font-medium text-primary hover:underline" aria-expanded={why} onclick={() => (why = !why)}>{t("route.why")}</button>
+          </p>
+          {#if why}
+            <p class="mt-0.5 pl-5">{editor.rules.singleFolder ? t("route.provisional", { name: next }) : t("route.provisionalMore", { name: next })}</p>
+          {/if}
+        </div>
       </li>
     {/if}
 
@@ -551,10 +571,11 @@
             <span></span>
             <span class="route-node grid place-items-center"><span class="size-1.5 rounded-full bg-[var(--spine)]"></span></span>
             <div class="flex items-center gap-2 px-2.5 text-[0.875rem]">
-              <Icon name="folder" size={14} class="text-base-content/70" />
-              <span class="font-semibold text-base-content/80">{groups.head[index]!.split(" / ").join(" › ")}</span>
+              <span class="text-[0.8125rem] text-base-content/70">{t("route.groupHead")}</span>
+              <Icon name="folder" size={14} class="text-base-content/60" />
+              <span class="font-medium text-base-content/75">{groups.head[index]!.split(" / ").join(" › ")}</span>
               <span class="h-px grow bg-base-300"></span>
-              <span class="pr-2 text-[0.8rem] text-base-content/70">{t("route.groupCount", { count: groups.size[index] })}</span>
+              <span class="pr-2 text-[0.8125rem] text-base-content/70">{t("route.groupCount", { count: groups.size[index] })}</span>
             </div>
           </div>
         {/if}
@@ -601,26 +622,26 @@
               <button class="w-full text-left" aria-current={selected ? "true" : undefined} onclick={() => pick(item.uid, "")}>
                 <span class="flex items-baseline gap-2">
                   <span class="font-semibold">{t("raw.heading")}</span>
-                  <span class="text-[0.8rem] text-base-content/70">{t("route.codeNote")}</span>
+                  <span class="text-[0.8125rem] text-base-content/70">{t("route.codeNote")}</span>
                   {#if editor.roundcubeRisks?.rawBlocks.includes(index)}
                     <span class="badge badge-sm badge-soft badge-warning">{t("roundcube.badge")}</span>
                   {/if}
                 </span>
-                <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8rem] leading-snug text-base-content/70">{item.code.trim() || "…"}</pre>
+                <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] leading-snug text-base-content/70">{item.code.trim() || "…"}</pre>
               </button>
             {/if}
           </div>
           <div class="flex shrink-0 items-center gap-1 pt-2 pr-1.5">
             {#if fresh === item.uid}
-              <span class="rounded-full bg-primary/12 px-2 text-[0.8rem] leading-5 font-medium text-primary">{t("route.fresh")}</span>
+              <span class="rounded-full bg-primary/12 px-2 text-[0.8125rem] leading-5 font-medium text-primary">{t("route.fresh")}</span>
             {/if}
             {#if tr?.unknown}
-              <span class="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 text-[0.8rem] leading-5 font-medium" title={t("trial.uncertain")}
+              <span class="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 text-[0.8125rem] leading-5 font-medium" title={t("trial.uncertain")}
                 ><Icon name="helpCircle" size={13} />{t("trial.unknown")}</span
               >
             {/if}
             {#if item.type === "rule" && !item.enabled}
-              <span class="rounded-full bg-base-200 px-2 text-[0.8rem] leading-5 font-medium text-base-content/70">{t("route.off")}</span>
+              <span class="rounded-full bg-base-200 px-2 text-[0.8125rem] leading-5 font-medium text-base-content/70">{t("route.off")}</span>
             {/if}
             {#if item.type === "rule" && editor.roundcubeRisks?.rules.includes(index)}
               <span class="badge badge-sm badge-soft badge-warning" title={t("roundcube.title")}>{t("roundcube.badge")}</span>

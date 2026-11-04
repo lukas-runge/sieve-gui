@@ -136,14 +136,14 @@
     onclick={() => onfocus(to)}
   >
     <span class="flex w-[6.2rem] shrink-0 items-center gap-1.5" style="color: {color}">
-      {#if n}<span class="rounded-full border-2 px-1.5 text-[0.8rem] leading-[1.05rem] font-bold" style="border-color: {color}">{n}</span>{/if}
+      {#if n}<span class="rounded-full border-2 px-1.5 text-[0.8125rem] leading-[1.05rem] font-bold" style="border-color: {color}">{n}</span>{/if}
       <span class="text-[0.875rem] font-semibold whitespace-nowrap">{word(c, list.length === 1)}</span>
     </span>
     <span class="grid min-w-0 gap-1">
       {#if c.conditions}<RouteConditions shape={conditionShape(c.conditions, false, 2)} />{:else}<span class="text-base-content/70">{t("route.allOthers")}</span>{/if}
       <RouteOutcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} />
       {#if c.nested.length && !context}
-        <span class="flex items-center gap-1 text-[0.8rem] text-base-content/70"><Icon name="nested" size={13} />{c.nested.length === 1 ? t("case.hasCheck") : t("case.hasChecks", { count: c.nested.length })}</span>
+        <span class="flex items-center gap-1 text-[0.8125rem] text-base-content/70"><Icon name="nested" size={13} />{c.nested.length === 1 ? t("case.hasCheck") : t("case.hasChecks", { count: c.nested.length })}</span>
       {/if}
     </span>
   </button>
@@ -169,7 +169,7 @@
   {#if chain!.length > 1 || cases(rule).length > 1}
   <nav class="mb-4 grid gap-0.5 rounded-box bg-base-200/60 p-1.5" aria-label={t("case.context")}>
     {#if cases(rule).length > 1}
-      <button class="flex items-center gap-1.5 rounded-field px-2 py-1 text-left text-[0.8rem] font-medium text-base-content/70 hover:bg-base-200" onclick={() => onfocus("")}>
+      <button class="flex items-center gap-1.5 rounded-field px-2 py-1 text-left text-[0.8125rem] font-medium text-base-content/70 hover:bg-base-200" onclick={() => onfocus("")}>
         <Icon name="arrowLeft" size={13} />{t("case.all", { count: cases(rule).length })}
       </button>
     {/if}
@@ -214,7 +214,7 @@
   {#if step.case.nested.length}
     <!-- A long case: jump to its parts. -->
     <nav class="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap items-center gap-1 bg-base-100 px-1 py-1" aria-label={t("case.parts")}>
-      <span class="mr-1 text-[0.8rem] text-base-content/70">{t("case.jump")}</span>
+      <span class="mr-1 text-[0.8125rem] text-base-content/70">{t("case.jump")}</span>
       {#each [{ el: conditionsEl, label: t("conditions.heading") }, { el: actionsEl, label: t("actions.heading") }, { el: checksEl, label: t("case.checkOne") }] as part}
         {#if part.el}
           <button class="btn btn-xs btn-soft" onclick={() => part.el?.scrollIntoView({ block: "start", behavior: "smooth" })}>{part.label}</button>
@@ -247,6 +247,7 @@
               <p class="grow text-[0.875rem] font-semibold" style="color: {inner}">
                 {list.length > 1 ? t("case.checkMany") : t("case.checkOne")}
               </p>
+              <button class="btn btn-ghost btn-xs gap-0.5" onclick={() => onfocus(`${path}.${j}.0`)}>{t("case.editCheck")}<Icon name="chevronRight" size={13} /></button>
               <button
                 class="btn btn-ghost btn-xs btn-square text-base-content/70"
                 aria-label={t("case.removeCheck")}

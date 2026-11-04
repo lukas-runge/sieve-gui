@@ -151,17 +151,20 @@ body {
   height: calc(var(--elbow) - 0.5rem);
 }
 
-/* A check inside a case: an elbow from the case's number into its box. */
-.nested-box::before {
-  content: "";
-  position: absolute;
-  left: calc(-1rem - 2px);
-  top: -0.55rem;
-  width: 1rem;
-  height: 1.35rem;
-  border-left: 2px solid var(--box);
-  border-bottom: 2px solid var(--box);
-  border-bottom-left-radius: 0.5rem;
+/* A case with checks inside: the row and its checks share one frame. */
+.case-frame {
+  border: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+  border-radius: var(--radius-field);
+  padding-bottom: 0.25rem;
+  margin: 0.15rem 0;
+}
+:root {
+  --nest-tint: 6%;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --nest-tint: 13%;
+  }
 }
 
 /* A row of the route: what is tested, and what happens in a column of the

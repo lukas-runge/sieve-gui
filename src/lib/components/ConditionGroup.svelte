@@ -93,7 +93,6 @@
       <ConditionRow
         {condition}
         {extensions}
-        compact={group.items.length > 1}
         onchange={(c, merge) => mutate((g) => (g.items[i] = c), merge)}
         onremove={() => remove(i)}
       />

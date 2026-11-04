@@ -92,7 +92,13 @@
       <span
         class={["inline-flex items-center gap-1 rounded-full border px-2 py-px text-[0.875rem] font-medium whitespace-nowrap", ontarget && o.target && "target"]}
         style="border-color: oklch(0.7 0.09 {h} / 0.55); background: oklch(0.7 0.09 {h} / 0.12)"
-        title={ontarget && o.target ? t("target.title", { name: o.text }) : o.kind === "setLabels" ? t("route.setLabelsTitle") : undefined}
+        title={o.text.startsWith("$")
+          ? t("route.unnamedLabel", { name: o.text })
+          : ontarget && o.target
+            ? t("target.title", { name: o.text })
+            : o.kind === "setLabels"
+              ? t("route.setLabelsTitle")
+              : undefined}
         role={ontarget && o.target ? "link" : undefined}
         tabindex={ontarget && o.target ? 0 : undefined}
         onclick={target(o)}

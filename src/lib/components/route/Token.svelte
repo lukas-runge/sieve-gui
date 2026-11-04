@@ -13,7 +13,7 @@
 
 <span class="inline-flex max-w-full flex-wrap items-baseline gap-x-1.5 gap-y-0.5" title={token.sentence}>
   <span
-    class="rounded-md bg-base-content/[0.07] px-1.5 py-px text-[0.8rem] font-medium whitespace-nowrap text-base-content/85"
+    class="rounded-md bg-base-content/[0.07] px-1.5 py-px text-[0.8125rem] font-medium whitespace-nowrap text-base-content/85"
     title={token.fieldTitle}><Mark text={token.field} {words} /></span
   >
   {#if token.negated && !noneOf}<span class="neg">{t("route.not")}</span>{/if}

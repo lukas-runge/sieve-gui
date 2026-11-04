@@ -28,8 +28,8 @@
   {@const negative = shape.mode === "none" || shape.mode === "notAll"}
   {@const joiner = shape.mode === "any" || shape.mode === "none" ? t("route.or") : t("route.and")}
   <div class={["grid", nested && "mt-0.5"]}>
-    <span class={["text-[0.8125rem] font-semibold", negative ? "text-error" : "text-base-content/80"]}>{t(heading[shape.mode])}</span>
-    <ul class="ml-1 grid border-l-2 border-base-content/20 pl-3">
+    <span class={["text-[0.75rem] font-bold tracking-wide uppercase", negative ? "text-error" : "text-base-content/85"]}>{t(heading[shape.mode])}</span>
+    <ul class="ml-1 grid border-l-2 border-base-content/35 pl-3">
       {#each shape.items as item, i}
         {#if i > 0}
           <li class="-ml-[1.05rem] py-px leading-none" aria-hidden="true">

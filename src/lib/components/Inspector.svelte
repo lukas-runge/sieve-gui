@@ -120,7 +120,8 @@
         </button>
       {/if}
       <div class="min-w-0 grow">
-        <p class="truncate text-[0.8rem] text-base-content/65">
+        <p class="truncate text-[0.8125rem] text-base-content/75">
+          <span>{editor.name}</span> <span class="text-base-content/50">›</span>
           {#if item.type === "raw"}{t("raw.heading")}{:else if isSimple(item)}{t("inspector.rule")}{:else if cases(item).length > 1}<!-- The path back to all cases. --><button
               class="hover:text-base-content hover:underline"
               onclick={() => (editor.focus = "")}>{t("inspector.switchAll", { count: cases(item).length })}</button

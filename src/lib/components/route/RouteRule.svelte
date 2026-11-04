@@ -178,14 +178,23 @@
     {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && c.nested.length}
       <!-- Nothing of its own: what happens is in the check below. -->
       <!-- Where its mail can go, muted, with what it depends on as a caption. -->
-      <span class="grid gap-0.5">
-        <span class="opacity-70"><Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} /></span>
-        <span class="flex items-start gap-1 text-[0.8125rem] text-base-content/75"
-          ><Icon name="chevronDown" size={13} class="mt-0.5 shrink-0" />{possibleHeading(c, num).replace(/:$/, "")}</span
+      <span class="grid gap-0.5 rounded-field border border-dashed border-base-content/25 px-2 py-1">
+        <span class="flex items-start gap-1 text-[0.8125rem] font-medium text-base-content/80"
+          ><Icon name="chevronDown" size={13} class="mt-0.5 shrink-0" />{t("route.possible")} {possibleHeading(c, num).replace(/:$/, "")}</span
         >
+        <span class="opacity-70"><Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} /></span>
       </span>
     {:else}
-      <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
+      <span class="grid gap-0.5">
+        <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
+        {#if c.nested.length}
+          <!-- What the added check may add on top. -->
+          <span class="flex flex-wrap items-center gap-x-1.5 text-[0.8125rem] text-base-content/75">
+            <span class="font-medium">{t("route.maybeAlso")}</span>
+            <span class="opacity-70"><Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} /></span>
+          </span>
+        {/if}
+      </span>
     {/if}
   </button>
 {/snippet}
@@ -232,7 +241,7 @@
                     "route.nestedHeadingSingle",
                   )}{/if}</span
                 >
-                {#if multi}<span class="text-base-content/70">· {t("route.casesFirst", { count: cases(n).length })}</span>{/if}
+                {#if multi}<span class="text-base-content/75">· {decides ? t("route.firstOf", { count: cases(n).length }) : t("route.casesFirst", { count: cases(n).length })}</span>{/if}
               </span>
             </p>
             {#if folded}
@@ -270,7 +279,11 @@
               unfolded.add(prefix);
             }}
           >
-            <Icon name="chevronRight" size={14} />{seg.count === 1 ? t("route.otherCase") : t("route.otherCases", { count: seg.count })}
+            <Icon name="chevronRight" size={14} />{segments(list, prefix).some((x) => x.kind === "case" && x.i > seg.i)
+              ? t("route.earlierCases", { count: seg.count })
+              : seg.count === 1
+                ? t("route.otherCase")
+                : t("route.otherCases", { count: seg.count })}
           </button>
         </li>
       {:else}

@@ -8,7 +8,7 @@
   import { t } from "../../i18n.svelte";
   import type { Branches } from "../../rules/view";
   import { folds, toggleFold } from "../../folds.svelte";
-  import { blockOutcomes, caseMatches, cases, nestedOutcomes, unreachable, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
+  import { blockOutcomes, caseMatches, cases, nestedOutcomes, possibleHeading, unreachable, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
   import Conditions from "./Conditions.svelte";
   import { SvelteSet } from "svelte/reactivity";
   import Icon from "../Icon.svelte";
@@ -103,14 +103,12 @@
   <!-- In the test: tried and no match, or never tried. -->
   {#if missed}
     <span class="justify-self-start rounded-full bg-base-content/10 px-2 text-[0.75rem] leading-5 font-medium text-base-content/80" title={t("trial.missed")}>{t("trial.missedShort")}</span>
-  {:else if untried}
-    <span class="text-[0.75rem] text-base-content/70 italic" title={t("trial.notTriedHint")}>{t("trial.notTried")}</span>
   {/if}
   </span>
 {/snippet}
 
 <!-- What a case tests (left) and does (right, in the column shared by all rows). -->
-{#snippet caseRow(c: Case, num: string | null, path: CasePath, dead = false, pre = "", depth = 0)}
+{#snippet caseRow(c: Case, num: string | null, path: CasePath, dead = false, pre = "", depth = 0, bare = false)}
   {@const hit = applies(path)}
   {@const dim = (words.length > 0 && !caseMatches(c, words, keywords, delimiter)) || hit === false || (filter !== null && !filter(c))}
   <button
@@ -120,7 +118,8 @@
       hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
       dim && "opacity-70",
     ]}
-    style="--row-indent: calc(7rem + 0.375rem)"
+    style="--row-indent: {bare ? '0px' : 'calc(7rem + 0.375rem)'}"
+    title={trial && trial.reached && hit === false && !trial.misses.includes(path) ? t("trial.notTriedHint") : undefined}
     data-nav
     aria-current={picked === path ? "true" : undefined}
     onclick={(e) => {
@@ -129,6 +128,7 @@
     }}
   >
     <span class="case-head flex min-w-0 items-start gap-1.5">
+      {#if !bare}
       {@render label(
         c,
         num,
@@ -136,6 +136,7 @@
         !!trial?.misses.includes(path),
         !!trial && (trial.hits.length > 0 || trial.misses.length > 0) && !trial.hits.includes(path) && !trial.misses.includes(path),
       )}
+      {/if}
       <span class="min-w-0">
         {#if c.conditions}
           <Conditions shape={conditionShape(c.conditions, false, picked === path ? Infinity : 3)} {words} />
@@ -154,57 +155,19 @@
     </span>
     {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && c.nested.length}
       <!-- Nothing of its own: what happens is in the check below. -->
-      {@const innerCases = c.nested.length === 1 ? cases(c.nested[0]) : []}
-      {@const numbered = innerCases.filter((x) => x.kind !== "else").length}
-      <Possible
-        compact
-        items={nestedOutcomes(c, keywords, delimiter)}
-        heading={innerCases.length > 1 && num
-          ? t(innerCases.length > numbered ? "route.dependsOnElse" : "route.dependsOn", { from: `${num}.1`, to: `${num}.${numbered}` })
-          : t("route.dependsOnCheck")}
-        {words}
-      />
+      <Possible compact items={nestedOutcomes(c, keywords, delimiter)} heading={possibleHeading(c, num)} {words} />
     {:else}
       <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
     {/if}
   </button>
 {/snippet}
 
-<!-- `pre`: the number of the case this block sits in ("1"), "" for a rule. -->
-{#snippet switchCases(b: Branches, depth: number, prefix: string, pre: string)}
-  {@const list = cases(b)}
-  {@const single = list.length === 1}
-  {@const dead = unreachable(list)}
-  <ul class="rails" style="--rail: var(--rail-{Math.min(depth, 3)}); --elbow: 0.95rem">
-    {#each segments(list, prefix) as seg}
-      {#if seg.kind === "folded"}
-        <li>
-          <button
-            class="flex w-full items-center gap-1 rounded-field px-1 py-0.5 text-left text-[0.875rem] text-base-content/75 hover:bg-base-content/[0.04]"
-            onclick={(e) => {
-              e.stopPropagation();
-              unfolded.add(prefix);
-            }}
-          >
-            <Icon name="chevronRight" size={14} />{seg.count === 1 ? t("route.otherCase") : t("route.otherCases", { count: seg.count })}
-          </button>
-        </li>
-      {:else}
-      {@const c = seg.c}
-      {@const i = seg.i}
-      {@const path = prefix + i}
-      {@const num = single || c.kind === "else" ? null : pre ? `${pre}.${c.number}` : String(c.number)}
-      {@const own = single ? pre : pre ? `${pre}.${c.number}` : String(c.number)}
-      <li>
-        <!-- A case with checks inside: row and checks in one frame, so they read as one. -->
-        <div class={c.nested.length > 0 ? "case-frame" : undefined}>
-        {@render caseRow(c, num, path, dead.has(i), pre, depth)}
-        {#each c.nested as n, j}
+<!-- A check inside a case: a box of its own, one rail deeper, saying whose it is. -->
+{#snippet nestedBox(c: Case, n: Branches, j: number, path: CasePath, depth: number, own: string)}
           {@const multi = cases(n).length > 1}
           {@const color = `var(--rail-${Math.min(depth + 1, 3)})`}
           {@const fold = id ? `${id}|${path}.${j}` : ""}
           {@const folded = !!fold && folds.has(fold)}
-          <!-- A check inside this case: a box of its own, one rail deeper, saying whose it is. -->
           <!-- Hangs off its case's number by an elbow, indented: a child, not a sibling. -->
           <div
             class="nested-box relative mx-1 mt-0.5 mb-1 ml-[1.6rem] rounded-field border-l-2 py-1.5 pr-1.5 pl-2"
@@ -236,12 +199,57 @@
               {@render switchCases(n, depth + 1, `${path}.${j}.`, c.kind === "else" ? "" : own)}
             {/if}
           </div>
+{/snippet}
+
+<!-- `pre`: the number of the case this block sits in ("1"), "" for a rule. -->
+{#snippet switchCases(b: Branches, depth: number, prefix: string, pre: string)}
+  {@const list = cases(b)}
+  {@const single = list.length === 1}
+  {@const dead = unreachable(list)}
+  {#if single && depth > 0}
+    <!-- A check with one case: one row under its heading, no tree. -->
+    {@const c = list[0]}
+    {@const path = prefix + "0"}
+    <div class="pl-1">
+      {@render caseRow(c, null, path, false, pre, depth, true)}
+      {#each c.nested as n, j}
+        {@render nestedBox(c, n, j, path, depth, pre)}
+      {/each}
+    </div>
+  {:else}
+  <ul class="rails" style="--rail: var(--rail-{Math.min(depth, 3)}); --elbow: 0.95rem">
+    {#each segments(list, prefix) as seg}
+      {#if seg.kind === "folded"}
+        <li>
+          <button
+            class="flex w-full items-center gap-1 rounded-field px-1 py-0.5 text-left text-[0.875rem] text-base-content/75 hover:bg-base-content/[0.04]"
+            onclick={(e) => {
+              e.stopPropagation();
+              unfolded.add(prefix);
+            }}
+          >
+            <Icon name="chevronRight" size={14} />{seg.count === 1 ? t("route.otherCase") : t("route.otherCases", { count: seg.count })}
+          </button>
+        </li>
+      {:else}
+      {@const c = seg.c}
+      {@const i = seg.i}
+      {@const path = prefix + i}
+      {@const num = single || c.kind === "else" ? null : pre ? `${pre}.${c.number}` : String(c.number)}
+      {@const own = single ? pre : pre ? `${pre}.${c.number}` : String(c.number)}
+      <li>
+        <!-- A case with checks inside: row and checks in one frame, so they read as one. -->
+        <div class={c.nested.length > 0 ? "case-frame" : undefined}>
+        {@render caseRow(c, num, path, dead.has(i), pre, depth)}
+        {#each c.nested as n, j}
+          {@render nestedBox(c, n, j, path, depth, own)}
         {/each}
         </div>
       </li>
       {/if}
     {/each}
   </ul>
+  {/if}
 {/snippet}
 
 {#if simple}
@@ -272,7 +280,8 @@
         onclick={() => toggleFold(id)}><Icon name={folded ? "chevronRight" : "chevronDown"} size={15} /></button
       >
     {/if}
-    <button class="flex min-w-0 grow flex-wrap items-baseline gap-x-2 text-left" data-nav onclick={() => onpick("")}>
+    <!-- The title opens the first case; the inspector lists the others from there. -->
+    <button class="flex min-w-0 grow flex-wrap items-baseline gap-x-2 text-left" data-nav onclick={() => onpick("0")}>
       <span class="font-semibold"><Mark text={rule.name || t("route.switch")} {words} /></span>
       {#if top.length > 1}
         <span class="text-[0.875rem] text-base-content/70">{t("route.casesFirst", { count: top.length })}</span>

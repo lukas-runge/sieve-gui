@@ -226,7 +226,7 @@
             </span>
             {/if}
           </div>
-          <div class="-ml-1 flex items-center gap-0.5 text-sm text-base-content/60">
+          <div class="-ml-1 flex items-center gap-0.5 text-sm text-base-content/75">
             <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
               <Icon name="undo" size={15} />
             </button>

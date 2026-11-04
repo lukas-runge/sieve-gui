@@ -103,6 +103,17 @@ function compareWord(op: string, part: string): string | null {
   }
 }
 
+/**
+ * The comparison turned around, in words: "enthält nicht", and for several
+ * values "endet auf keinem von", so it's clear "not" covers all of them.
+ */
+function negatedWord(op: string, part: string, several: boolean): string {
+  const key = op === "is" && part === "domain" ? "is" : op;
+  const known = ["contains", "is", "isWithSubdomains", "startsWith", "endsWith", "matches", "regex", "exists", "hasType"];
+  const name = known.includes(key) ? key : "contains";
+  return t(`route.${several ? "noneOf" : "not"}.${name === "isWithSubdomains" ? "is" : name}` as MessageKey);
+}
+
 function valueToken(op: string, part: string, value: string): ValueToken {
   let before = "";
   let after = "";
@@ -152,6 +163,7 @@ export function conditionToken(c: Condition, max = MAX_VALUES): ConditionToken {
     word = compareWord(op, v.part);
     values = v.values.map((x) => valueToken(op, v.part, x));
   }
+  if (negated) word = negatedWord(op, v.part, v.values.length > 1);
   return {
     field: chip.label,
     fieldTitle: chip.title,
@@ -375,6 +387,20 @@ export function blockOutcomes(b: Branches, keywords: Record<string, string>, del
   };
   for (const c of cases(b)) visit(c);
   return out;
+}
+
+/**
+ * Says what a case without actions of its own depends on: "je nach Fall
+ * 1.1–1.3 oder „sonst“" for a check with several cases (`num` is the
+ * case's number), "nur wenn die Zusatzprüfung zutrifft" for one with one.
+ */
+export function possibleHeading(c: Case, num: string | null): string {
+  const inner = c.nested.length === 1 ? cases(c.nested[0]) : [];
+  if (inner.length <= 1) return t("route.onlyIfCheck");
+  const numbered = inner.filter((x) => x.kind !== "else").length;
+  const from = num ? `${num}.1` : "1";
+  const to = num ? `${num}.${numbered}` : String(numbered);
+  return t(inner.length > numbered ? "route.dependsOnElse" : "route.dependsOn", { from, to });
 }
 
 /** What the checks inside a case do, for a case without actions of its own. */

@@ -63,6 +63,7 @@
   );
   const regexUnsupported = $derived(regex && extensions.length > 0 && !extensions.includes("regex"));
   let sample = $state("");
+  let regexHelp = $state(false);
   /** Whether the condition holds for the sample, or null if an expression is invalid. */
   const sampleResult = $derived.by(() => {
     if (!view || !regex || sample === "") return undefined;
@@ -193,7 +194,7 @@
         {t("field.withTime")}
       </label>
     {:else if hasValues(view.operator)}
-      <div class="grow min-w-48">
+      <div class="grow min-w-40">
         <ValueList
           values={view.values.length ? view.values : [""]}
           label={t(`op.${view.operator}` as MessageKey)}
@@ -214,6 +215,11 @@
           {#if regexUnsupported}
             <p class="mt-1 text-[0.8rem] text-warning" role="alert">{t("regex.unsupported")}</p>
           {/if}
+          <!-- Help and trying it out, on request. -->
+          <button class="mt-1 text-[0.8125rem] text-base-content/70 hover:text-base-content hover:underline" aria-expanded={regexHelp} onclick={() => (regexHelp = !regexHelp)}>
+            {regexHelp ? t("regex.hideHelp") : t("regex.help")}
+          </button>
+          {#if regexHelp}
           <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.regexHint")}</p>
           <label class="mt-2 flex flex-wrap items-center gap-2 text-[0.8rem]">
             <span class="text-base-content/70">{t("regex.try")}</span>
@@ -230,6 +236,7 @@
               <span class="badge badge-sm badge-ghost">{t("regex.doesNotHold")}</span>
             {/if}
           </label>
+          {/if}
         {:else if view.operator.toLowerCase().includes("matches")}
           <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.patternHint")}</p>
         {:else if view.operator.endsWith("WithSubdomains")}

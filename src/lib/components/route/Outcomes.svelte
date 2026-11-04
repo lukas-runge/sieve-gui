@@ -83,7 +83,11 @@
                 />{/if}&nbsp;/&nbsp;</span
             >
           {/if}
-          <span class="shrink-0 font-semibold"><Mark text={o.path.at(-1) ?? o.text} {words} /></span>
+          {#if o.text === ""}
+            <span class="text-[0.875rem] text-base-content/70 italic">{t("route.noFolder")}</span>
+          {:else}
+            <span class="shrink-0 font-semibold"><Mark text={o.path.at(-1) ?? o.text} {words} /></span>
+          {/if}
         </span>
       </span>
     {:else if o.kind === "label" || o.kind === "unlabel" || o.kind === "setLabels"}

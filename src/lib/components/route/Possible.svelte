@@ -25,9 +25,10 @@
 </script>
 
 {#if compact}
-  <span class="block text-[0.8125rem] leading-snug text-base-content/70">
+  <!-- A line of what may happen, quieter than real actions but with the same pills. -->
+  <span class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] text-base-content/75">
     <span>{heading}</span>
-    {items.map((o) => (o.kind === "move" || o.kind === "copy" ? (o.path.at(-1) ?? o.text) : o.text)).join(" · ")}
+    <span class="opacity-85"><Outcomes {items} {words} /></span>
   </span>
 {:else}
 <span class="grid gap-1 rounded-field border border-dashed border-base-content/25 px-2 py-1.5 text-[0.875rem]">

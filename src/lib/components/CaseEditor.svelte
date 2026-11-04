@@ -6,7 +6,7 @@
   import type { Action, Rule } from "#tauri/types";
   import { t } from "../i18n.svelte";
   import type { ScriptFolders } from "../rules/mailbox";
-  import { caseChain, caseNumber, cases, conditionShape, nestedOutcomes, outcomes, stops, type Case, type CasePath } from "../rules/route";
+  import { caseChain, caseNumber, cases, conditionShape, nestedOutcomes, outcomes, possibleHeading, stops, type Case, type CasePath } from "../rules/route";
   import { buildAction, newBranch, type Branches, type ConditionGroup as Group } from "../rules/view";
   import ActionRow from "./ActionRow.svelte";
   import ConditionGroup from "./ConditionGroup.svelte";
@@ -155,7 +155,7 @@
       {#if outcomes(c.actions, keywords, delimiter).length || stops(c.actions)}
         <RouteOutcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} />
       {:else if c.nested.length}
-        <Possible compact items={nestedOutcomes(c, keywords, delimiter)} heading={t("route.dependsOnCheck")} />
+        <Possible compact items={nestedOutcomes(c, keywords, delimiter)} heading={possibleHeading(c, label(c, list, pre))} />
       {/if}
       {#if c.nested.length && !context}
         <span class="flex items-center gap-1 text-[0.8125rem] text-base-content/70"><Icon name="nested" size={13} />{c.nested.length === 1 ? t("case.hasCheck") : t("case.hasChecks", { count: c.nested.length })}</span>
@@ -245,7 +245,7 @@
           {#if outcomes(step.case.actions, keywords, delimiter).length || stops(step.case.actions)}
             <Outcomes items={outcomes(step.case.actions, keywords, delimiter)} stop={stops(step.case.actions)} {singleFolder} />
           {:else}
-            <Possible compact items={nestedOutcomes(step.case, keywords, delimiter)} heading={t("route.dependsOnCheck")} />
+            <Possible compact items={nestedOutcomes(step.case, keywords, delimiter)} heading={possibleHeading(step.case, label(step.case, step.list, prefix))} />
           {/if}
         </span>
       {/if}

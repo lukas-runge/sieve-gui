@@ -153,7 +153,7 @@ body {
 
 /* A case with checks inside: the row and its checks share one frame. */
 .case-frame {
-  border: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+  background: color-mix(in oklab, var(--color-base-content) 2.5%, transparent);
   border-radius: var(--radius-field);
   padding-bottom: 0.25rem;
   margin: 0.15rem 0;
@@ -223,6 +223,7 @@ body {
 
 /* Every control shows where the keyboard is. */
 button:focus-visible,
+[tabindex]:focus-visible,
 [role="button"]:focus-visible,
 [role="link"]:focus-visible,
 summary:focus-visible {

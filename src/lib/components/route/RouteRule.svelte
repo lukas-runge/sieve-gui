@@ -306,7 +306,7 @@
 {#if simple}
   {@const hit = applies("0")}
   <button
-    class={["w-full rounded-field text-left transition-opacity", hit && "trial-hit-row", hit === false && "opacity-70"]}
+    class={["block w-full rounded-field text-left transition-opacity", hit && "trial-hit-row", hit === false && "opacity-70"]}
     aria-current={picked === "" ? "true" : undefined}
     data-nav
     onclick={() => onpick("")}

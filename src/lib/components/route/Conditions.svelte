@@ -28,11 +28,11 @@
   {@const negative = shape.mode === "none" || shape.mode === "notAll"}
   {@const joiner = shape.mode === "any" || shape.mode === "none" ? t("route.or") : t("route.and")}
   <div class="grid gap-0.5">
-    <span class={["text-[0.8125rem] font-semibold", negative ? "text-error" : "text-base-content/70"]}>{t(heading[shape.mode])}</span>
-    <ul class="ml-0.5 grid border-l-[1.5px] border-base-content/25 pl-2.5">
+    <span class={["text-[0.75rem] font-bold tracking-wide uppercase", negative ? "text-error" : "text-base-content/75"]}>{t(heading[shape.mode])}</span>
+    <ul class="ml-0.5 grid gap-y-0.5 border-l-2 border-base-content/25 pl-2.5">
       {#each shape.items as item, i}
         {#if i > 0}
-          <li class="text-[0.8125rem] text-base-content/70" aria-hidden="true">{joiner}</li>
+          <li class="text-[0.7rem] font-bold tracking-wide text-base-content/60 uppercase" aria-hidden="true">{joiner}</li>
         {/if}
         <li class="min-w-0">
           {#if item.kind === "token"}<Token token={item.token} {words} />{:else}<Self shape={item.shape} {words} nested />{/if}

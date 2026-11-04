@@ -259,7 +259,13 @@
     query = "";
     target = null;
     editor.selected = item.uid;
+    fresh = item.uid;
   }
+  /** The rule just added, marked until another one is picked. */
+  let fresh = $state<string | null>(null);
+  $effect(() => {
+    if (editor.selected !== fresh) fresh = null;
+  });
 
   export function addRule() {
     insert({ type: "rule", ...newRule(t("rule.new")), uid: uid() });
@@ -324,7 +330,7 @@
     </div>
     {#if target}
       <div class="flex min-w-0 grow items-center gap-2 px-1.5 py-1 text-sm">
-        <span class="whitespace-nowrap text-base-content/70">{t("target.heading")}</span>
+        <span class="whitespace-nowrap text-base-content/70">{target.folder ? t("target.headingFolder") : t("target.headingLabel")}</span>
         <span class="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-primary/10 py-0.5 pr-1 pl-2.5 font-semibold text-primary">
           <Icon name={target.folder ? "folder" : "tag"} size={14} /><span class="truncate">{target.text}</span>
           <button class="grid size-5 place-items-center rounded-full hover:bg-primary/15" aria-label={t("target.clear")} title={t("target.clear")} onclick={() => (target = null)}>
@@ -416,7 +422,7 @@
   {/if}
 
   {#if view === "dest" && !target}
-    <Destinations scripts={runningScripts} {delimiter} {keywords} onpick={(tg) => {
+    <Destinations scripts={runningScripts} {delimiter} {keywords} ontest={trialOpen ? undefined : onshowtrial} onpick={(tg) => {
       withInactive = false;
       target = tg;
     }} />
@@ -425,6 +431,7 @@
     <div class="grid gap-4 px-3 py-3">
       <p class="px-1 text-[0.8125rem] text-base-content/70">
         {target && !withInactive ? t("scope.running", { account: accountLabel }) : t("scope.all", { account: accountLabel })}
+        {#if target}· {t("dest.notFinal")}{/if}
       </p>
       {#each results as r (r.name)}
         <section class="grid gap-1" aria-label={r.name}>
@@ -604,6 +611,9 @@
             {/if}
           </div>
           <div class="flex shrink-0 items-center gap-1 pt-2 pr-1.5">
+            {#if fresh === item.uid}
+              <span class="rounded-full bg-primary/12 px-2 text-[0.8rem] leading-5 font-medium text-primary">{t("route.fresh")}</span>
+            {/if}
             {#if tr?.unknown}
               <span class="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 text-[0.8rem] leading-5 font-medium" title={t("trial.uncertain")}
                 ><Icon name="helpCircle" size={13} />{t("trial.unknown")}</span

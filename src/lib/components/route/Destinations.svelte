@@ -13,12 +13,15 @@
     delimiter,
     keywords,
     onpick,
+    ontest,
   }: {
     /** The running scripts, in order. */
     scripts: { name: string; items: RuleItem[] }[];
     delimiter: string | null;
     keywords: Record<string, string>;
     onpick: (target: Target & { text: string; folder: boolean }) => void;
+    /** Opens the test, to see where a message really ends up. */
+    ontest?: () => void;
   } = $props();
 
   interface Folder {
@@ -100,7 +103,13 @@
 {/snippet}
 
 <div class="grid gap-5 px-3 py-4">
-  <p class="px-1 text-sm text-base-content/70">{t("dest.intro", { count: scripts.length })}</p>
+  <div class="grid gap-1.5 px-1">
+    <p class="text-sm text-base-content/75">{t("dest.intro", { count: scripts.length })}</p>
+    <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] text-base-content/70">
+      <Icon name="info" size={14} class="text-primary" />{t("dest.notFinal")}
+      {#if ontest}<button class="btn btn-xs btn-soft gap-1" onclick={ontest}><Icon name="flask" size={13} />{t("dest.test")}</button>{/if}
+    </p>
+  </div>
   <section aria-label={t("dest.folders")}>
     <h3 class="mb-1 px-1 text-[0.8rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.folders")}</h3>
     <ul class="grid">

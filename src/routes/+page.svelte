@@ -71,8 +71,11 @@
   $effect(() => localStorage.setItem("sidebar", sidebarOpen ? "1" : "0"));
   /** The panel sits beside the route (else it takes its place). */
   const beside = $derived(large.current);
-  /** Medium windows: the panel floats over the route, which keeps its width. */
-  const overlay = $derived(!large.current && medium.current);
+  /**
+   * Medium windows: the test floats over the route (its marks stay in
+   * sight); the inspector and the code take the route's place, with a way back.
+   */
+  const overlay = $derived(!large.current && medium.current && trial.open && !showCode && !editor?.selected);
   /** Unless the window is roomy, the sidebar steps aside while the panel is open. */
   let sidebarPinned = $state(false);
   /** The floating panel starts below the header, so saving stays in reach. */

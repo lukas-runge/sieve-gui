@@ -6,13 +6,15 @@
   import type { Action, Rule } from "#tauri/types";
   import { t } from "../i18n.svelte";
   import type { ScriptFolders } from "../rules/mailbox";
-  import { caseChain, caseNumber, cases, conditionShape, outcomes, stops, type Case, type CasePath } from "../rules/route";
+  import { caseChain, caseNumber, cases, conditionShape, nestedOutcomes, outcomes, stops, type Case, type CasePath } from "../rules/route";
   import { buildAction, newBranch, type Branches, type ConditionGroup as Group } from "../rules/view";
   import ActionRow from "./ActionRow.svelte";
   import ConditionGroup from "./ConditionGroup.svelte";
   import Icon from "./Icon.svelte";
   import RouteConditions from "./route/Conditions.svelte";
   import RouteOutcomes from "./route/Outcomes.svelte";
+  import Outcomes from "./route/Outcomes.svelte";
+  import Possible from "./route/Possible.svelte";
 
   let {
     rule,
@@ -42,6 +44,15 @@
   let conditionsEl = $state<HTMLElement>();
   let actionsEl = $state<HTMLElement>();
   let checksEl = $state<HTMLElement>();
+  /** Whether the case's actions are in view (else a summary sticks to the bottom). */
+  let actionsVisible = $state(true);
+  $effect(() => {
+    const el = actionsEl;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => (actionsVisible = entry.isIntersecting));
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
   const step = $derived(chain?.at(-1) ?? null);
   const depth = $derived((chain?.length ?? 1) - 1);
   const rail = $derived(`var(--rail-${Math.min(depth, 3)})`);
@@ -274,4 +285,19 @@
       {/if}
       <p class="basis-full px-1 text-[0.8125rem] text-base-content/70">{t("case.addElsifHint")}</p>
   </div>
+
+  {#if !actionsVisible}
+    <!-- While the conditions fill the panel: what this case does stays in sight. -->
+    <button
+      class="sticky bottom-0 z-10 -mx-4 mt-3 flex w-[calc(100%+2rem)] items-start gap-2 border-t border-base-300 bg-base-100 px-4 py-2 text-left shadow-[0_-4px_12px_-8px_rgb(0_0_0/0.25)]"
+      onclick={() => actionsEl?.scrollIntoView({ block: "start", behavior: "smooth" })}
+    >
+      <span class="shrink-0 pt-0.5 text-sm font-semibold text-base-content/75">{t("actions.heading")}</span>
+      {#if outcomes(step.case.actions, keywords, delimiter).length || stops(step.case.actions)}
+        <Outcomes items={outcomes(step.case.actions, keywords, delimiter)} stop={stops(step.case.actions)} {singleFolder} />
+      {:else}
+        <Possible items={nestedOutcomes(step.case, keywords, delimiter)} heading={t("route.seeBelow")} />
+      {/if}
+    </button>
+  {/if}
 {/if}

@@ -14,6 +14,7 @@
   import Icon from "../Icon.svelte";
   import Mark from "./Mark.svelte";
   import Outcomes from "./Outcomes.svelte";
+  import Possible from "./Possible.svelte";
 
   let {
     rule,
@@ -113,7 +114,7 @@
       "route-row case-row w-full rounded-field py-1 pr-1 text-left transition-opacity hover:bg-base-content/[0.04]",
       picked === path && "bg-primary/10 ring-1 ring-primary/35",
       hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
-      dim && "opacity-60",
+      dim && "opacity-70",
     ]}
     style="--row-indent: calc(7rem + 0.375rem)"
     data-nav
@@ -140,10 +141,7 @@
     </span>
     {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && c.nested.length}
       <!-- Nothing of its own: what happens is in the check below. -->
-      <span class="grid gap-0.5">
-        <span class="flex items-center gap-1 text-[0.8rem] text-base-content/70"><Icon name="chevronDown" size={13} />{t("route.seeBelow")}</span>
-        <span class="opacity-75"><Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} /></span>
-      </span>
+      <Possible items={nestedOutcomes(c, keywords, delimiter)} heading={t("route.seeBelow")} {words} />
     {:else}
       <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
     {/if}
@@ -188,10 +186,10 @@
             class="nested-box relative mt-0.5 mb-1.5 ml-[1.6rem] rounded-field border-l-2 py-1.5 pr-1.5 pl-2"
             style="--box: {color}; border-color: {color}; background: color-mix(in oklab, {color} 6%, transparent)"
           >
-            <p class={["flex items-start gap-1 pl-0.5 text-[0.875rem] text-base-content/75", !folded && "mb-1", applies(path) === false && "opacity-60"]}>
+            <p class={["flex items-start gap-1 pl-0.5 text-[0.875rem] text-base-content/75", !folded && "mb-1", applies(path) === false && "opacity-70"]}>
               {#if fold}
                 <button
-                  class="mt-0.5 grid size-5 shrink-0 place-items-center rounded hover:bg-base-content/10"
+                  class="mt-0 grid size-6 shrink-0 place-items-center rounded hover:bg-base-content/10"
                   aria-expanded={!folded}
                   aria-label={folded ? t("route.unfold") : t("route.fold")}
                   title={folded ? t("route.unfold") : t("route.fold")}
@@ -209,7 +207,7 @@
               </span>
             </p>
             {#if folded}
-              <div class="pt-1 pb-0.5 pl-6"><Outcomes items={blockOutcomes(n, keywords, delimiter)} {words} /></div>
+              <div class="pt-1 pb-0.5 pl-6"><Possible items={blockOutcomes(n, keywords, delimiter)} heading={t("route.foldedSummary")} {words} /></div>
             {:else}
               {@render switchCases(n, depth + 1, `${path}.${j}.`, c.kind === "else" ? "" : own)}
             {/if}
@@ -224,7 +222,7 @@
 {#if simple}
   {@const hit = applies("0")}
   <button
-    class={["w-full rounded-field text-left transition-opacity", hit && "trial-hit-row", hit === false && "opacity-60"]}
+    class={["w-full rounded-field text-left transition-opacity", hit && "trial-hit-row", hit === false && "opacity-70"]}
     aria-current={picked === "" ? "true" : undefined}
     data-nav
     onclick={() => onpick("")}
@@ -239,7 +237,7 @@
   </button>
 {:else}
   {@const folded = !!id && folds.has(id)}
-  <div class={["flex items-start gap-1", trial && !trial.hits.length && "opacity-60"]}>
+  <div class={["flex items-start gap-1", trial && !trial.hits.length && "opacity-70"]}>
     {#if id}
       <button
         class="-ml-1 mt-0.5 grid size-6 shrink-0 place-items-center rounded hover:bg-base-content/10"
@@ -259,8 +257,8 @@
   {#if folded}
     <!-- Folded: where its mail can go, in one line. -->
     <button class="route-row mt-1 w-full rounded-field py-1 pl-6 text-left hover:bg-base-content/[0.04]" onclick={() => onpick("")}>
-      <span class="text-[0.875rem] text-base-content/70">{t("route.foldedSummary")}</span>
-      <Outcomes items={blockOutcomes(rule, keywords, delimiter)} {words} />
+      <span class="text-[0.875rem] text-base-content/70">{t("route.casesFirst", { count: top.length })}</span>
+      <Possible items={blockOutcomes(rule, keywords, delimiter)} heading={t("route.foldedSummary")} {words} />
     </button>
   {:else}
     <div class="mt-1">

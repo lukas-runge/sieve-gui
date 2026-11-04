@@ -113,8 +113,8 @@
   <aside class="flex h-full min-w-0 flex-col border-l border-base-300 bg-base-100" aria-label={t("inspector.label")}>
     <header class="flex items-start gap-2 border-b border-base-300 px-4 pt-3 pb-2.5">
       {#if onback}
-        <button class="btn btn-ghost btn-sm btn-square -ml-1.5" aria-label={t("inspector.back")} title={t("inspector.back")} onclick={onback}>
-          <Icon name="arrowLeft" size={17} />
+        <button class="btn btn-ghost btn-sm -ml-1.5 gap-1" title={t("inspector.back")} onclick={onback}>
+          <Icon name="arrowLeft" size={16} />{t("inspector.backShort")}
         </button>
       {/if}
       <div class="min-w-0 grow">

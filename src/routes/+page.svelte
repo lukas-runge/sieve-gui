@@ -23,6 +23,8 @@
   $effect(() => localStorage.setItem("showCode", showCode ? "1" : "0"));
   // Wide windows show the code beside the rules, narrow ones instead of them.
   const wide = new MediaQuery("min-width: 1100px");
+  // Medium windows make room for the panel by folding the sidebar away.
+  const medium = new MediaQuery("min-width: 860px");
 
   const editor = $derived(session.editor);
   const active = $derived(editor ? session.runs(editor.accountId, editor.name) : false);
@@ -63,6 +65,19 @@
   // The sidebar can be folded away; both choices persist.
   let sidebarOpen = $state(localStorage.getItem("sidebar") !== "0");
   $effect(() => localStorage.setItem("sidebar", sidebarOpen ? "1" : "0"));
+  /** The panel sits beside the route (else it takes its place). */
+  const beside = $derived(wide.current || medium.current);
+  /** In medium windows the sidebar steps aside while the panel is open. */
+  let windowWidth = $state(window.innerWidth);
+  let sidebarPinned = $state(false);
+  const sidebarShown = $derived(sidebarOpen && (wide.current || !rightPanel || sidebarPinned));
+  $effect(() => {
+    if (!rightPanel) sidebarPinned = false;
+  });
+  function toggleSidebar() {
+    sidebarOpen = !sidebarShown;
+    sidebarPinned = sidebarOpen;
+  }
   const clampWidth = (w: number) => Math.round(Math.min(Math.max(w, 340), Math.min(820, window.innerWidth * 0.6)));
   let panelWidth = $state(clampWidth(Number(localStorage.getItem("panelWidth")) || 480));
   $effect(() => localStorage.setItem("panelWidth", String(panelWidth)));
@@ -133,13 +148,13 @@
   }
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} bind:innerWidth={windowWidth} />
 
 <div
   class="grid h-screen"
-  style:grid-template-columns="{sidebarOpen ? '16rem' : '0'} minmax(0, 1fr){rightPanel && wide.current ? ` ${panelWidth}px` : ''}"
+  style:grid-template-columns="{sidebarShown ? '16rem' : '0'} minmax(0, 1fr){rightPanel && beside ? ` ${wide.current ? panelWidth : Math.min(panelWidth, Math.round(windowWidth * 0.44))}px` : ''}"
 >
-  <aside class="min-h-0 overflow-hidden border-r border-base-300 bg-base-200" inert={!sidebarOpen}>
+  <aside class="min-h-0 overflow-hidden border-r border-base-300 bg-base-200" inert={!sidebarShown}>
     <Sidebar onaccount={(account) => (accountDialog = { account })} />
   </aside>
 
@@ -148,10 +163,10 @@
       <header class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-base-300 bg-base-100 px-6 py-3">
         <button
           class="btn btn-ghost btn-sm btn-square -ml-2 self-start text-base-content/60"
-          aria-pressed={!sidebarOpen}
-          aria-label={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
-          title={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
-          onclick={() => (sidebarOpen = !sidebarOpen)}
+          aria-pressed={!sidebarShown}
+          aria-label={sidebarShown ? t("sidebar.hide") : t("sidebar.show")}
+          title={sidebarShown ? t("sidebar.hide") : t("sidebar.show")}
+          onclick={toggleSidebar}
         >
           <Icon name="panelLeft" size={17} />
         </button>
@@ -205,7 +220,7 @@
         </div>
       </header>
 
-      {#if rightPanel && !wide.current}
+      {#if rightPanel && !beside}
         <!-- Narrow windows: the inspector or the code takes the place of the route. -->
         <section class="flex min-h-0 grow flex-col">
           {#if showCode}
@@ -301,7 +316,7 @@
     {/if}
   </main>
 
-  {#if rightPanel && wide.current}
+  {#if rightPanel && beside}
     <div class="relative flex min-h-0 min-w-0 flex-col">
     <!-- Drag to make the panel wider or narrower. -->
     <button

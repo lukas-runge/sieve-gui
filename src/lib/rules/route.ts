@@ -28,7 +28,7 @@ export interface ConditionToken {
   fieldTitle: string | null;
   /** "not" etc.: the comparison is negated. */
   negated: boolean;
-  /** How the values are compared ("ends with", "exists", ">" …); none for "contains". */
+  /** How the values are compared ("contains", "ends with", "exists", ">" …); none for "@domain". */
   word: string | null;
   /** Values are patterns or regular expressions: shown in the code font. */
   pattern: boolean;
@@ -81,7 +81,7 @@ const NEGATED: Record<string, string> = {
   notHasType: "hasType",
 };
 
-/** How a value is compared, as a word before it; none for "contains". */
+/** How a value is compared, as a word before it; none for addresses written as "@domain". */
 function compareWord(op: string, part: string): string | null {
   switch (op) {
     case "is":
@@ -96,6 +96,8 @@ function compareWord(op: string, part: string): string | null {
       return t("route.op.matches");
     case "regex":
       return t("route.op.regex");
+    case "contains":
+      return t("route.op.contains");
     default:
       return null;
   }
@@ -316,7 +318,9 @@ export function outcomes(actions: Action[], keywords: Record<string, string>, de
             text: flagName(f, keywords),
             target: a.op === "remove" ? undefined : { kind: "label", key: f },
           });
-        if (a.op === "set") out.push({ kind: "system", path: [], text: t("route.othersCleared") });
+        if (a.op === "set" && labels.length) out.push({ kind: "system", path: [], text: t("route.othersClearedNote") });
+        else if (a.op === "set" && system.length) out[out.length - 1].text += t("route.othersCleared");
+        else if (a.op === "set") out.push({ kind: "system", path: [], text: t("route.allCleared") });
         break;
       }
       case "redirect":

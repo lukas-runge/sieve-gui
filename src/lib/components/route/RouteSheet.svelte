@@ -118,6 +118,14 @@
   const elsewhere = $derived(searching && scope === "script" ? allResults.filter((r) => r.name !== editor.name) : []);
   const caseFilter = $derived(target ? (c: Parameters<typeof caseGoesTo>[0]) => caseGoesTo(c, target!) : null);
 
+  // The picked case stays in view, e.g. when the inspector narrows the route.
+  let sheet = $state<HTMLElement>();
+  $effect(() => {
+    if (!editor.selected) return;
+    void editor.focus;
+    requestAnimationFrame(() => sheet?.querySelector<HTMLElement>('.route [aria-current="true"]')?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+  });
+
   // Another script opened: start over.
   let shownFor: string | null = null;
   $effect(() => {
@@ -236,9 +244,9 @@
   }
 </script>
 
-<section class="route-sheet rounded-box border border-base-300 bg-base-100" aria-label={t("route.heading")}>
+<section class="route-sheet rounded-box border border-base-300 bg-base-100" aria-label={t("route.heading")} bind:this={sheet}>
   <!-- Search: sticks to the top while the list scrolls. -->
-  <div class="sticky top-0 z-20 flex items-center gap-2 rounded-t-box border-b border-base-300 bg-base-100/95 px-3 py-2 backdrop-blur">
+  <div class="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-t-box border-b border-base-300 bg-base-100/95 px-3 py-2 backdrop-blur">
     {#if target}
       <div class="flex min-w-0 grow items-center gap-2 px-1.5 py-1 text-sm">
         <span class="whitespace-nowrap text-base-content/70">{t("target.heading")}</span>
@@ -251,7 +259,7 @@
         <span class="whitespace-nowrap text-[0.8rem] text-base-content/65" role="status">{t("target.count", { count: resultCount, scripts: results.length })}</span>
       </div>
     {:else}
-    <label class="flex min-w-0 grow items-center gap-2 rounded-field px-1.5 py-1 focus-within:bg-base-200">
+    <label class="flex min-w-48 grow basis-48 items-center gap-2 rounded-field px-1.5 py-1 focus-within:bg-base-200">
       <Icon name="search" size={15} class="text-base-content/65" />
       <input
         id="rule-search"
@@ -381,12 +389,19 @@
         {/if}
         {#if groups.head[index]}
           <!-- The folder a run of rules files into, once. -->
-          <div class="col-span-3 grid grid-cols-subgrid pt-2">
+          <!-- The folder a run of rules files into, once, above their destinations. -->
+          <div class="col-span-3 grid grid-cols-subgrid pt-3">
             <span></span>
-            <span class="route-node grid place-items-center"><span class="size-1.5 rounded-full bg-[var(--spine)]"></span></span>
-            <span class="flex items-center gap-1.5 px-2.5 text-[0.875rem] font-medium text-base-content/70">
-              <Icon name="folder" size={14} class="text-primary" />{groups.head[index]}
-            </span>
+            <span></span>
+            <div class="flex items-end gap-2 border-b border-dashed border-base-300 pb-1">
+              <div class="route-row grow px-2.5">
+                <span></span>
+                <span class="flex min-w-0 items-center gap-1.5 text-[0.8rem] font-semibold tracking-wide text-base-content/65 uppercase">
+                  <Icon name="folder" size={13} class="text-primary" /><span class="truncate">{groups.head[index]} /</span>
+                </span>
+              </div>
+              <span class="w-[2.125rem] shrink-0"></span>
+            </div>
           </div>
         {/if}
         {#if searching}

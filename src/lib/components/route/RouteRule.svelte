@@ -57,7 +57,7 @@
 <!-- The case label: "1 if", "2 else if", "otherwise"; nested cases count on
      from their case: "1.2 else if". Fixed width, so conditions line up. -->
 {#snippet label(c: Case, num: string | null, hit: boolean)}
-  <span class="flex w-[7rem] shrink-0 items-center gap-1.5 pt-px" style="color: var(--rail)">
+  <span class="case-label flex w-[7rem] shrink-0 items-center gap-1.5 pt-px" style="color: var(--rail)">
     {#if hit}
       <span class="grid size-[1.25rem] shrink-0 place-items-center rounded-full bg-success text-success-content" title={t("trial.applies")}
         ><Icon name="check" size={13} /></span
@@ -91,7 +91,7 @@
       onpick(path);
     }}
   >
-    <span class="flex min-w-0 items-start gap-1.5">
+    <span class="case-head flex min-w-0 items-start gap-1.5">
       {@render label(c, num, !!hit)}
       <span class="min-w-0">
         {#if c.conditions}
@@ -146,7 +146,7 @@
   >
     <span class="route-row">
       <span class="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-        {#if rule.name}<span class="text-[0.875rem] font-medium text-base-content/70"><Mark text={rule.name} {words} /></span>{/if}
+        {#if rule.name}<span class="font-semibold"><Mark text={rule.name} {words} /></span>{/if}
         <Conditions shape={conditionShape(rule.conditions, false, picked === "" ? Infinity : 3)} {words} />
       </span>
       <Outcomes items={outcomes(rule.actions, keywords, delimiter)} stop={stops(rule.actions)} {singleFolder} {next} {words} {hideParent} {ontarget} />

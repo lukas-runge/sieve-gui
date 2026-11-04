@@ -181,6 +181,21 @@ body {
   }
 }
 
+/* Narrower still: a case's label goes above its conditions. */
+@container route (max-width: 36rem) {
+  .case-head {
+    flex-wrap: wrap;
+    row-gap: 0.15rem;
+  }
+  .case-head > :last-child {
+    flex-basis: 100%;
+    padding-left: 0.4rem;
+  }
+  .route-row.case-row > :last-child {
+    padding-left: 0.4rem;
+  }
+}
+
 /* A simple rule the sample message matched: tinted, without moving its columns. */
 .trial-hit-row {
   --hit: color-mix(in oklab, var(--color-success) 10%, var(--color-base-100));

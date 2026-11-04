@@ -198,7 +198,7 @@ body {
     padding-left: var(--row-indent, 0);
   }
 }
-@container route (max-width: 38rem) {
+@container route (max-width: 46rem) {
   .route-row.case-row {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 0.2rem;

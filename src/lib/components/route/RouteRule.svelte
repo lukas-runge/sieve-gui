@@ -243,6 +243,12 @@
               <div class="pt-1 pb-0.5 pl-6"><Possible items={blockOutcomes(n, keywords, delimiter)} heading={t("route.foldedSummary")} {words} /></div>
             {:else}
               {@render switchCases(n, depth + 1, `${path}.${j}.`, c.kind === "else" ? "" : own)}
+              {#if decides && depth === 0}
+                <!-- Where the way goes on: past the other cases of this rule. -->
+                <p class="mt-0.5 flex items-center gap-1 pl-1 text-[0.8125rem] text-base-content/70">
+                  <Icon name="chevronRight" size={13} />{t("route.chainEnd")}
+                </p>
+              {/if}
             {/if}
           </div>
 {/snippet}
@@ -313,6 +319,7 @@
     <span class="route-row">
       <!-- The name sits above the condition, so conditions start at one edge. -->
       <span class="grid min-w-0 gap-y-0.5">
+        {#if hit}<span class="inline-flex w-fit items-center gap-1 rounded-full bg-success px-1.5 text-[0.75rem] font-semibold text-success-content"><Icon name="check" size={12} />{t("trial.applies")}</span>{/if}
         {#if rule.name}<span class="font-semibold"><Mark text={rule.name} {words} /></span>{/if}
         <Conditions shape={conditionShape(rule.conditions, false, picked === "" ? Infinity : 3)} {words} />
       </span>

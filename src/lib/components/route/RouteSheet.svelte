@@ -392,7 +392,7 @@
             : ""}</span>
       </div>
     {:else}
-    <label class="flex min-w-48 grow basis-48 items-center gap-2 rounded-field px-1.5 py-1 focus-within:bg-base-200">
+    <label class="flex min-w-64 grow basis-72 items-center gap-2 rounded-field px-1.5 py-1 focus-within:bg-base-200">
       <Icon name="search" size={15} class="text-base-content/70" />
       <input
         id="rule-search"
@@ -424,8 +424,9 @@
         >
       {/each}
     </div>
-    <div class="join">
-      <button class="btn btn-primary btn-sm join-item gap-1" disabled={listing || view === "dest"} onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
+    <!-- While results span scripts, the search gets the room. -->
+    <div class={["join", (listing || view === "dest") && "hidden"]}>
+      <button class="btn btn-primary btn-sm join-item gap-1" onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
       <div class="dropdown dropdown-end">
         <div tabindex="0" role="button" class="btn btn-primary btn-sm join-item border-l-primary-content/25 px-1.5" aria-label={t("route.moreAdd")}>
           <Icon name="chevronDown" size={15} />

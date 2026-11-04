@@ -105,7 +105,7 @@
       <span class={["truncate", f.rules.size ? "font-semibold" : "text-base-content/75"]}>{f.name}</span>
       <span class="h-px grow"></span>
       <span class="shrink-0 text-[0.8125rem] text-base-content/70">
-        {#if f.rules.size}{count(f.rules.size)}{:else}{t("dest.below", { count: f.all.size })}{/if}
+        {#if f.rules.size}{t("dest.direct", { rules: count(f.rules.size) })}{/if}{#if f.rules.size && f.all.size > f.rules.size} · {/if}{#if f.all.size > f.rules.size}{t("dest.below", { count: f.all.size - f.rules.size })}{/if}
       </span>
     </button>
     {#if f.children.size && !closed.has(f.raw)}

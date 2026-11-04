@@ -27,12 +27,12 @@
        like the connectors of a route. Groups inside groups nest the same way. -->
   {@const negative = shape.mode === "none" || shape.mode === "notAll"}
   {@const joiner = shape.mode === "any" || shape.mode === "none" ? t("route.or") : t("route.and")}
-  <div class={["grid", nested && "mt-0.5"]}>
-    <span class={["text-[0.75rem] font-bold tracking-wide uppercase", negative ? "text-error" : "text-base-content/85"]}>{t(heading[shape.mode])}</span>
-    <ul class="ml-1 grid border-l-2 border-base-content/35 pl-3">
+  <div class={["grid rounded-field border-l-[3px] bg-base-content/[0.035] py-1 pr-2 pl-2", nested && "mt-0.5", negative ? "border-error/60" : "border-base-content/35"]}>
+    <span class={["text-[0.8125rem] font-semibold", negative ? "text-error" : "text-base-content/90"]}>{t(heading[shape.mode])}</span>
+    <ul class="grid pl-1">
       {#each shape.items as item, i}
         {#if i > 0}
-          <li class="-ml-[1.05rem] py-px leading-none" aria-hidden="true">
+          <li class="py-px leading-none" aria-hidden="true">
             <span class="inline-block rounded-full bg-base-200 px-1.5 text-[0.8125rem] leading-5 font-medium text-base-content/85 ring-1 ring-base-300">{joiner}</span>
           </li>
         {/if}

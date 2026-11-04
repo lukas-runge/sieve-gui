@@ -251,7 +251,7 @@
           <p class="flex items-start gap-1.5 text-base-content/80"><Icon name="alert" size={14} class="mt-0.5 shrink-0 text-error" />{server.error}</p>
           {#if server.certificate}
             {@const untrusted = server.certificate}
-            <button class="btn btn-xs self-start" onclick={() => session.showCertificate(account.id, untrusted)}>{t("certificate.show")}</button>
+            <button class="btn btn-xs justify-self-start" onclick={() => session.showCertificate(account.id, untrusted)}>{t("certificate.show")}</button>
           {:else}
             <button class="btn btn-xs self-start" onclick={() => session.connect(account.id)}>{t("accounts.retry")}</button>
           {/if}

@@ -103,6 +103,8 @@
   const accountLabel = $derived(session.accounts.find((a) => a.id === editor.accountId)?.label ?? "");
 
   let why = $state(false);
+  /** The provisional note, once read, can be put away for good. */
+  let whyDismissed = $state(localStorage.getItem("whyDismissed") === "1");
   /** Whether a script running after this one moves mail too (so folders here are provisional). */
   const laterMoves = $derived.by(() => {
     const i = order.indexOf(editor.name);
@@ -385,7 +387,9 @@
         {/if}
         <span class="whitespace-nowrap text-[0.8125rem] text-base-content/70" role="status">{withInactive
             ? t(resultCount === 1 ? "search.hitOne" : "search.countAll", { count: resultCount })
-            : t(resultCount === 1 ? "target.countOne" : "target.count", { count: resultCount })}</span>
+            : t(resultCount === 1 ? "target.countOne" : "target.count", { count: resultCount })}{caseCount > resultCount
+            ? " · " + t("search.cases", { count: caseCount })
+            : ""}</span>
       </div>
     {:else}
     <label class="flex min-w-48 grow basis-48 items-center gap-2 rounded-field px-1.5 py-1 focus-within:bg-base-200">
@@ -420,8 +424,8 @@
         >
       {/each}
     </div>
-    <div class={["join", (listing || view === "dest") && "hidden"]}>
-      <button class="btn btn-primary btn-sm join-item gap-1" onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
+    <div class="join">
+      <button class="btn btn-primary btn-sm join-item gap-1" disabled={listing || view === "dest"} onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
       <div class="dropdown dropdown-end">
         <div tabindex="0" role="button" class="btn btn-primary btn-sm join-item border-l-primary-content/25 px-1.5" aria-label={t("route.moreAdd")}>
           <Icon name="chevronDown" size={15} />
@@ -558,7 +562,7 @@
         {/if}
       </span>
     </li>
-    {#if running && next && laterMoves}
+    {#if running && next && laterMoves && !whyDismissed}
       <!-- What's shown here isn't necessarily the end of the story. -->
       <li class="route-item text-[0.8125rem] text-base-content/75">
         <span></span><span></span>
@@ -568,16 +572,32 @@
             <button class="font-medium text-primary hover:underline" aria-expanded={why} onclick={() => (why = !why)}>{t("route.why")}</button>
           </p>
           {#if why}
-            <p class="mt-0.5 pl-5">{editor.rules.singleFolder ? t("route.provisional", { name: next }) : t("route.provisionalMore", { name: next })}</p>
+            <p class="mt-0.5 pl-5">
+              <button
+                class="float-right ml-2 text-[0.8125rem] text-base-content/70 hover:underline"
+                onclick={() => {
+                  whyDismissed = true;
+                  localStorage.setItem("whyDismissed", "1");
+                }}>{t("route.whyDismiss")}</button
+              >{editor.rules.singleFolder ? t("route.provisional", { name: next }) : t("route.provisionalMore", { name: next })}</p>
           {/if}
         </div>
       </li>
     {/if}
     <!-- What the right column means, once. -->
-    <li class="route-item pt-1" aria-hidden="true" hidden={searching}>
+    <li class="route-item pt-1" hidden={searching}>
       <span></span><span></span>
-      <span class="route-row px-2.5 text-[0.75rem] font-semibold tracking-wide text-base-content/60 uppercase">
-        <span>{t("route.colIf")}</span><span>{t("route.colDoes")}</span>
+      <span class="route-row px-2.5 text-[0.75rem] font-semibold tracking-wide text-base-content/70 uppercase">
+        <span class="flex flex-wrap items-center gap-x-3">
+          {t("route.colIf")}
+          <!-- What the marks on the line mean. -->
+          <span class="flex items-center gap-2.5 font-normal tracking-normal normal-case">
+            <span class="flex items-center gap-1"><span class="route-mark route-mark-dot"></span>{t("route.legendRule")}</span>
+            <span class="flex items-center gap-1"><span class="route-mark route-mark-diamond scale-75"></span>{t("route.legendCases")}</span>
+            <span class="flex items-center gap-1"><span class="route-mark route-mark-square"></span>{t("route.legendCode")}</span>
+          </span>
+        </span>
+        <span>{t("route.colDoes")}</span>
       </span>
     </li>
 

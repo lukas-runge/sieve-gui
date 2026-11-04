@@ -364,7 +364,7 @@ export function outcomes(actions: Action[], keywords: Record<string, string>, de
  * everywhere. Green (matches, running) and blue (selection, actions) are
  * left out, so a label never looks like a state.
  */
-const LABEL_HUES = [15, 40, 65, 195, 285, 310, 335, 355];
+const LABEL_HUES = [25, 60, 95, 180, 210, 290, 330, 0];
 export function labelHue(name: string): number {
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 997;

@@ -158,6 +158,8 @@ body {
   padding-bottom: 0.25rem;
   margin: 0.15rem 0;
 }
+/* Actions sit at one x-position at every depth: nested blocks indent on
+   the left only. */
 :root {
   --nest-tint: 6%;
 }

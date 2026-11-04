@@ -95,7 +95,7 @@
       <!-- svelte-ignore a11y_no_noninteractive_tabindex: a link when `ontarget` is set -->
       <span
         class={["inline-flex items-center gap-1 rounded-full border px-2 py-px text-[0.875rem] font-medium whitespace-nowrap", ontarget && o.target && "target"]}
-        style="border-color: color-mix(in oklab, var(--color-base-content) 22%, transparent); background: color-mix(in oklab, var(--color-base-content) 4%, transparent)"
+        style="border-color: oklch(0.65 0.11 {h} / 0.6); background: oklch(0.7 0.1 {h} / 0.1)"
         title={o.text.startsWith("$")
           ? t("route.unnamedLabel", { name: o.text })
           : ontarget && o.target

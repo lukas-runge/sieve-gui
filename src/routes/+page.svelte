@@ -248,7 +248,7 @@
             <span class="max-xl:sr-only">{t("trial.button")}</span>
           </button>
           <button
-            hidden={accountView.active}
+            disabled={accountView.active}
             class={["btn btn-ghost btn-sm gap-1.5", showCode && "btn-active"]}
             aria-pressed={showCode}
             title={showCode ? t("editor.hideCode") : t("editor.showCode")}
@@ -257,7 +257,7 @@
             <Icon name="code" size={16} />
             <span class="max-xl:sr-only">{t("editor.code")}</span>
           </button>
-          <button hidden={accountView.active} class="btn btn-primary btn-sm gap-1.5" disabled={!editor.dirty} onclick={() => (deploying = true)} title="⌘S">
+          <button class="btn btn-primary btn-sm gap-1.5" disabled={!editor.dirty || accountView.active} onclick={() => (deploying = true)} title="⌘S">
             <Icon name="save" size={15} />{t("editor.deploy")}
           </button>
         </div>

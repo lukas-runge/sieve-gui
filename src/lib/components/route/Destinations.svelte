@@ -132,7 +132,7 @@
           {@const h = labelHue(l.text)}
           <button
             class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[0.875rem] font-medium hover:brightness-95"
-            style="border-color: color-mix(in oklab, var(--color-base-content) 22%, transparent); background: color-mix(in oklab, var(--color-base-content) 4%, transparent)"
+            style="border-color: oklch(0.65 0.11 {h} / 0.6); background: oklch(0.7 0.1 {h} / 0.1)"
             title={t("target.title", { name: l.text })}
             onclick={() => onpick({ kind: "label", key: l.key, text: l.text, folder: false })}
           >

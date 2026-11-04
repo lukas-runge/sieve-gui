@@ -119,7 +119,7 @@
   </span>
   <!-- In the test: tried and no match, or never tried. -->
   {#if missed}
-    <span class="justify-self-start rounded-full bg-base-content/10 px-2 text-[0.75rem] leading-5 font-medium text-base-content/85" title={t("trial.missed")}>{t("trial.missedShort")}</span>
+    <span class="justify-self-start rounded-full border border-warning/70 px-2 text-[0.75rem] leading-5 font-medium text-base-content/90" title={t("trial.missed")}>✕ {t("trial.missedShort")}</span>
   {:else if untried}
     <span class="text-[0.8125rem] text-base-content/85" title={t("trial.notTriedHint")}>{t("trial.notTried")}</span>
   {/if}
@@ -208,11 +208,11 @@
                decides further (no actions of its own) continues its rail,
                without a box; a check that adds to what a case does is an
                attached section with a "+". -->
-          {@const decides = outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions)}
+          {@const decides = multi}
           <div
             class={[
-              "relative mt-0.5 mb-1 ml-[1.6rem] py-1 pr-1.5",
-              decides ? "pl-1" : "nested-box mx-1 rounded-field border-l-2 border-dashed pl-2",
+              "relative mt-0.5 mb-1 ml-[1.6rem] py-1",
+              decides ? "pl-1" : "nested-box rounded-field border-l-2 border-dashed pl-2",
             ]}
             style="--box: {color}; border-color: {color}; {decides ? '' : `background: color-mix(in oklab, ${color} var(--nest-tint), transparent)`}"
           >
@@ -232,13 +232,9 @@
               <span>
                 {#if !decides}<span class="mr-1 inline-grid size-4 place-items-center rounded-full text-[0.75rem] font-bold text-base-100" style="background: {color}" aria-hidden="true">+</span>{/if}
                 <span class="font-semibold" style="color: {color}">
-                  {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && !multi}{t(
-                    "route.onlyIfAlso",
-                  )}{:else if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions)}{own
-                    ? t("route.decidesIn", { n: own })
-                    : t("route.decidesHere")}{:else if c.kind === "else"}{t("route.nestedInOtherwise")}{:else if own}{t("route.nestedIn", { n: own })}{:else}{t(
-                    "route.nestedHeadingSingle",
-                  )}{/if}</span
+                  {#if decides}{own ? t("route.chainIn", { n: own }) : t("route.chain")}{:else if own}{t("route.extraIn", { n: own })}{:else if c.kind === "else"}{t(
+                      "route.extraInOtherwise",
+                    )}{:else}{t("route.extra")}{/if}</span
                 >
                 {#if multi}<span class="text-base-content/75">· {decides ? t("route.firstOf", { count: cases(n).length }) : t("route.casesFirst", { count: cases(n).length })}</span>{/if}
               </span>

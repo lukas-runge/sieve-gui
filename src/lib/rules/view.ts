@@ -347,6 +347,42 @@ export function operatorsFor(field: Field, part: Part, extensions: string[]): re
   return ops;
 }
 
+/** Headers that hold addresses (RFC 5322 and common delivery headers). */
+const ADDRESS_HEADERS = new Set([
+  "from",
+  "to",
+  "cc",
+  "bcc",
+  "sender",
+  "reply-to",
+  "resent-from",
+  "resent-to",
+  "resent-cc",
+  "resent-bcc",
+  "resent-sender",
+  "return-path",
+  "delivered-to",
+  "x-original-to",
+  "envelope-to",
+  "x-envelope-to",
+  "errors-to",
+  "disposition-notification-to",
+  "mail-followup-to",
+  "mail-reply-to",
+]);
+
+/**
+ * Whether the editor offers an address part. For a header typed in by hand
+ * only if it holds addresses, or a part is chosen already: `X-Spam-Flag`
+ * has none to pick from.
+ */
+export function offersPart(v: ConditionView): boolean {
+  if (!ADDRESS_FIELDS.includes(v.field) || !hasValues(v.operator)) return false;
+  if (v.field !== "header" || v.part !== "header") return true;
+  const names = headerNames(v.header);
+  return names.length > 0 && names.every((n) => ADDRESS_HEADERS.has(n.toLowerCase()));
+}
+
 /** The parts that can be chosen for a field; `current` stays available. */
 export function partsFor(field: Field, extensions: string[], current: Part): readonly Part[] {
   if (!ADDRESS_FIELDS.includes(field)) return [];
@@ -380,9 +416,34 @@ export function withField(v: ConditionView, field: Field): ConditionView {
   return keepOperator({ ...v, field, part });
 }
 
-/** Changing the part keeps operator and values where they still make sense. */
+/**
+ * Changing the part keeps operator and values where they still make sense.
+ * A whole address typed before is cut down to the new part, since e.g. the
+ * domain never contains `max@example.org`.
+ */
 export function withPart(v: ConditionView, part: Part): ConditionView {
-  return keepOperator({ ...v, part });
+  const next = keepOperator({ ...v, part });
+  if (/matches|regex/i.test(next.operator)) return next;
+  return { ...next, values: next.values.map((value) => partOfAddress(value, part)) };
+}
+
+/** The `part` of a value written as (part of) an address; other values unchanged. */
+function partOfAddress(value: string, part: Part): string {
+  const at = value.lastIndexOf("@");
+  const local = at >= 0 ? value.slice(0, at) : value;
+  const plus = local.indexOf("+");
+  switch (part) {
+    case "domain":
+      return at >= 0 ? value.slice(at + 1) : value;
+    case "localPart":
+      return local;
+    case "user":
+      return plus >= 0 ? local.slice(0, plus) : local;
+    case "detail":
+      return plus >= 0 ? local.slice(plus + 1) : at >= 0 ? "" : value;
+    default:
+      return value;
+  }
 }
 
 /** Swaps an operator the field and part don't offer for the closest one. */

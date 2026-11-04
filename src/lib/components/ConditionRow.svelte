@@ -6,6 +6,7 @@
     buildCondition,
     fieldsFor,
     hasValues,
+    offersPart,
     operatorsFor,
     partsFor,
     viewCondition,
@@ -43,18 +44,7 @@
   let editing = $state(false);
   const open = $derived(!compact || editing || !view || (hasValues(view.operator) && view.values.every((v) => v === "")));
   const size = $derived(view?.field === "size" ? splitSize(Number(view.values[0])) : null);
-  // "exists" asks for the header, not a part of its addresses.
-  // For a header typed in by hand, the address part is an expert detail: only
-  // shown once one is chosen.
-  const parts = $derived(
-    view && hasValues(view.operator) && (view.field !== "header" || view.part !== "header")
-      ? partsFor(view.field, extensions, view.part)
-      : [],
-  );
-
-  /** Which part of an address to compare is a detail: shown once asked for or chosen. */
-  let morePart = $state(false);
-  const showPart = $derived(morePart || (!!view && view.part !== "header" && view.part !== "all"));
+  const parts = $derived(view && offersPart(view) ? partsFor(view.field, extensions, view.part) : []);
 
   const regex = $derived(view?.operator === "regex" || view?.operator === "notRegex");
   // The current operator stays selectable, e.g. a regex on a server without `regex`.
@@ -131,15 +121,17 @@
         oninput={(e) => update({ header: e.currentTarget.value }, true)}
       />
     {/if}
-    {#if parts.length > 0 && showPart}
+    {#if parts.length > 0}
+      <!-- Which part of the addresses: the whole line, the address, the domain … -->
       <select
         class="select select-sm w-auto"
         aria-label={t("part.label")}
+        title={t("part.hint")}
         value={view.part}
         onchange={(e) => view && onchange(buildCondition(withPart(view, e.currentTarget.value as Part)), false)}
       >
         {#each parts as part}
-          <option value={part}>{t(`part.${part}` as MessageKey)}</option>
+          <option value={part}>{t(part === "header" && view.field === "header" ? "part.wholeHeader" : (`part.${part}` as MessageKey))}</option>
         {/each}
       </select>
     {/if}
@@ -245,11 +237,6 @@
           <p class="mt-1 text-[0.8rem] text-base-content/70">{t("op.typeHint")}</p>
         {/if}
       </div>
-    {/if}
-    {#if parts.length > 0 && !showPart}
-      <button class="basis-full text-left text-[0.8rem] text-base-content/70 hover:text-base-content hover:underline" onclick={() => (morePart = true)}>
-        {t("part.more")}
-      </button>
     {/if}
   {:else}
     <div class="grow">

@@ -177,6 +177,7 @@
         <ValueList
           values={view.values.length ? view.values : [""]}
           label={t(`op.${view.operator}` as MessageKey)}
+          mono={regex || view.operator === "matches" || view.operator === "notMatches"}
           onchange={(values, merge) => update({ values }, merge)}
         />
         {#if regex}

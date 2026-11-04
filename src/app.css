@@ -164,12 +164,19 @@ body {
 }
 /* Too narrow for two columns (e.g. beside the inspector): what happens goes
    below what is tested, indented to the conditions. */
-@container route (max-width: 46rem) {
+@container route (max-width: 34rem) {
   .route-row {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 0.2rem;
   }
-  .route-row > :last-child {
+}
+/* Cases sit deeper and have a label in front: they need the room sooner. */
+@container route (max-width: 46rem) {
+  .route-row.case-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.2rem;
+  }
+  .route-row.case-row > :last-child {
     padding-left: var(--row-indent, 0);
   }
 }
@@ -181,6 +188,16 @@ body {
   box-shadow:
     0 0 0 0.35rem var(--hit),
     0 0 0 calc(0.35rem + 1px) color-mix(in oklab, var(--color-success) 35%, var(--color-base-100));
+}
+
+/* Small controls stay readable: daisyUI's small sizes are 12px. */
+.input-sm,
+.select-sm,
+.textarea-sm {
+  font-size: 0.875rem;
+}
+.btn-xs {
+  font-size: 0.8rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -73,7 +73,7 @@
   {@const dim = (words.length > 0 && !caseMatches(c, words, keywords, delimiter)) || hit === false}
   <button
     class={[
-      "route-row w-full rounded-field py-1 pr-1 text-left transition-opacity hover:bg-base-content/[0.04]",
+      "route-row case-row w-full rounded-field py-1 pr-1 text-left transition-opacity hover:bg-base-content/[0.04]",
       picked === path && "bg-primary/10 ring-1 ring-primary/35",
       hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
       dim && "opacity-35",

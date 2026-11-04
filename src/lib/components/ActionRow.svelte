@@ -71,8 +71,10 @@
     {@const label = mailboxLabel(action.mailbox)}
     {@const missing = folders.existing !== null && label !== "" && !folderExists(folders.existing, label)}
     <div class="grow min-w-48">
+      <label class={["input input-sm w-full", missing && "input-warning"]}>
+      <Icon name="folder" size={15} class="text-primary" />
       <input
-        class={["input input-sm w-full font-mono", missing && "input-warning"]}
+        class="grow"
         aria-label={t("action.folder")}
         aria-describedby={missing ? `${folderListId}-missing` : undefined}
         placeholder={t("action.folder")}
@@ -80,6 +82,7 @@
         value={label}
         oninput={(e) => onchange({ ...action, mailbox: mailboxRaw(e.currentTarget.value, folders.encoding) }, true)}
       />
+      </label>
       <datalist id={folderListId}>
         {#each folders.labels as folder}<option value={folder}></option>{/each}
       </datalist>
@@ -103,7 +106,7 @@
   {:else if action.type === "redirect"}
     <input
       type="email"
-      class="input input-sm grow min-w-48 font-mono"
+      class="input input-sm grow min-w-48"
       aria-label={t("action.address")}
       placeholder="name@example.com"
       value={action.address}

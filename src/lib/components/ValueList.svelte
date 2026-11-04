@@ -6,8 +6,15 @@
   let {
     values,
     label,
+    mono = false,
     onchange,
-  }: { values: string[]; label: string; onchange: (values: string[], merge: boolean) => void } = $props();
+  }: {
+    values: string[];
+    label: string;
+    /** Patterns and regular expressions show in the code font, like on the route. */
+    mono?: boolean;
+    onchange: (values: string[], merge: boolean) => void;
+  } = $props();
 
   function set(i: number, value: string) {
     onchange(values.map((v, j) => (j === i ? value : v)), true);
@@ -19,7 +26,7 @@
     <div class="flex items-center gap-1.5">
       {#if i > 0}<span class="text-sm text-base-content/60 w-8 text-right">{t("sentence.or")}</span>{/if}
       <input
-        class="input input-sm font-mono grow"
+        class={["input input-sm grow", mono && "font-mono"]}
         aria-label={label}
         placeholder={t("value.placeholder")}
         {value}

@@ -33,7 +33,7 @@
 {:else}
 <span class="grid gap-1 rounded-field border border-dashed border-base-content/25 px-2 py-1.5 text-[0.875rem]">
   <span class="text-[0.8125rem] font-medium text-base-content/70">{heading}</span>
-  <span class="grid gap-1 opacity-85">
+  <span class="grid gap-1">
     {#if folders.length}
       <span class="flex flex-wrap items-baseline gap-x-2"><span class="text-[0.8125rem] text-base-content/70">{t("route.possibleFolders")}</span><Outcomes items={folders} {words} /></span>
     {/if}

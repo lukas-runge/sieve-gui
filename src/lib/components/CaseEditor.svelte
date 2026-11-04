@@ -234,9 +234,7 @@
         onclick={() => onfocus(path.replace(/\d+$/, String(step!.index + 1)))}><Icon name="chevronRight" size={16} /></button
       >
     {/if}
-    {#if step.index > 0 || step.block.elsif.length > 0}
-      <button class="btn btn-ghost btn-sm gap-1 text-base-content/70" onclick={removeCase}><Icon name="trash" size={14} />{t("case.remove")}</button>
-    {/if}
+
   </div>
   {/if}
   {#if hint}<p class="mb-2 text-sm text-base-content/70">{hint}</p>{/if}
@@ -244,18 +242,6 @@
   <button class="btn btn-ghost btn-xs mb-3 -ml-1 gap-1 text-success" onclick={testCase}>
     <Icon name="flask" size={13} />{t("case.test")}
   </button>
-
-  {#if !actionsVisible}
-    <!-- While the conditions fill the panel: what this case does stays in sight. -->
-    <div class="sticky top-0 z-10 -mx-1 mb-3 border-b border-base-200 bg-base-100 px-1 py-1.5 text-[0.8125rem]">
-      <span class="mr-1 font-semibold text-base-content/75">{t("actions.heading")}:</span>
-      {#if outcomes(step.case.actions, keywords, delimiter).length || stops(step.case.actions)}
-        <Outcomes items={outcomes(step.case.actions, keywords, delimiter)} stop={stops(step.case.actions)} {singleFolder} />
-      {:else}
-        <Possible compact items={nestedOutcomes(step.case, keywords, delimiter)} heading={possibleHeading(step.case, label(step.case, step.list, prefix))} />
-      {/if}
-    </div>
-  {/if}
 
   <div class="grid grid-cols-1 gap-4">
     <div bind:this={conditionsEl} class="scroll-mt-12"></div>
@@ -318,6 +304,24 @@
       {#if !step.list.some((c) => c.kind === "else")}
         <button class="btn btn-ghost btn-sm gap-1 text-base-content/75" onclick={() => addCase(true)}><Icon name="plus" size={14} />{t("case.addElse")}</button>
       {/if}
+      {#if step.index > 0 || step.block.elsif.length > 0}
+        <button class="btn btn-ghost btn-sm ml-auto gap-1 text-error/80" onclick={removeCase}><Icon name="trash" size={14} />{t("case.remove")}</button>
+      {/if}
       <p class="basis-full px-1 text-[0.8125rem] text-base-content/70">{t("case.addElsifHint")}</p>
   </div>
+  {#if !actionsVisible}
+    <!-- While the conditions fill the panel: what this case does stays in sight. -->
+    <!-- Wenn stays first: the summary of "Dann" sits at the bottom edge. -->
+    <button
+      class="sticky bottom-0 z-10 -mx-4 mt-3 block w-[calc(100%+2rem)] border-t border-base-300 bg-base-100 px-4 py-2 text-left text-[0.8125rem] shadow-[0_-6px_12px_-10px_rgb(0_0_0/0.4)]"
+      onclick={() => actionsEl?.scrollIntoView({ block: "start", behavior: "smooth" })}
+    >
+      <span class="mr-1 font-semibold text-base-content/75">{t("actions.heading")} ↓</span>
+      {#if outcomes(step.case.actions, keywords, delimiter).length || stops(step.case.actions)}
+        <Outcomes items={outcomes(step.case.actions, keywords, delimiter)} stop={stops(step.case.actions)} {singleFolder} />
+      {:else}
+        <Possible compact items={nestedOutcomes(step.case, keywords, delimiter)} heading={possibleHeading(step.case, label(step.case, step.list, prefix))} />
+      {/if}
+    </button>
+  {/if}
 {/if}

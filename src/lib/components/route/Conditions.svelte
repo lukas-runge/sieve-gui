@@ -33,7 +33,7 @@
       {#each shape.items as item, i}
         {#if i > 0}
           <li class="-ml-[1.05rem] py-px leading-none" aria-hidden="true">
-            <span class="inline-block rounded-full bg-base-200 px-1.5 text-[0.75rem] leading-4 font-medium text-base-content/75 ring-1 ring-base-300">{joiner}</span>
+            <span class="inline-block rounded-full bg-base-200 px-1.5 text-[0.8125rem] leading-5 font-medium text-base-content/85 ring-1 ring-base-300">{joiner}</span>
           </li>
         {/if}
         <li class="min-w-0 py-0.5">

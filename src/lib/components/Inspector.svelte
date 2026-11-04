@@ -132,7 +132,7 @@
         </p>
         {#if item.type === "rule"}
           <!-- The name edits in place: a pencil and a hover frame say so. -->
-          <label class="group/name -mx-1 flex items-center gap-1.5 rounded-field border border-dashed border-base-content/20 px-1 hover:border-base-content/40 hover:bg-base-200 focus-within:border-primary focus-within:bg-base-200">
+          <label class="group/name -mx-1 flex items-center gap-1.5 rounded-field border border-transparent px-1 hover:border-base-content/30 hover:bg-base-200 focus-within:border-primary focus-within:bg-base-200">
           <input
             class="w-full bg-transparent text-lg font-semibold outline-none placeholder:font-normal placeholder:text-base-content/65"
             aria-label={t("rule.name")}

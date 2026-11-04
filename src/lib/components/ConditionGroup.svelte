@@ -153,7 +153,7 @@
         class="btn btn-ghost btn-sm btn-square ml-auto"
         aria-label={t("conditions.removeGroup")}
         title={t("conditions.removeGroup")}
-        onclick={() => onremove?.()}><Icon name="x" size={15} /></button
+        onclick={() => onremove?.()}><Icon name="trash" size={15} /></button
       >
     </div>
     {#if !folded}{@render body()}{/if}

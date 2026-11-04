@@ -136,7 +136,7 @@
       bare && "pl-1.5",
       depth > 0 && "case-deep",
       picked === path && !c.nested.length && "ring-2 ring-primary/70",
-      hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
+      hit && picked !== path && "bg-success/15 ring-2 ring-success/60",
       dim && "opacity-70",
     ]}
     style="--row-indent: {bare ? '0px' : 'calc(7rem + 0.375rem)'}"
@@ -180,9 +180,9 @@
       <!-- Where its mail can go, muted, with what it depends on as a caption. -->
       <span class="grid gap-0.5 rounded-field border border-dashed border-base-content/25 px-2 py-1">
         <span class="flex items-start gap-1 text-[0.8125rem] font-medium text-base-content/80"
-          ><Icon name="chevronDown" size={13} class="mt-0.5 shrink-0" />{t("route.possible")} {possibleHeading(c, num).replace(/:$/, "")}</span
+          ><Icon name="chevronDown" size={13} class="mt-0.5 shrink-0" />{t("route.possibleMaybe")} {possibleHeading(c, num).replace(/:$/, "")}:</span
         >
-        <span class="opacity-70"><Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} /></span>
+        <Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} />
       </span>
     {:else}
       <span class="grid gap-0.5">
@@ -191,7 +191,7 @@
           <!-- What the added check may add on top. -->
           <span class="flex flex-wrap items-center gap-x-1.5 text-[0.8125rem] text-base-content/75">
             <span class="font-medium">{t("route.maybeAlso")}</span>
-            <span class="opacity-70"><Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} /></span>
+            <Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} />
           </span>
         {/if}
       </span>

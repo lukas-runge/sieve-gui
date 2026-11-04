@@ -380,7 +380,7 @@
         </span>
         {#if target.folder}
           <label class="flex items-center gap-1.5 whitespace-nowrap text-[0.8125rem] text-base-content/75">
-            <input type="checkbox" class="checkbox checkbox-xs" bind:checked={target.subfolders} />{t("target.subfolders")}
+            <input type="checkbox" class="checkbox checkbox-sm rounded" bind:checked={target.subfolders} />{t("target.subfolders")}
           </label>
         {/if}
         <span class="whitespace-nowrap text-[0.8125rem] text-base-content/70" role="status">{withInactive
@@ -516,7 +516,7 @@
                 <button class="w-full text-left" onclick={() => openMatch(r.name, hit.index, "")}>
                   <span class="font-semibold">{t("raw.heading")}</span>
                   <span class="text-[0.8125rem] text-base-content/70">{t("route.codeNote")}</span>
-                  <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] break-all whitespace-pre-wrap text-base-content/70">{hit.item.code.trim()}</pre>
+                  <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] whitespace-pre-wrap text-base-content/75 [overflow-wrap:break-word]">{hit.item.code.trim()}</pre>
                 </button>
               {/if}
             </div>
@@ -621,8 +621,7 @@
             <span class="route-node grid place-items-center"><span class="size-1.5 rounded-full bg-[var(--spine)]"></span></span>
             <div class="flex items-center gap-2 px-2.5 text-[0.875rem]">
               <span class="text-[0.8125rem] text-base-content/70">{t("route.groupHead")}</span>
-              <Icon name="folder" size={14} class="text-base-content/60" />
-              <span class="font-semibold text-base-content/90">{groups.head[index]}</span>
+              <span class="font-semibold text-base-content/90" title={t("route.groupTitle")}>{groups.head[index]}</span>
               <span class="h-px grow bg-base-300"></span>
               <span class="pr-2 text-[0.8125rem] text-base-content/70">{t("route.groupCount", { count: groups.size[index] })}</span>
             </div>
@@ -681,7 +680,7 @@
                     <span class="badge badge-sm badge-soft badge-warning">{t("roundcube.badge")}</span>
                   {/if}
                 </span>
-                <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] leading-snug break-all whitespace-pre-wrap text-base-content/70">{item.code.trim() || "…"}</pre>
+                <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] leading-snug whitespace-pre-wrap text-base-content/75 [overflow-wrap:break-word]">{item.code.trim() || "…"}</pre>
               </button>
             {/if}
           </div>

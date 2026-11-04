@@ -83,33 +83,24 @@
 </script>
 
 {#snippet folder(f: Folder, depth: number)}
-  <li>
+  <li class="relative">
+    {#if f.children.size}
+      <!-- Folds the folders below; a button of its own beside the folder. -->
+      <button
+        class="absolute top-1 grid size-6 place-items-center rounded hover:bg-base-300"
+        style="left: {depth * 1.25 - 0.9}rem"
+        aria-expanded={!closed.has(f.raw)}
+        aria-label={closed.has(f.raw) ? t("dest.open", { name: f.name }) : t("dest.close", { name: f.name })}
+        onclick={() => (closed.has(f.raw) ? closed.delete(f.raw) : closed.add(f.raw))}
+        ><Icon name={closed.has(f.raw) ? "chevronRight" : "chevronDown"} size={13} /></button
+      >
+    {/if}
     <button
       class="flex w-full items-center gap-2 rounded-field py-1 pr-2 text-left hover:bg-base-200"
       style="padding-left: {0.5 + depth * 1.25}rem"
       title={t("target.title", { name: f.path.join(" / ") })}
       onclick={() => onpick({ kind: "folder", key: f.raw, subfolders: f.rules.size === 0, text: f.path.join(" / "), folder: true })}
     >
-      {#if f.children.size}
-        <span
-          role="button"
-          tabindex="0"
-          class="-ml-1 grid size-5 place-items-center rounded hover:bg-base-300"
-          aria-label={closed.has(f.raw) ? t("route.unfold") : t("route.fold")}
-          onclick={(e) => {
-            e.stopPropagation();
-            if (closed.has(f.raw)) closed.delete(f.raw);
-            else closed.add(f.raw);
-          }}
-          onkeydown={(e) => {
-            if (e.key !== "Enter") return;
-            e.stopPropagation();
-            e.preventDefault();
-            if (closed.has(f.raw)) closed.delete(f.raw);
-            else closed.add(f.raw);
-          }}><Icon name={closed.has(f.raw) ? "chevronRight" : "chevronDown"} size={13} /></span
-        >
-      {/if}
       <Icon name="folder" size={15} class={f.rules.size ? "text-primary" : "text-base-content/50"} />
       <span class={["truncate", f.rules.size ? "font-semibold" : "text-base-content/75"]}>{f.name}</span>
       <span class="h-px grow"></span>
@@ -125,7 +116,7 @@
   </li>
 {/snippet}
 
-<div class="grid gap-5 px-3 py-4">
+<div class="grid gap-5 py-4 pr-3 pl-6">
   <div class="grid gap-1.5 px-1">
     <p class="text-sm text-base-content/75">{t("dest.intro", { count: scripts.length })}</p>
     <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] text-base-content/70">

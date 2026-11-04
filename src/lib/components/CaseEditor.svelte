@@ -201,13 +201,8 @@
   </div>
 {:else}
   <!-- Where the case sits: the cases above it, one line each. -->
-  {#if chain!.length > 1 || cases(rule).length > 1}
+  {#if chain!.length > 1}
   <nav class="mb-4 grid grid-cols-1 gap-0.5 rounded-box bg-base-200/60 p-1.5" aria-label={t("case.context")}>
-    {#if cases(rule).length > 1}
-      <button class="flex items-center gap-1.5 rounded-field px-2 py-1 text-left text-[0.8125rem] font-medium text-base-content/70 hover:bg-base-200" onclick={() => onfocus("")}>
-        <Icon name="arrowLeft" size={13} />{t("case.all", { count: cases(rule).length })}
-      </button>
-    {/if}
     {#each chain!.slice(0, -1) as s, i}
       <div style="padding-left: {i * 0.9}rem">
         {@render caseLine(s.case, s.list, caseNumber(chain!.slice(0, i)), s.path, `var(--rail-${Math.min(i, 3)})`, true)}
@@ -250,30 +245,16 @@
     <Icon name="flask" size={13} />{t("case.test")}
   </button>
 
-  {#if step.case.nested.length}
-    <!-- A long case: jump to its parts. -->
-    <nav class="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap items-center gap-1 border-b border-base-200 bg-base-100 px-1 py-1" aria-label={t("case.parts")}>
-      <span class="mr-1 text-[0.8125rem] text-base-content/70">{t("case.jump")}</span>
-      {#each [{ el: conditionsEl, label: t("conditions.heading") }, { el: actionsEl, label: t("actions.heading") }, { el: checksEl, label: t("case.checkOne") }] as part}
-        {#if part.el}
-          <button
-            class={["rounded px-1.5 py-0.5 text-[0.8125rem] underline-offset-2 hover:underline", activePart === part.el ? "font-semibold text-primary underline" : "text-base-content/80"]}
-            aria-current={activePart === part.el ? "true" : undefined}
-            onclick={() => part.el?.scrollIntoView({ block: "start", behavior: "smooth" })}>{part.label}</button
-          >
-        {/if}
-      {/each}
-      {#if !actionsVisible}
-        <!-- While the conditions fill the panel: what this case does stays in sight. -->
-        <span class="basis-full pt-1 text-[0.8125rem]">
-          {#if outcomes(step.case.actions, keywords, delimiter).length || stops(step.case.actions)}
-            <Outcomes items={outcomes(step.case.actions, keywords, delimiter)} stop={stops(step.case.actions)} {singleFolder} />
-          {:else}
-            <Possible compact items={nestedOutcomes(step.case, keywords, delimiter)} heading={possibleHeading(step.case, label(step.case, step.list, prefix))} />
-          {/if}
-        </span>
+  {#if !actionsVisible}
+    <!-- While the conditions fill the panel: what this case does stays in sight. -->
+    <div class="sticky top-0 z-10 -mx-1 mb-3 border-b border-base-200 bg-base-100 px-1 py-1.5 text-[0.8125rem]">
+      <span class="mr-1 font-semibold text-base-content/75">{t("actions.heading")}:</span>
+      {#if outcomes(step.case.actions, keywords, delimiter).length || stops(step.case.actions)}
+        <Outcomes items={outcomes(step.case.actions, keywords, delimiter)} stop={stops(step.case.actions)} {singleFolder} />
+      {:else}
+        <Possible compact items={nestedOutcomes(step.case, keywords, delimiter)} heading={possibleHeading(step.case, label(step.case, step.list, prefix))} />
       {/if}
-    </nav>
+    </div>
   {/if}
 
   <div class="grid grid-cols-1 gap-4">

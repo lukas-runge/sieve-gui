@@ -103,8 +103,10 @@
   <span class="case-label grid w-[7rem] shrink-0 gap-0.5 pt-px">
   <span class="flex items-center gap-1.5" style="color: var(--rail)">
     {#if hit}
-      <span class="grid size-[1.25rem] shrink-0 place-items-center rounded-full bg-success text-success-content" title={t("trial.applies")}
-        ><Icon name="check" size={13} /></span
+      <!-- Applies to the test message: the number stays, on green. -->
+      <span
+        class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full bg-success px-[0.3rem] text-[0.8125rem] font-bold text-success-content"
+        title={t("trial.applies")}>{#if num}{num}{:else}<Icon name="check" size={13} />{/if}</span
       >
     {:else if num}
       <span class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full border-2 px-[0.3rem] text-[0.8125rem] font-bold" style="border-color: var(--rail)"
@@ -119,7 +121,7 @@
   {#if missed}
     <span class="justify-self-start rounded-full bg-base-content/10 px-2 text-[0.75rem] leading-5 font-medium text-base-content/85" title={t("trial.missed")}>{t("trial.missedShort")}</span>
   {:else if untried}
-    <span class="text-[0.75rem] text-base-content/85 italic" title={t("trial.notTriedHint")}>{t("trial.notTried")}</span>
+    <span class="text-[0.8125rem] text-base-content/85" title={t("trial.notTriedHint")}>{t("trial.notTried")}</span>
   {/if}
   </span>
 {/snippet}
@@ -133,7 +135,7 @@
       "route-row case-row w-full rounded-field py-1 pr-1 text-left transition-opacity hover:bg-base-content/[0.04]",
       bare && "pl-1.5",
       depth > 0 && "case-deep",
-      picked === path && "ring-2 ring-primary/70",
+      picked === path && !c.nested.length && "ring-2 ring-primary/70",
       hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
       dim && "opacity-70",
     ]}
@@ -175,9 +177,13 @@
     </span>
     {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && c.nested.length}
       <!-- Nothing of its own: what happens is in the check below. -->
-      <span class="flex items-start gap-1 text-[0.8125rem] text-base-content/75"
-        ><Icon name="chevronDown" size={13} class="mt-0.5 shrink-0" />{possibleHeading(c, num).replace(/:$/, "")}</span
-      >
+      <!-- Where its mail can go, muted, with what it depends on as a caption. -->
+      <span class="grid gap-0.5">
+        <span class="opacity-70"><Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} /></span>
+        <span class="flex items-start gap-1 text-[0.8125rem] text-base-content/75"
+          ><Icon name="chevronDown" size={13} class="mt-0.5 shrink-0" />{possibleHeading(c, num).replace(/:$/, "")}</span
+        >
+      </span>
     {:else}
       <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
     {/if}
@@ -275,7 +281,7 @@
       {@const own = single ? pre : pre ? `${pre}.${c.number}` : String(c.number)}
       <li>
         <!-- A case with checks inside: row and checks in one frame, so they read as one. -->
-        <div class={c.nested.length > 0 ? "case-frame" : undefined}>
+        <div class={[c.nested.length > 0 && "case-frame", c.nested.length > 0 && picked === path && "ring-2 ring-primary/60"]}>
         {@render caseRow(c, num, path, dead.has(i), pre, depth)}
         {#each c.nested as n, j}
           {@render nestedBox(c, n, j, path, depth, own)}

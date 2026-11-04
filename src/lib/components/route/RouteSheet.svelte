@@ -622,7 +622,7 @@
             <div class="flex items-center gap-2 px-2.5 text-[0.875rem]">
               <span class="text-[0.8125rem] text-base-content/70">{t("route.groupHead")}</span>
               <Icon name="folder" size={14} class="text-base-content/60" />
-              <span class="font-semibold text-base-content/90">{groups.head[index]!.split(" / ").join(" › ")}</span>
+              <span class="font-semibold text-base-content/90">{groups.head[index]}</span>
               <span class="h-px grow bg-base-300"></span>
               <span class="pr-2 text-[0.8125rem] text-base-content/70">{t("route.groupCount", { count: groups.size[index] })}</span>
             </div>

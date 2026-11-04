@@ -121,9 +121,10 @@
       {/if}
       <div class="min-w-0 grow">
         <p class="truncate text-[0.8rem] text-base-content/65">
-          {#if item.type === "raw"}{t("raw.heading")}{:else if isSimple(item)}{t("inspector.rule")}{:else if cases(item).length > 1}{t(
-              "inspector.switch",
-            )}{:else}{t("inspector.withCheck")}{/if}
+          {#if item.type === "raw"}{t("raw.heading")}{:else if isSimple(item)}{t("inspector.rule")}{:else if cases(item).length > 1}<!-- The path back to all cases. --><button
+              class="hover:text-base-content hover:underline"
+              onclick={() => (editor.focus = "")}>{t("inspector.switchAll", { count: cases(item).length })}</button
+            >{:else}{t("inspector.withCheck")}{/if}
           {#if item.type === "rule" && editor.focus && casePathLabel(item, editor.focus)}
             <span class="text-base-content/65">›</span> <span class="font-medium text-base-content/80">{casePathLabel(item, editor.focus)}</span>
           {/if}

@@ -32,15 +32,15 @@
 
 {#snippet value(v: ConditionToken["values"][number], i: number)}
   <span class={["token-value min-w-0 text-base-content [overflow-wrap:anywhere]", token.pattern ? "pattern-value font-mono text-[0.875rem]" : "text-[0.94rem]"]}
-    >{#if v.before}<span class="text-base-content/65">{v.before}</span>{/if}<Mark text={v.text} {words} breaks={!token.pattern} />{#if v.after}<span
+    >{#if v.before}<span class="text-base-content/65">{v.before}</span>{/if}<Mark text={v.text} {words} breaks={!token.pattern} pattern={token.pattern} />{#if v.after}<span
         class="font-normal text-base-content/70">{v.after}</span
       >{/if}{#if i < token.values.length - 1}<span class="font-normal text-base-content/70">{token.negated ? ", " : t("route.listOr")}</span>{/if}</span
   >
 {/snippet}
 
 <style>
-  /* Patterns break anywhere: they have no words to break at. */
+  /* Patterns break after "|", or anywhere only when a piece is too long. */
   :global(.pattern-value) {
-    word-break: break-all;
+    overflow-wrap: anywhere;
   }
 </style>

@@ -44,6 +44,10 @@
       : [],
   );
 
+  /** Which part of an address to compare is a detail: shown once asked for or chosen. */
+  let morePart = $state(false);
+  const showPart = $derived(morePart || (!!view && view.part !== "header" && view.part !== "all"));
+
   const regex = $derived(view?.operator === "regex" || view?.operator === "notRegex");
   // The current operator stays selectable, e.g. a regex on a server without `regex`.
   const operators = $derived(
@@ -88,7 +92,9 @@
   }
 </script>
 
-<div class="flex flex-wrap items-start gap-2 rounded-field bg-base-200/70 p-2">
+<!-- One sentence: [field] [compare] [values], the remove button at its end. -->
+<div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-1 rounded-field bg-base-200/70 p-2">
+  <div class="flex min-w-0 flex-wrap items-start gap-2">
   {#if view}
     <select
       class="select select-sm w-auto"
@@ -110,7 +116,7 @@
         oninput={(e) => update({ header: e.currentTarget.value }, true)}
       />
     {/if}
-    {#if parts.length > 0}
+    {#if parts.length > 0 && showPart}
       <select
         class="select select-sm w-auto"
         aria-label={t("part.label")}
@@ -178,6 +184,7 @@
           values={view.values.length ? view.values : [""]}
           label={t(`op.${view.operator}` as MessageKey)}
           mono={regex || view.operator === "matches" || view.operator === "notMatches"}
+          placeholder={view.part !== "header" ? samplePlaceholder(view) : undefined}
           onchange={(values, merge) => update({ values }, merge)}
         />
         {#if regex}
@@ -218,14 +225,20 @@
         {/if}
       </div>
     {/if}
+    {#if parts.length > 0 && !showPart}
+      <button class="basis-full text-left text-[0.8rem] text-base-content/60 hover:text-base-content hover:underline" onclick={() => (morePart = true)}>
+        {t("part.more")}
+      </button>
+    {/if}
   {:else}
     <div class="grow">
       <code class="block font-mono text-sm break-all">{print(condition)}</code>
       <p class="mt-1 text-[0.8rem] text-base-content/60">{t("conditions.advanced")}</p>
     </div>
   {/if}
+  </div>
   <button
-    class="btn btn-ghost btn-sm btn-square ml-auto text-base-content/65"
+    class="btn btn-ghost btn-sm btn-square text-base-content/65"
     aria-label={t("conditions.remove")}
     title={t("conditions.remove")}
     onclick={onremove}><Icon name="trash" size={15} /></button

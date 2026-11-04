@@ -156,21 +156,27 @@
       {/if}
     </button>
     {#if !(running && node.via)}
-      <button
-        class={[
-          "grid size-6 shrink-0 place-items-center rounded-full",
-          active ? "text-base-content/65 hover:bg-base-200 hover:text-base-content" : "text-primary hover:bg-primary/12",
-          "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
-          current && "opacity-100",
-        ]}
-        aria-pressed={active}
-        aria-label="{name}: {active ? t('scripts.deactivate') : t('scripts.activate')}"
-        title={active ? t("scripts.deactivate") : t("scripts.activate")}
-        disabled={toggling.has(key)}
-        onclick={() => toggle(id, name, active)}
-      >
-        {#if toggling.has(key)}<span class="loading loading-spinner loading-xs"></span>{:else}<Icon name={active ? "pause" : "play"} size={12} />{/if}
-      </button>
+      <!-- On/off as a switch: what it does is visible without a tooltip. -->
+      {#if toggling.has(key)}
+        <span class="grid w-7 shrink-0 place-items-center"><span class="loading loading-spinner loading-xs"></span></span>
+      {:else}
+        <input
+          type="checkbox"
+          class={[
+            "toggle toggle-xs shrink-0",
+            active && "toggle-success",
+            "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
+            current && "opacity-100",
+          ]}
+          checked={active}
+          aria-label="{name}: {active ? t('scripts.deactivate') : t('scripts.activate')}"
+          title={active ? t("scripts.deactivate") : t("scripts.activate")}
+          onchange={(e) => {
+            e.currentTarget.checked = active;
+            toggle(id, name, active);
+          }}
+        />
+      {/if}
     {/if}
     <div class="dropdown dropdown-end">
       <div

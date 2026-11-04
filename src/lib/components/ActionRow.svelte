@@ -8,7 +8,7 @@
   import { isKeyword } from "../keywords";
   import { session } from "../session.svelte";
   import Icon from "./Icon.svelte";
-  import { flagFromText, flagName, SYSTEM_FLAG_LIST } from "../rules/route";
+  import { flagFromText, flagName, labelHue, SYSTEM_FLAG_LIST } from "../rules/route";
 
   let {
     action,
@@ -55,7 +55,9 @@
 
 </script>
 
-<div class="flex flex-wrap items-start gap-2 rounded-field bg-base-200/70 p-2">
+<!-- The action as one line where it fits, the remove button at its end. -->
+<div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-1 rounded-field bg-base-200/70 p-2">
+  <div class="flex min-w-0 flex-wrap items-start gap-2">
   <select
     class="select select-sm w-auto"
     aria-label={t("actions.heading")}
@@ -123,10 +125,14 @@
   {:else if action.type === "flags" && kind !== "markRead" && kind !== "flag"}
     {@const flags = action.flags}
     <div class="grid grow min-w-48 gap-1.5">
-      <div class="flex flex-wrap items-center gap-1.5">
+      <!-- One field: the labels as chips, typing adds another. -->
+      <label class="input input-sm flex h-auto min-h-8 w-full flex-wrap items-center gap-1 py-1">
         {#each flags as flag, i}
           {@const unnamed = isKeyword(flag) && !keywordNames[flag]}
-          <span class="inline-flex items-center gap-0.5 rounded-full border border-base-300 bg-base-100 py-px pr-0.5 pl-2 text-sm">
+          <span
+            class="inline-flex items-center gap-0.5 rounded-full border py-px pr-0.5 pl-2 text-sm font-medium"
+            style="border-color: oklch(0.7 0.09 {labelHue(flagName(flag, keywordNames))} / 0.55); background: oklch(0.7 0.09 {labelHue(flagName(flag, keywordNames))} / 0.12)"
+          >
             {#if isKeyword(flag) && accountId}
               <button
                 type="button"
@@ -146,7 +152,7 @@
           </span>
         {/each}
         <input
-          class="input input-sm min-w-40 grow"
+          class="min-w-32 grow bg-transparent outline-none"
           aria-label={t("action.flags")}
           placeholder={t("action.flagAdd")}
           list="{folderListId}-flags"
@@ -163,11 +169,11 @@
             e.currentTarget.value = "";
           }}
         />
-        <datalist id="{folderListId}-flags">
-          {#each SYSTEM_FLAG_LIST as f}<option value={flagName(f, {})}></option>{/each}
-          {#each Object.values(keywordNames) as name}<option value={name}></option>{/each}
-        </datalist>
-      </div>
+      </label>
+      <datalist id="{folderListId}-flags">
+        {#each SYSTEM_FLAG_LIST as f}<option value={flagName(f, {})}></option>{/each}
+        {#each Object.values(keywordNames) as name}<option value={name}></option>{/each}
+      </datalist>
       {#if flags.some((f) => isKeyword(f) && !keywordNames[f])}
         <p class="text-[0.8rem] text-base-content/65">{t("action.flagNameHint")}</p>
       {/if}
@@ -215,8 +221,9 @@
     </div>
   {/if}
 
+  </div>
   <button
-    class="btn btn-ghost btn-sm btn-square ml-auto text-base-content/65"
+    class="btn btn-ghost btn-sm btn-square text-base-content/65"
     aria-label={t("actions.remove")}
     title={t("actions.remove")}
     onclick={onremove}><Icon name="trash" size={15} /></button

@@ -124,7 +124,12 @@
         {/if}
       </span>
     </span>
-    <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
+    {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && c.nested.length}
+      <!-- Nothing of its own: what happens is in the check below. -->
+      <span class="flex items-center gap-1 text-[0.875rem] text-base-content/60"><Icon name="chevronDown" size={14} />{t("route.seeBelow")}</span>
+    {:else}
+      <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
+    {/if}
   </button>
 {/snippet}
 
@@ -152,14 +157,16 @@
           {@const multi = cases(n).length > 1}
           {@const color = `var(--rail-${Math.min(depth + 1, 3)})`}
           <!-- A check inside this case: a box of its own, one rail deeper, saying whose it is. -->
+          <!-- Hangs off its case's number by an elbow, indented: a child, not a sibling. -->
           <div
-            class="my-1 ml-1 rounded-field border-l-2 py-1.5 pr-1.5 pl-2"
-            style="border-color: {color}; background: color-mix(in oklab, {color} 6%, transparent)"
+            class="nested-box relative mt-0.5 mb-1.5 ml-[1.6rem] rounded-field border-l-2 py-1.5 pr-1.5 pl-2"
+            style="--box: {color}; border-color: {color}; background: color-mix(in oklab, {color} 6%, transparent)"
           >
             <p class={["mb-1 pl-1 text-[0.875rem] text-base-content/70", applies(path) === false && "opacity-60"]}>
               <span class="font-semibold" style="color: {color}">
                 {#if c.kind === "else"}{t("route.nestedInOtherwise")}{:else if own}{t("route.nestedIn", { n: own })}{:else}{t("route.nestedHeadingSingle")}{/if}</span
-              >{multi ? t("route.firstMatchTail") : ""}
+              >
+              {#if multi}<span class="text-base-content/65">· {t("route.casesFirst", { count: cases(n).length })}</span>{/if}
             </p>
             {@render switchCases(n, depth + 1, `${path}.${j}.`, c.kind === "else" ? "" : own)}
           </div>

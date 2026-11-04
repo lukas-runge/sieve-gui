@@ -8,7 +8,7 @@
   import type { RuleItem } from "#tauri/types";
   import { session } from "../../session.svelte";
   import type { ScriptEditor } from "../../editor.svelte";
-  import { uid } from "../../editor.svelte";
+  import { uid, type EditorItem } from "../../editor.svelte";
   import { t } from "../../i18n.svelte";
   import { closesMenu } from "../../menu";
   import { isSimple, outcomes } from "../../rules/route";
@@ -17,6 +17,8 @@
   import type { ScriptRun } from "../../rules/simulate";
   import { trial as sample } from "../../trial.svelte";
   import { newRule } from "../../rules/view";
+  import { addresses } from "../../rules/simulate";
+  import { templateRule, type TemplateKind } from "../../rules/templates";
   import Icon from "../Icon.svelte";
   import RouteRule from "./RouteRule.svelte";
 
@@ -77,17 +79,19 @@
       return moves.length === 1 && moves[0].path.length > 1 ? moves[0].path.slice(0, -1).join(" / ") : null;
     });
     const head: (string | null)[] = parents.map(() => null);
+    const size: number[] = parents.map(() => 0);
     const grouped: boolean[] = parents.map(() => false);
     for (let i = 0; i < parents.length; ) {
       let j = i;
       while (parents[i] && parents[j + 1] === parents[i]) j++;
       if (parents[i] && j > i) {
         head[i] = parents[i];
+        size[i] = j - i + 1;
         grouped.fill(true, i, j + 1);
       }
       i = j + 1;
     }
-    return { head, grouped };
+    return { head, grouped, size };
   });
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
@@ -216,24 +220,31 @@
     });
   }
 
-  export function addRule() {
+  /** New items go after the picked rule, or at the end. */
+  function insert(item: EditorItem) {
     editor.focus = "";
-    const item = { type: "rule" as const, ...newRule(t("rule.new")), uid: uid() };
+    const at = editor.rules.items.findIndex((i) => i.uid === editor.selected);
     editor.edit((rules) => {
-      rules.items.push(item);
+      rules.items.splice(at >= 0 ? at + 1 : rules.items.length, 0, item);
     });
     query = "";
+    target = null;
     editor.selected = item.uid;
   }
 
+  export function addRule() {
+    insert({ type: "rule", ...newRule(t("rule.new")), uid: uid() });
+  }
+
+  function addTemplate(kind: TemplateKind, value = "") {
+    insert({ type: "rule", ...templateRule(kind, t(`template.${kind}Name`), value), uid: uid() });
+  }
+
+  /** The sender's domain of the sample message, for a rule made from it. */
+  const sampleDomain = $derived(addresses([sample.mail.from])[0]?.split("@")[1] ?? "");
+
   function addCode() {
-    editor.focus = "";
-    const item = { type: "raw" as const, code: "", uid: uid() };
-    editor.edit((rules) => {
-      rules.items.push(item);
-    });
-    query = "";
-    editor.selected = item.uid;
+    insert({ type: "raw", code: "", uid: uid() });
   }
 
   function onhandlekey(e: KeyboardEvent, index: number) {
@@ -273,6 +284,11 @@
             <Icon name="x" size={13} />
           </button>
         </span>
+        {#if target.folder}
+          <label class="flex items-center gap-1.5 whitespace-nowrap text-[0.8125rem] text-base-content/75">
+            <input type="checkbox" class="checkbox checkbox-xs" bind:checked={target.subfolders} />{t("target.subfolders")}
+          </label>
+        {/if}
         <span class="whitespace-nowrap text-[0.8rem] text-base-content/65" role="status">{withInactive
             ? t(resultCount === 1 ? "search.hitOne" : "search.countAll", { count: resultCount })
             : t(resultCount === 1 ? "target.countOne" : "target.count", { count: resultCount })}</span>
@@ -312,9 +328,26 @@
         <div tabindex="0" role="button" class="btn btn-primary btn-sm join-item border-l-primary-content/25 px-1.5" aria-label={t("route.moreAdd")}>
           <Icon name="chevronDown" size={15} />
         </div>
-        <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-30 mt-1 w-72 rounded-box border border-base-300 bg-base-100 p-1 shadow-lg">
+        <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-30 mt-1 w-80 rounded-box border border-base-300 bg-base-100 p-1 shadow-lg">
+          <li class="menu-title">{t("template.heading")}</li>
+          {#if sample.active && sampleDomain}
+            <li>
+              <button class="grid gap-0.5 text-left" onclick={() => addTemplate("sender", sampleDomain)}>
+                <span class="flex items-center gap-2 font-medium"><Icon name="flask" size={15} class="text-success" />{t("template.sample", { domain: sampleDomain })}</span>
+              </button>
+            </li>
+          {/if}
           <li>
-            <button class="grid gap-0.5 text-left" onclick={addCode}>
+            <button class="flex items-center gap-2" onclick={() => addTemplate("sender")}><Icon name="user" size={15} />{t("template.sender")}</button>
+          </li>
+          <li>
+            <button class="flex items-center gap-2" onclick={() => addTemplate("recipient")}><Icon name="tag" size={15} />{t("template.recipient")}</button>
+          </li>
+          <li>
+            <button class="flex items-center gap-2" onclick={() => addTemplate("subject")}><Icon name="text" size={15} />{t("template.subject")}</button>
+          </li>
+          <li class="mt-1 border-t border-base-300 pt-1">
+            <button class="flex flex-col items-start gap-0.5 text-left" onclick={addCode}>
               <span class="flex items-center gap-2 font-medium"><Icon name="code" size={15} />{t("route.addCodeBlock")}</span>
               <span class="text-[0.8rem] text-base-content/70">{t("route.addCodeHint")}</span>
             </button>
@@ -433,18 +466,15 @@
         {/if}
         {#if groups.head[index]}
           <!-- The folder a run of rules files into, once. -->
-          <!-- The folder a run of rules files into, once, above their destinations. -->
-          <div class="col-span-3 grid grid-cols-subgrid pt-3">
+          <!-- A section: the folder a run of rules files into, said once. -->
+          <div class="col-span-3 grid grid-cols-subgrid pt-3 pb-0.5">
             <span></span>
-            <span></span>
-            <div class="flex items-end gap-2 border-b border-dashed border-base-300 pb-1">
-              <div class="route-row grow px-2.5">
-                <span></span>
-                <span class="flex min-w-0 items-center gap-1.5 text-[0.8rem] font-semibold tracking-wide text-base-content/65 uppercase">
-                  <Icon name="folder" size={13} class="text-primary" /><span class="truncate">{groups.head[index]} /</span>
-                </span>
-              </div>
-              <span class="w-[2.125rem] shrink-0"></span>
+            <span class="route-node grid place-items-center"><span class="size-1.5 rounded-full bg-[var(--spine)]"></span></span>
+            <div class="flex items-center gap-2 px-2.5 text-[0.875rem]">
+              <Icon name="folder" size={14} class="text-base-content/60" />
+              <span class="font-semibold text-base-content/80">{groups.head[index]!.split(" / ").join(" › ")}</span>
+              <span class="h-px grow bg-base-300"></span>
+              <span class="pr-2 text-[0.8rem] text-base-content/60">{t("route.groupCount", { count: groups.size[index] })}</span>
             </div>
           </div>
         {/if}
@@ -467,7 +497,7 @@
             <Icon name="grip" size={14} />
           </button>
         {/if}
-        <span class="route-node grid place-items-center pt-[0.95rem]">
+        <span class="route-node grid place-items-center pt-[0.95rem]" title={t(`route.shape.${shape}`)}>
           <span class="route-mark route-mark-{shape}" class:selected class:trial-hit={!!tr?.hits.length}></span>
         </span>
         <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected ? "bg-primary/[0.05] ring-1 ring-primary/25" : "hover:bg-base-200/50"]}>

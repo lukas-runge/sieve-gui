@@ -346,6 +346,13 @@ export function outcomes(actions: Action[], keywords: Record<string, string>, de
   return out;
 }
 
+/** A stable, calm hue per label name, so the same label looks the same everywhere. */
+export function labelHue(name: string): number {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  return h;
+}
+
 /** Whether the actions end the script for the message ("stop"). */
 export function stops(actions: Action[]): boolean {
   return actions.some((a) => a.type === "stop");

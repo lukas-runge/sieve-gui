@@ -147,7 +147,7 @@
       <!-- Where it ends up. -->
       <section class="mt-4 rounded-box border border-success/35 bg-success/[0.07] px-3.5 py-3" aria-live="polite">
         <h3 class="mb-1.5 text-[0.8rem] font-semibold tracking-wide text-success uppercase">{t("trial.result")}</h3>
-        <div class="text-[1.05rem]"><Outcomes items={delivery} /></div>
+        <div class="text-[1.05rem]"><Outcomes items={delivery} fullPath /></div>
         {#if result.delivery.forwards.length || result.delivery.rejected || result.delivery.discarded || result.delivery.replied}
           <ul class="mt-1.5 grid gap-0.5 text-sm text-base-content/80">
             {#each result.delivery.forwards as address}<li class="flex items-center gap-1.5"><Icon name="forward" size={14} />{t("trial.forwarded", { address })}</li>{/each}

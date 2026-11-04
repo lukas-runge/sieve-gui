@@ -16,12 +16,12 @@
     class="rounded-md bg-base-200 px-1.5 py-px text-[0.8rem] font-medium whitespace-nowrap text-base-content/80"
     title={token.fieldTitle}><Mark text={token.field} {words} /></span
   >
-  {#if token.negated && !noneOf}<span class="text-[0.875rem] font-semibold text-error">{t("route.not")}</span>{/if}
+  {#if token.negated && !noneOf}<span class="neg">{t("route.not")}</span>{/if}
   {#if token.word}<span class="text-[0.875rem] text-base-content/70">{token.word}</span>{/if}
-  {#if noneOf}<span class="text-[0.875rem] font-semibold text-error">{t("route.noneOf")}</span>{/if}
+  {#if noneOf}<span class="neg">{t("route.noneOf")}</span>{/if}
   {#each token.values as v, i}
     <span class={["max-w-full font-medium [overflow-wrap:break-word]", token.pattern ? "font-mono text-[0.875rem]" : "text-[0.94rem]"]}
-      >{#if v.before}<span class="text-primary">{v.before}</span>{/if}<Mark text={v.text} {words} breaks={!token.pattern} />{#if v.after}<span
+      >{#if v.before}<span class="text-base-content/55">{v.before}</span>{/if}<Mark text={v.text} {words} breaks={!token.pattern} />{#if v.after}<span
           class="font-normal text-base-content/70">{v.after}</span
         >{/if}{#if i < token.values.length - 1}<span class="font-normal text-base-content/60">{noneOf ? ", " : t("route.listOr")}</span>{/if}</span
     >
@@ -32,3 +32,19 @@
     >
   {/if}
 </span>
+
+<style>
+  /* "not" turns the whole condition around: a token of its own, not an error. */
+  .neg {
+    align-self: center;
+    border: 1px solid color-mix(in oklab, var(--color-base-content) 35%, transparent);
+    border-radius: 0.3rem;
+    padding: 0 0.3rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.15rem;
+    text-transform: uppercase;
+    color: var(--color-base-content);
+  }
+</style>

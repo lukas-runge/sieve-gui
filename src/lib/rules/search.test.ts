@@ -52,5 +52,6 @@ test("branches and nested ifs are searched", () => {
 test("finds rules by where they file messages", () => {
   assert.equal(goesTo(rule, { kind: "folder", key: "Accounts.Versand.B&APw-cher" }), true);
   assert.equal(goesTo(rule, { kind: "folder", key: "Accounts" }), false);
+  assert.equal(goesTo(rule, { kind: "folder", key: "Accounts", subfolders: true }), true);
   assert.equal(goesTo(rule, { kind: "label", key: "$label1" }), false);
 });

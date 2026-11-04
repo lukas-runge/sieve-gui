@@ -1,7 +1,7 @@
 <script lang="ts">
   // Where a message goes and what happens to it: the folder like a sorting
   // compartment (path quiet, last folder strong), labels as tags.
-  import type { Outcome } from "../../rules/route";
+  import { labelHue as hue, type Outcome } from "../../rules/route";
   import { t } from "../../i18n.svelte";
   import Icon, { type IconName } from "../Icon.svelte";
   import Mark from "./Mark.svelte";
@@ -13,6 +13,7 @@
     words = [],
     hideParent = false,
     next = null,
+    fullPath = false,
     ontarget,
   }: {
     items: Outcome[];
@@ -22,6 +23,8 @@
     hideParent?: boolean;
     /** The script that runs next: a stop in single-folder mode continues there. */
     next?: string | null;
+    /** The whole folder path, not just the parent. */
+    fullPath?: boolean;
     /** Clicking a folder or label shows everything that goes there. */
     ontarget?: (o: Outcome) => void;
   } = $props();
@@ -54,12 +57,6 @@
     keep: "inbox",
   };
 
-  /** A stable, calm hue per label name, so the same label looks the same everywhere. */
-  function hue(name: string): number {
-    let h = 0;
-    for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360;
-    return h;
-  }
 </script>
 
 <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -80,7 +77,7 @@
                unless the search found a word higher up. -->
           {#if o.path.length > 1 && !hideParent}
             <span class="min-w-0 truncate text-[0.875rem] text-base-content/65"
-              >{#if words.length}<Mark text={o.path.slice(0, -1).join(" / ")} {words} />{:else}{o.path.length > 2 ? "… / " : ""}<Mark
+              >{#if words.length || fullPath}<Mark text={o.path.slice(0, -1).join(" / ")} {words} />{:else}{o.path.length > 2 ? "… / " : ""}<Mark
                   text={o.path.at(-2) ?? ""}
                   {words}
                 />{/if}&nbsp;/&nbsp;</span

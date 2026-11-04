@@ -72,12 +72,15 @@
     return index === 1 ? n(1) : `${n(1)}–${n(index)}`;
   }
 
+  /** When the case applies, all of it: the case it sits in, and the cases before it. */
   const hint = $derived.by(() => {
     if (!step) return "";
-    if (step.list.length === 1) return depth > 0 ? t("case.extra", { n: caseNumber(chain!.slice(0, -1)) || "1" }) : "";
-    if (step.case.kind === "else") return t("case.otherwise", { list: before(step.list.length - 1, prefix) });
-    if (step.index === 0) return t("case.first");
-    return t("case.after", { list: before(step.index, prefix) });
+    const parent = depth > 0 ? caseNumber(chain!.slice(0, -1)) : "";
+    const inside = depth > 0 ? (parent ? t("case.inside", { n: parent }) : t("case.insideAbove")) : "";
+    if (step.list.length === 1) return depth > 0 ? t("case.extra", { inside }) : "";
+    if (step.case.kind === "else") return t("case.otherwise", { list: before(step.list.length - 1, prefix), inside: inside ? ` ${inside}` : "" });
+    if (step.index === 0) return depth > 0 ? t("case.firstInside", { inside }) : t("case.first");
+    return t("case.after", { list: before(step.index, prefix), inside: inside ? `${inside} ${t("case.and")} ` : "" });
   });
 
   function removeCase() {

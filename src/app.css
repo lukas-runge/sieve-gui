@@ -151,6 +151,19 @@ body {
   height: calc(var(--elbow) - 0.5rem);
 }
 
+/* A check inside a case: an elbow from the case's number into its box. */
+.nested-box::before {
+  content: "";
+  position: absolute;
+  left: calc(-1rem - 2px);
+  top: -0.55rem;
+  width: 1rem;
+  height: 1.35rem;
+  border-left: 2px solid var(--box);
+  border-bottom: 2px solid var(--box);
+  border-bottom-left-radius: 0.5rem;
+}
+
 /* A row of the route: what is tested, and what happens in a column of the
    same width on every row and depth, so destinations line up. */
 .route-sheet {

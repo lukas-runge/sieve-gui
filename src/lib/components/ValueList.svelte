@@ -7,12 +7,14 @@
     values,
     label,
     mono = false,
+    placeholder,
     onchange,
   }: {
     values: string[];
     label: string;
     /** Patterns and regular expressions show in the code font, like on the route. */
     mono?: boolean;
+    placeholder?: string;
     onchange: (values: string[], merge: boolean) => void;
   } = $props();
 
@@ -28,7 +30,7 @@
       <input
         class={["input input-sm grow", mono && "font-mono"]}
         aria-label={label}
-        placeholder={t("value.placeholder")}
+        placeholder={placeholder ?? t("value.placeholder")}
         {value}
         oninput={(e) => set(i, e.currentTarget.value)}
       />

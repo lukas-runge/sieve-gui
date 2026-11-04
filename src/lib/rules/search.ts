@@ -50,12 +50,19 @@ export interface Target {
   kind: "folder" | "label";
   /** The folder as stored (e.g. modified UTF-7) or the label's keyword. */
   key: string;
+  /** Folders inside the folder count too. */
+  subfolders?: boolean;
+}
+
+function inFolder(mailbox: string, target: Target): boolean {
+  if (mailbox === target.key) return true;
+  return !!target.subfolders && [".", "/"].some((d) => mailbox.startsWith(target.key + d));
 }
 
 /** Whether the actions (checks inside them included) file into the folder or set the label. */
 export function actionsGoTo(actions: Action[], target: Target): boolean {
   return actions.some((a) => {
-    if (a.type === "fileInto") return target.kind === "folder" && a.mailbox === target.key;
+    if (a.type === "fileInto") return target.kind === "folder" && inFolder(a.mailbox, target);
     if (a.type === "flags") return target.kind === "label" && a.op !== "remove" && a.flags.some((f) => f.split(/\s+/).includes(target.key));
     if (a.type === "if") return blockGoesTo(a, target);
     return false;

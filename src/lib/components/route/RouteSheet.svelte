@@ -550,6 +550,13 @@
         </div>
       </li>
     {/if}
+    <!-- What the right column means, once. -->
+    <li class="route-item pt-1" aria-hidden="true" hidden={searching}>
+      <span></span><span></span>
+      <span class="route-row px-2.5 text-[0.75rem] font-semibold tracking-wide text-base-content/60 uppercase">
+        <span>{t("route.colIf")}</span><span>{t("route.colDoes")}</span>
+      </span>
+    </li>
 
     {#each editor.rules.items as item, index (item.uid)}
       {@const selected = editor.selected === item.uid}
@@ -620,7 +627,7 @@
         <span class="route-node grid place-items-center pt-[0.95rem]" title={t(`route.shape.${shape}`)}>
           <span class="route-mark route-mark-{shape}" class:selected class:trial-hit={!!tr?.hits.length}></span>
         </span>
-        <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected ? "ring-2 ring-primary/60" : "hover:bg-base-200/50"]}>
+        <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected && (!editor.focus || (item.type === "rule" && cases(item).length === 1)) ? "ring-2 ring-primary/60" : selected ? "ring-1 ring-primary/20" : "hover:bg-base-200/50"]}>
           <div class="min-w-0 grow rounded-field px-2.5 py-2">
             {#if item.type === "rule"}
               <RouteRule

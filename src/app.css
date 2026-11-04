@@ -231,6 +231,19 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
+/* In the inspector, values show in full. */
+[data-inspector] .token-value,
+[data-inspector] .token-head {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  flex-wrap: wrap;
+}
+[data-inspector] .pattern-value {
+  max-width: none;
+  white-space: normal;
+}
+
 /* Small controls stay readable: daisyUI's small sizes are 12px. */
 .input-sm,
 .select-sm,

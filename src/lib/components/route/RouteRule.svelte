@@ -193,7 +193,11 @@
               {/if}
               <span>
                 <span class="font-semibold" style="color: {color}">
-                  {#if c.kind === "else"}{t("route.nestedInOtherwise")}{:else if own}{t("route.nestedIn", { n: own })}{:else}{t("route.nestedHeadingSingle")}{/if}</span
+                  {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions)}{own
+                    ? t("route.decidesIn", { n: own })
+                    : t("route.decidesHere")}{:else if c.kind === "else"}{t("route.nestedInOtherwise")}{:else if own}{t("route.nestedIn", { n: own })}{:else}{t(
+                    "route.nestedHeadingSingle",
+                  )}{/if}</span
                 >
                 {#if multi}<span class="text-base-content/70">· {t("route.casesFirst", { count: cases(n).length })}</span>{/if}
               </span>

@@ -493,3 +493,48 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
   delivery.flags = flags;
   return { scripts: runs, steps, delivery, uncertain };
 }
+
+// ── A sample message for a case ──────────────────────────────────────────────
+
+/**
+ * A message that likely matches the given conditions (a case and the cases
+ * it sits in): the first value of each plain header or address test, as far
+ * as one can be made up. Patterns, regexes and negations are left out; the
+ * test then shows whether the message really matches.
+ */
+export function sampleFor(conditions: Conditions[]): SampleMail {
+  const mail: SampleMail = { ...EMPTY_MAIL };
+  const extra: string[] = [];
+  const put = (header: string, value: string) => {
+    const h = header.toLowerCase();
+    if (h === "from" && !mail.from) mail.from = value;
+    else if (["to", "cc", "bcc"].includes(h) && !mail.to) mail.to = value;
+    else if (h === "subject" && !mail.subject) mail.subject = value;
+    else if (!["to", "cc", "bcc", "from", "subject"].includes(h) && !extra.some((l) => l.toLowerCase().startsWith(h + ":")))
+      extra.push(`${header}: ${value}`);
+  };
+  const visit = (cs: Conditions) => {
+    // For "any of", one condition is enough.
+    const items = cs.join === "any" ? cs.items.slice(0, 1) : cs.items;
+    for (const c of items) {
+      if (c.negate) continue;
+      const test = c.test;
+      if (test.type === "group") {
+        visit({ join: test.join, items: test.items });
+        continue;
+      }
+      if (test.type !== "header" && test.type !== "address") continue;
+      const mt = test.matcher.matchType.type;
+      if (mt !== "is" && mt !== "contains") continue;
+      const key = test.keys[0];
+      if (!key) continue;
+      let value = key;
+      if (test.type === "address" && test.part === "domain") value = `info@${key}`;
+      else if (test.type === "address" && (test.part === "localPart" || test.part === "user")) value = `${key}@example.org`;
+      put(test.headers[0] ?? "", value);
+    }
+  };
+  for (const cs of conditions) visit(cs);
+  mail.headers = extra.join("\n");
+  return mail;
+}

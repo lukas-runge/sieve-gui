@@ -10,6 +10,8 @@
   import { scriptFolders, type ScriptFolders } from "../rules/mailbox";
   import { casePathLabel, cases, isSimple } from "../rules/route";
   import { session } from "../session.svelte";
+  import { sampleFor } from "../rules/simulate";
+  import { trial } from "../trial.svelte";
   import BranchesEditor, { SUMMARY, type SummaryContext } from "./BranchesEditor.svelte";
   import CaseEditor from "./CaseEditor.svelte";
   import CodeEditor from "./CodeEditor.svelte";
@@ -162,6 +164,14 @@
           {#if cases(item).length > 1}<span class="text-[0.8125rem] text-base-content/70">{t("inspector.allCases", { count: cases(item).length })}</span>{/if}
         </label>
         {#if isSimple(item)}
+          <button
+            class="btn btn-ghost btn-xs mb-3 -ml-1 gap-1 text-success"
+            onclick={() => {
+              trial.mail = sampleFor([item.conditions]);
+              trial.open = true;
+              editor.selected = null;
+            }}><Icon name="flask" size={13} />{t("case.test")}</button
+          >
           <BranchesEditor
             block={item}
             {extensions}

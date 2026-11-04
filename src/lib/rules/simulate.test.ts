@@ -63,3 +63,16 @@ test("nothing matches: the message stays in the inbox; code is unknown", () => {
   assert.equal(trial.uncertain, true);
   assert.deepEqual(trial.scripts[0].unknown, [1]);
 });
+
+test("makes up a message for a case", async () => {
+  const { sampleFor } = await import("./simulate.ts");
+  const mail = sampleFor([{ join: "all", items: [from("shop.example"), subject("Rechnung")] }]);
+  assert.equal(mail.from, "info@shop.example");
+  assert.equal(mail.subject, "Rechnung");
+  const trial = runTrial(
+    [{ name: "s", items: [rule([from("shop.example"), subject("rechnung")], [move("R")])], singleFolder: true }],
+    mail,
+    true,
+  );
+  assert.deepEqual(trial.delivery.folders, ["R"]);
+});

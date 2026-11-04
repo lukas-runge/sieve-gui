@@ -15,6 +15,9 @@
   import RouteOutcomes from "./route/Outcomes.svelte";
   import Outcomes from "./route/Outcomes.svelte";
   import Possible from "./route/Possible.svelte";
+  import { sampleFor } from "../rules/simulate";
+  import { trial } from "../trial.svelte";
+  import { session } from "../session.svelte";
 
   let {
     rule,
@@ -107,6 +110,17 @@
     if (step.index === 0) return depth > 0 ? t("case.firstInside", { inside }) : t("case.first");
     return t("case.after", { list: before(step.index, prefix), inside: inside ? `${inside} ${t("case.and")} ` : "" });
   });
+
+  /** Opens the test with a message this case should catch. */
+  function testCase() {
+    if (!chain) return;
+    // Earlier cases of each block must not match first; the made-up message
+    // only covers this case's own conditions and those of its parents.
+    const conds = chain.flatMap((st) => (st.case.conditions ? [st.case.conditions] : []));
+    trial.mail = sampleFor(conds);
+    trial.open = true;
+    if (session.editor) session.editor.selected = null;
+  }
 
   function removeCase() {
     if (!step) return;
@@ -230,7 +244,11 @@
     {/if}
   </div>
   {/if}
-  {#if hint}<p class="mb-4 text-sm text-base-content/70">{hint}</p>{/if}
+  {#if hint}<p class="mb-2 text-sm text-base-content/70">{hint}</p>{/if}
+  <!-- Try it: a message made up from this case's conditions (and those it sits in). -->
+  <button class="btn btn-ghost btn-xs mb-3 -ml-1 gap-1 text-success" onclick={testCase}>
+    <Icon name="flask" size={13} />{t("case.test")}
+  </button>
 
   {#if step.case.nested.length}
     <!-- A long case: jump to its parts. -->

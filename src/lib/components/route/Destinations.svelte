@@ -6,6 +6,7 @@
   import { t } from "../../i18n.svelte";
   import { cases, labelHue, outcomes, type Case } from "../../rules/route";
   import type { Target } from "../../rules/search";
+  import { SvelteSet } from "svelte/reactivity";
   import Icon from "../Icon.svelte";
 
   let {
@@ -75,6 +76,8 @@
     return { root, labels: [...labels.values()].sort((a, b) => a.text.localeCompare(b.text)) };
   });
 
+  /** Folder branches folded away. */
+  const closed = new SvelteSet<string>();
   const sorted = (f: Folder) => [...f.children.values()].sort((a, b) => a.name.localeCompare(b.name));
   const count = (n: number) => (n === 1 ? t("search.hitOne") : t("search.hits", { count: n }));
 </script>
@@ -87,6 +90,26 @@
       title={t("target.title", { name: f.path.join(" / ") })}
       onclick={() => onpick({ kind: "folder", key: f.raw, subfolders: f.rules.size === 0, text: f.path.join(" / "), folder: true })}
     >
+      {#if f.children.size}
+        <span
+          role="button"
+          tabindex="0"
+          class="-ml-1 grid size-5 place-items-center rounded hover:bg-base-300"
+          aria-label={closed.has(f.raw) ? t("route.unfold") : t("route.fold")}
+          onclick={(e) => {
+            e.stopPropagation();
+            if (closed.has(f.raw)) closed.delete(f.raw);
+            else closed.add(f.raw);
+          }}
+          onkeydown={(e) => {
+            if (e.key !== "Enter") return;
+            e.stopPropagation();
+            e.preventDefault();
+            if (closed.has(f.raw)) closed.delete(f.raw);
+            else closed.add(f.raw);
+          }}><Icon name={closed.has(f.raw) ? "chevronRight" : "chevronDown"} size={13} /></span
+        >
+      {/if}
       <Icon name="folder" size={15} class={f.rules.size ? "text-primary" : "text-base-content/50"} />
       <span class={["truncate", f.rules.size ? "font-semibold" : "text-base-content/75"]}>{f.name}</span>
       <span class="h-px grow"></span>
@@ -94,7 +117,7 @@
         {#if f.rules.size}{count(f.rules.size)}{:else}{t("dest.below", { count: f.all.size })}{/if}
       </span>
     </button>
-    {#if f.children.size}
+    {#if f.children.size && !closed.has(f.raw)}
       <ul>
         {#each sorted(f) as child (child.name)}{@render folder(child, depth + 1)}{/each}
       </ul>
@@ -110,15 +133,6 @@
       {#if ontest}<button class="btn btn-xs btn-soft gap-1" onclick={ontest}><Icon name="flask" size={13} />{t("dest.test")}</button>{/if}
     </p>
   </div>
-  <section aria-label={t("dest.folders")}>
-    <h3 class="mb-1 px-1 text-[0.8125rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.folders")}</h3>
-    <ul class="grid">
-      {#each sorted(tree.root) as f (f.name)}{@render folder(f, 0)}{/each}
-      <li class="flex items-center gap-2 py-1 pr-2 pl-2 text-base-content/70">
-        <Icon name="inbox" size={15} />{t("dest.inbox")}
-      </li>
-    </ul>
-  </section>
   {#if tree.labels.length}
     <section aria-label={t("dest.labels")}>
       <h3 class="mb-2 px-1 text-[0.8125rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.labels")}</h3>
@@ -138,4 +152,13 @@
       </div>
     </section>
   {/if}
+  <section aria-label={t("dest.folders")}>
+    <h3 class="mb-1 px-1 text-[0.8125rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.folders")}</h3>
+    <ul class="grid">
+      {#each sorted(tree.root) as f (f.name)}{@render folder(f, 0)}{/each}
+      <li class="flex items-center gap-2 py-1 pr-2 pl-2 text-base-content/70">
+        <Icon name="inbox" size={15} />{t("dest.inbox")}
+      </li>
+    </ul>
+  </section>
 </div>

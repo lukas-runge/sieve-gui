@@ -7,7 +7,7 @@
   import type { Rule } from "#tauri/types";
   import { t } from "../../i18n.svelte";
   import type { Branches } from "../../rules/view";
-  import { caseMatches, cases, unreachable, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
+  import { caseMatches, cases, nestedOutcomes, unreachable, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
   import Conditions from "./Conditions.svelte";
   import Icon from "../Icon.svelte";
   import Mark from "./Mark.svelte";
@@ -132,7 +132,10 @@
     </span>
     {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && c.nested.length}
       <!-- Nothing of its own: what happens is in the check below. -->
-      <span class="flex items-center gap-1 text-[0.875rem] text-base-content/60"><Icon name="chevronDown" size={14} />{t("route.seeBelow")}</span>
+      <span class="grid gap-0.5">
+        <span class="flex items-center gap-1 text-[0.8rem] text-base-content/65"><Icon name="chevronDown" size={13} />{t("route.seeBelow")}</span>
+        <span class="opacity-75"><Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} /></span>
+      </span>
     {:else}
       <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
     {/if}

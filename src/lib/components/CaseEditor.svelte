@@ -202,7 +202,8 @@
 
   {#if step.case.nested.length}
     <!-- A long case: jump to its parts. -->
-    <nav class="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap gap-1 bg-base-100 px-1 py-1" aria-label={t("case.parts")}>
+    <nav class="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap items-center gap-1 bg-base-100 px-1 py-1" aria-label={t("case.parts")}>
+      <span class="mr-1 text-[0.8rem] text-base-content/65">{t("case.jump")}</span>
       {#each [{ el: conditionsEl, label: t("conditions.heading") }, { el: actionsEl, label: t("actions.heading") }, { el: checksEl, label: t("case.checkOne") }] as part}
         {#if part.el}
           <button class="btn btn-xs btn-soft" onclick={() => part.el?.scrollIntoView({ block: "start", behavior: "smooth" })}>{part.label}</button>

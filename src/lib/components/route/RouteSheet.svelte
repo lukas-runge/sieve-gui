@@ -92,7 +92,9 @@
       }
       i = j + 1;
     }
-    return { head, grouped, size };
+    // A rule right after a run, outside it: the section visibly ends.
+    const ends = parents.map((_, i) => i > 0 && grouped[i - 1] && !grouped[i]);
+    return { head, grouped, size, ends };
   });
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
@@ -244,10 +246,11 @@
     });
   }
 
-  /** New items go after the picked rule, or at the end. */
+  /** New items go after the picked rule (after its folder section), or at the end. */
   function insert(item: EditorItem) {
     editor.focus = "";
-    const at = editor.rules.items.findIndex((i) => i.uid === editor.selected);
+    let at = editor.rules.items.findIndex((i) => i.uid === editor.selected);
+    while (at >= 0 && groups.grouped[at + 1] && !groups.head[at + 1]) at++;
     editor.edit((rules) => {
       rules.items.splice(at >= 0 ? at + 1 : rules.items.length, 0, item);
     });
@@ -365,7 +368,7 @@
         {t("search.allScripts")}
       </button>
     </div>
-    <div class="join">
+    <div class={["join", target && "hidden"]}>
       <button class="btn btn-primary btn-sm join-item gap-1" onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
       <div class="dropdown dropdown-end">
         <div tabindex="0" role="button" class="btn btn-primary btn-sm join-item border-l-primary-content/25 px-1.5" aria-label={t("route.moreAdd")}>
@@ -444,6 +447,7 @@
               {:else}
                 <button class="w-full text-left" onclick={() => openMatch(r.name, hit.index, "")}>
                   <span class="font-semibold">{t("raw.heading")}</span>
+                  <span class="text-[0.8rem] text-base-content/60">{t("route.codeNote")}</span>
                   <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8rem] text-base-content/65">{hit.item.code.trim()}</pre>
                 </button>
               {/if}
@@ -512,6 +516,12 @@
         {#if dropAt === index && dragFrom !== null}
           <div class="absolute -top-px right-2 left-8 z-10 h-0.5 rounded bg-primary"></div>
         {/if}
+        {#if groups.ends[index]}
+          <div class="col-span-3 grid grid-cols-subgrid pt-2">
+            <span></span><span></span>
+            <span class="mx-2.5 h-px bg-base-300"></span>
+          </div>
+        {/if}
         {#if groups.head[index]}
           <!-- The folder a run of rules files into, once. -->
           <!-- A section: the folder a run of rules files into, said once. -->
@@ -561,13 +571,14 @@
                 hideParent={groups.grouped[index]}
                 ontarget={showTarget}
                 {next}
-                trial={tr}
+                trial={tr?.reached ? tr : null}
                 onpick={(path) => pick(item.uid, path)}
               />
             {:else}
               <button class="w-full text-left" aria-current={selected ? "true" : undefined} onclick={() => pick(item.uid, "")}>
                 <span class="flex items-baseline gap-2">
                   <span class="font-semibold">{t("raw.heading")}</span>
+                  <span class="text-[0.8rem] text-base-content/60">{t("route.codeNote")}</span>
                   {#if editor.roundcubeRisks?.rawBlocks.includes(index)}
                     <span class="badge badge-sm badge-soft badge-warning">{t("roundcube.badge")}</span>
                   {/if}

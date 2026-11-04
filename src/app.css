@@ -218,6 +218,15 @@ body {
     0 0 0 calc(0.35rem + 1px) color-mix(in oklab, var(--color-success) 35%, var(--color-base-100));
 }
 
+/* Every control shows where the keyboard is. */
+button:focus-visible,
+[role="button"]:focus-visible,
+[role="link"]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 /* Small controls stay readable: daisyUI's small sizes are 12px. */
 .input-sm,
 .select-sm,

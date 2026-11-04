@@ -193,7 +193,7 @@
       open.add(block.elsif.length + 1);
     }}
   >
-    <Icon name="branch" size={13} />{t("branch.addElsif")}
+    <Icon name="branch" size={13} />{t("case.addElsif")}
   </button>
   {#if !block.otherwise}
     <button
@@ -203,7 +203,7 @@
         open.add(count);
       }}
     >
-      <Icon name="plus" size={13} />{t("branch.addElse")}
+      <Icon name="plus" size={13} />{t("case.addElse")}
     </button>
   {/if}
 </div>

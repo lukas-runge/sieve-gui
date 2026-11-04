@@ -346,11 +346,33 @@ export function outcomes(actions: Action[], keywords: Record<string, string>, de
   return out;
 }
 
-/** A stable, calm hue per label name, so the same label looks the same everywhere. */
+/**
+ * A stable, calm hue per label name, so the same label looks the same
+ * everywhere. Green (matches, running) and blue (selection, actions) are
+ * left out, so a label never looks like a state.
+ */
+const LABEL_HUES = [15, 40, 65, 195, 285, 310, 335, 355];
 export function labelHue(name: string): number {
   let h = 0;
-  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 360;
-  return h;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 997;
+  return LABEL_HUES[h % LABEL_HUES.length];
+}
+
+/** What the checks inside a case do, for a case without actions of its own. */
+export function nestedOutcomes(c: Case, keywords: Record<string, string>, delimiter: string | null): Outcome[] {
+  const seen = new Set<string>();
+  const out: Outcome[] = [];
+  const visit = (x: Case) => {
+    for (const o of outcomes(x.actions, keywords, delimiter)) {
+      const key = `${o.kind}:${o.text}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(o);
+    }
+    for (const n of x.nested) for (const inner of cases(n)) visit(inner);
+  };
+  for (const n of c.nested) for (const inner of cases(n)) visit(inner);
+  return out;
 }
 
 /** Whether the actions end the script for the message ("stop"). */

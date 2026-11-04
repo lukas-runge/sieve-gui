@@ -21,12 +21,14 @@
   // The code sidebar stays open or closed across restarts.
   let showCode = $state(localStorage.getItem("showCode") === "1");
   $effect(() => localStorage.setItem("showCode", showCode ? "1" : "0"));
-  // Wide windows show the code beside the rules, narrow ones instead of them.
-  const wide = new MediaQuery("min-width: 1100px");
+  // Large windows show the panel beside the route, medium ones over it,
+  // narrow ones instead of it.
   // Below this, the sidebar steps aside while the panel is open, so the route keeps its columns.
   const roomy = new MediaQuery("min-width: 1500px");
   // Medium windows make room for the panel by folding the sidebar away.
   const medium = new MediaQuery("min-width: 860px");
+  // Below this the panel floats over the route instead of narrowing it.
+  const large = new MediaQuery("min-width: 1200px");
 
   const editor = $derived(session.editor);
   const active = $derived(editor ? session.runs(editor.accountId, editor.name) : false);
@@ -68,10 +70,13 @@
   let sidebarOpen = $state(localStorage.getItem("sidebar") !== "0");
   $effect(() => localStorage.setItem("sidebar", sidebarOpen ? "1" : "0"));
   /** The panel sits beside the route (else it takes its place). */
-  const beside = $derived(wide.current || medium.current);
+  const beside = $derived(large.current);
+  /** Medium windows: the panel floats over the route, which keeps its width. */
+  const overlay = $derived(!large.current && medium.current);
   /** Unless the window is roomy, the sidebar steps aside while the panel is open. */
-  let windowWidth = $state(window.innerWidth);
   let sidebarPinned = $state(false);
+  /** The floating panel starts below the header, so saving stays in reach. */
+  let headerHeight = $state(0);
   const sidebarShown = $derived(sidebarOpen && (roomy.current || !rightPanel || sidebarPinned));
   $effect(() => {
     if (!rightPanel) sidebarPinned = false;
@@ -150,11 +155,11 @@
   }
 </script>
 
-<svelte:window {onkeydown} bind:innerWidth={windowWidth} />
+<svelte:window {onkeydown} />
 
 <div
   class="grid h-screen"
-  style:grid-template-columns="{sidebarShown ? '16rem' : '0'} minmax(0, 1fr){rightPanel && beside ? ` ${wide.current ? panelWidth : Math.min(panelWidth, Math.round(windowWidth * 0.44))}px` : ''}"
+  style:grid-template-columns="{sidebarShown ? '16rem' : '0'} minmax(0, 1fr){rightPanel && beside ? ` ${panelWidth}px` : ''}"
 >
   <aside class="min-h-0 overflow-hidden border-r border-base-300 bg-base-200" inert={!sidebarShown}>
     <Sidebar onaccount={(account) => (accountDialog = { account })} />
@@ -162,7 +167,7 @@
 
   <main class="flex min-w-0 flex-col overflow-hidden bg-base-200">
     {#if editor}
-      <header class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-base-300 bg-base-100 px-6 py-3">
+      <header bind:clientHeight={headerHeight} class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-base-300 bg-base-100 px-6 py-3">
         <button
           class="btn btn-ghost btn-sm btn-square -ml-2 self-start text-base-content/60"
           aria-pressed={!sidebarShown}
@@ -186,10 +191,10 @@
             </span>
           </div>
           <div class="-ml-1 flex items-center gap-0.5 text-sm text-base-content/60">
-            <button class="btn btn-ghost btn-xs btn-square" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
+            <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
               <Icon name="undo" size={15} />
             </button>
-            <button class="btn btn-ghost btn-xs btn-square" disabled={!editor.canRedo} onclick={() => editor.redo()} aria-label={t("editor.redo")} title="{t('editor.redo')} (⇧⌘Z)">
+            <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canRedo} onclick={() => editor.redo()} aria-label={t("editor.redo")} title="{t('editor.redo')} (⇧⌘Z)">
               <Icon name="redo" size={15} />
             </button>
             <p class="ml-1 flex items-center gap-1.5 truncate" aria-live="polite">
@@ -205,7 +210,7 @@
             onclick={toggleTrial}
           >
             <Icon name="flask" size={16} />
-            {t("trial.button")}
+            <span class="max-xl:sr-only">{t("trial.button")}</span>
           </button>
           <button
             class={["btn btn-ghost btn-sm gap-1.5", showCode && "btn-active"]}
@@ -214,7 +219,7 @@
             onclick={toggleCode}
           >
             <Icon name="code" size={16} />
-            {t("editor.code")}
+            <span class="max-xl:sr-only">{t("editor.code")}</span>
           </button>
           <button class="btn btn-primary btn-sm gap-1.5" disabled={!editor.dirty} onclick={() => (deploying = true)} title="⌘S">
             <Icon name="save" size={15} />{t("editor.deploy")}
@@ -222,7 +227,7 @@
         </div>
       </header>
 
-      {#if rightPanel && !beside}
+      {#if rightPanel && !beside && !overlay}
         <!-- Narrow windows: the inspector or the code takes the place of the route. -->
         <section class="flex min-h-0 grow flex-col">
           {#if showCode}
@@ -320,10 +325,17 @@
     {/if}
   </main>
 
-  {#if rightPanel && beside}
-    <div class="relative flex min-h-0 min-w-0 flex-col">
+  {#if rightPanel && (beside || overlay)}
+    <div
+      class={[
+        "flex min-h-0 min-w-0 flex-col",
+        overlay ? "fixed right-0 bottom-0 z-40 w-[min(32rem,62vw)] shadow-2xl" : "relative",
+      ]}
+      style:top={overlay ? `${headerHeight}px` : undefined}
+    >
     <!-- Drag to make the panel wider or narrower. -->
     <button
+      hidden={overlay}
       aria-label={t("panel.resize")}
       title={t("panel.resize")}
       class="absolute inset-y-0 -left-1 z-30 w-2 cursor-col-resize hover:bg-primary/25 focus-visible:bg-primary/40"

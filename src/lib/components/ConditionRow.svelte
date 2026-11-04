@@ -18,22 +18,30 @@
   } from "../rules/view";
   import { SIZE_UNITS, splitSize } from "../rules/format";
   import ValueList from "./ValueList.svelte";
+  import Token from "./route/Token.svelte";
+  import { conditionToken } from "../rules/route";
   import Icon from "./Icon.svelte";
   import { checkRegex, regexMatches, type RegexProblem } from "../rules/regex";
 
   let {
     condition,
     extensions,
+    compact = false,
     onchange,
     onremove,
   }: {
     condition: Condition;
     extensions: string[];
+    /** One of several: shows as a line to read until it's opened for editing. */
+    compact?: boolean;
     onchange: (c: Condition, merge: boolean) => void;
     onremove: () => void;
   } = $props();
 
   const view = $derived(viewCondition(condition));
+  /** Editing this condition (a compact one opens on click; empty ones start open). */
+  let editing = $state(false);
+  const open = $derived(!compact || editing || !view || (hasValues(view.operator) && view.values.every((v) => v === "")));
   const size = $derived(view?.field === "size" ? splitSize(Number(view.values[0])) : null);
   // "exists" asks for the header, not a part of its addresses.
   // For a header typed in by hand, the address part is an expert detail: only
@@ -95,7 +103,13 @@
 <!-- One sentence: [field] [compare] [values], the remove button at its end. -->
 <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-1 rounded-field bg-base-200/70 p-2">
   <div class="flex min-w-0 flex-wrap items-start gap-2">
-  {#if view}
+  {#if !open}
+    <!-- Read like on the route; click to change. -->
+    <button class="flex min-w-0 grow items-start gap-2 rounded-field px-1 py-1 text-left hover:bg-base-100" title={t("conditions.edit")} onclick={() => (editing = true)}>
+      <span class="min-w-0 grow"><Token token={conditionToken(condition, Infinity)} /></span>
+      <Icon name="pencil" size={14} class="mt-1 text-base-content/55" />
+    </button>
+  {:else if view}
     <select
       class="select select-sm w-auto"
       aria-label={t("conditions.heading")}

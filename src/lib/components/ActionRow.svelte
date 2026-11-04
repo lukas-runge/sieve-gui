@@ -152,7 +152,7 @@
           </span>
         {/each}
         <input
-          class="min-w-32 grow bg-transparent outline-none"
+          class="h-6 min-w-32 grow bg-transparent outline-none"
           aria-label={t("action.flags")}
           placeholder={t("action.flagAdd")}
           list="{folderListId}-flags"

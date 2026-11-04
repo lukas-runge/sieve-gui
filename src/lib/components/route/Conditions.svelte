@@ -22,21 +22,17 @@
 {:else if shape.kind === "line"}
   <Token token={shape.token} {words} />
 {:else}
-  <!-- A condition group: a neutral bracket, unlike the colored rails of cases,
-       so "which conditions" never looks like "which case". -->
+  <!-- A condition group: a thin neutral bracket with a short lead-in, unlike
+       the colored rails of cases, so "which conditions" never looks like
+       "which case". -->
   {@const negative = shape.mode === "none" || shape.mode === "notAll"}
   {@const joiner = shape.mode === "any" || shape.mode === "none" ? t("route.or") : t("route.and")}
-  <div class="grid gap-1 rounded-md border border-base-content/15 bg-base-content/[0.025] py-1.5 pr-2 pl-2">
-    <span
-      class={[
-        "justify-self-start rounded px-1.5 text-[0.75rem] leading-5 font-bold tracking-wide uppercase",
-        negative ? "bg-error/12 text-error" : "bg-base-content/8 text-base-content/75",
-      ]}>{t(heading[shape.mode])}</span
-    >
-    <ul class="grid">
+  <div class="grid gap-0.5">
+    <span class={["text-[0.8125rem] font-semibold", negative ? "text-error" : "text-base-content/70"]}>{t(heading[shape.mode])}</span>
+    <ul class="ml-0.5 grid border-l-[1.5px] border-base-content/25 pl-2.5">
       {#each shape.items as item, i}
         {#if i > 0}
-          <li class="py-0.5 text-[0.75rem] font-bold tracking-wide text-base-content/55 uppercase" aria-hidden="true">{joiner}</li>
+          <li class="text-[0.8125rem] text-base-content/60" aria-hidden="true">{joiner}</li>
         {/if}
         <li class="min-w-0">
           {#if item.kind === "token"}<Token token={item.token} {words} />{:else}<Self shape={item.shape} {words} nested />{/if}

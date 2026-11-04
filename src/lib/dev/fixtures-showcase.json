@@ -1,17 +1,66 @@
 {
-  "Postfächer": {
+  "Inboxes": {
     "rules": {
       "items": [
+        {
+          "actions": [
+            {
+              "flags": [
+                "$label1",
+                "\\Flagged"
+              ],
+              "op": "add",
+              "type": "flags"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "family.example",
+                    "grandma.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Family",
+          "otherwise": null,
+          "type": "rule"
+        },
         {
           "actions": [
             {
               "actions": [
                 {
                   "flags": [
-                    "$label1"
+                    "$label2"
                   ],
                   "op": "add",
                   "type": "flags"
+                },
+                {
+                  "copy": false,
+                  "create": false,
+                  "flags": null,
+                  "mailbox": "Work/Clients",
+                  "type": "fileInto"
                 }
               ],
               "conditions": {
@@ -20,18 +69,19 @@
                     "negate": false,
                     "test": {
                       "headers": [
-                        "X-Forwarded-From"
+                        "from"
                       ],
                       "keys": [
-                        "student@hochschule.example"
+                        "client-a.example"
                       ],
                       "matcher": {
                         "comparator": null,
                         "matchType": {
-                          "type": "contains"
+                          "type": "is"
                         }
                       },
-                      "type": "header"
+                      "part": "domain",
+                      "type": "address"
                     }
                   }
                 ],
@@ -42,7 +92,8 @@
                   "actions": [
                     {
                       "flags": [
-                        "$label1"
+                        "\\Flagged",
+                        "$label5"
                       ],
                       "op": "add",
                       "type": "flags"
@@ -54,45 +105,11 @@
                         "negate": false,
                         "test": {
                           "headers": [
-                            "X-Forwarded-From"
+                            "subject"
                           ],
                           "keys": [
-                            "tutor@hochschule.example"
-                          ],
-                          "matcher": {
-                            "comparator": null,
-                            "matchType": {
-                              "type": "contains"
-                            }
-                          },
-                          "type": "header"
-                        }
-                      }
-                    ],
-                    "join": "any"
-                  }
-                },
-                {
-                  "actions": [
-                    {
-                      "flags": [
-                        "$label2"
-                      ],
-                      "op": "add",
-                      "type": "flags"
-                    }
-                  ],
-                  "conditions": {
-                    "items": [
-                      {
-                        "negate": false,
-                        "test": {
-                          "headers": [
-                            "X-Original-To",
-                            "Delivered-To"
-                          ],
-                          "keys": [
-                            "info@filmprojekt.example"
+                            "urgent",
+                            "asap"
                           ],
                           "matcher": {
                             "comparator": null,
@@ -113,7 +130,7 @@
                   "copy": false,
                   "create": false,
                   "flags": null,
-                  "mailbox": "Konten",
+                  "mailbox": "Work",
                   "type": "fileInto"
                 }
               ],
@@ -131,7 +148,7 @@
                     "bcc"
                   ],
                   "keys": [
-                    "alt@freemail.example"
+                    "me@work.example"
                   ],
                   "matcher": {
                     "comparator": null,
@@ -146,43 +163,6 @@
             "join": "any"
           },
           "elsif": [
-            {
-              "actions": [
-                {
-                  "copy": false,
-                  "create": false,
-                  "flags": null,
-                  "mailbox": "Konten",
-                  "type": "fileInto"
-                }
-              ],
-              "conditions": {
-                "items": [
-                  {
-                    "negate": false,
-                    "test": {
-                      "headers": [
-                        "to",
-                        "cc",
-                        "bcc"
-                      ],
-                      "keys": [
-                        "login@meinname.example",
-                        "dev@meinname.example"
-                      ],
-                      "matcher": {
-                        "comparator": null,
-                        "matchType": {
-                          "type": "contains"
-                        }
-                      },
-                      "type": "header"
-                    }
-                  }
-                ],
-                "join": "any"
-              }
-            },
             {
               "actions": [
                 {
@@ -208,12 +188,10 @@
                         "negate": false,
                         "test": {
                           "headers": [
-                            "to",
-                            "cc",
-                            "bcc"
+                            "subject"
                           ],
                           "keys": [
-                            "rechnung@meinname.example"
+                            "invoice"
                           ],
                           "matcher": {
                             "comparator": null,
@@ -243,9 +221,7 @@
                         "bcc"
                       ],
                       "keys": [
-                        "info@meinname.example",
-                        "buero@meinname.example",
-                        "rechnung@meinname.example"
+                        "hello@side-project.example"
                       ],
                       "matcher": {
                         "comparator": null,
@@ -263,11 +239,9 @@
             {
               "actions": [
                 {
-                  "flags": [
-                    "$label5"
-                  ],
-                  "op": "add",
-                  "type": "flags"
+                  "address": "me@personal.example",
+                  "copy": true,
+                  "type": "redirect"
                 }
               ],
               "conditions": {
@@ -281,79 +255,7 @@
                         "bcc"
                       ],
                       "keys": [
-                        "kontakt@agentur.example"
-                      ],
-                      "matcher": {
-                        "comparator": null,
-                        "matchType": {
-                          "type": "contains"
-                        }
-                      },
-                      "type": "header"
-                    }
-                  }
-                ],
-                "join": "any"
-              }
-            },
-            {
-              "actions": [
-                {
-                  "flags": [
-                    "$label6"
-                  ],
-                  "op": "add",
-                  "type": "flags"
-                }
-              ],
-              "conditions": {
-                "items": [
-                  {
-                    "negate": false,
-                    "test": {
-                      "headers": [
-                        "to",
-                        "cc",
-                        "bcc"
-                      ],
-                      "keys": [
-                        "privat@meinname.example"
-                      ],
-                      "matcher": {
-                        "comparator": null,
-                        "matchType": {
-                          "type": "contains"
-                        }
-                      },
-                      "type": "header"
-                    }
-                  }
-                ],
-                "join": "any"
-              }
-            },
-            {
-              "actions": [
-                {
-                  "copy": false,
-                  "create": false,
-                  "flags": null,
-                  "mailbox": "Admin",
-                  "type": "fileInto"
-                }
-              ],
-              "conditions": {
-                "items": [
-                  {
-                    "negate": false,
-                    "test": {
-                      "headers": [
-                        "to",
-                        "cc",
-                        "bcc"
-                      ],
-                      "keys": [
-                        "admin@server.example"
+                        "old@freemail.example"
                       ],
                       "matcher": {
                         "comparator": null,
@@ -370,7 +272,7 @@
             }
           ],
           "enabled": true,
-          "name": "Nach Postfach sortieren",
+          "name": "By address",
           "otherwise": [
             {
               "flags": null,
@@ -378,952 +280,21 @@
             }
           ],
           "type": "rule"
-        }
-      ],
-      "preamble": null,
-      "requires": [
-        "fileinto",
-        "imap4flags",
-        "include",
-        "variables"
-      ],
-      "singleFolder": true
-    },
-    "source": "require [\"fileinto\",\"imap4flags\",\"include\",\"variables\"];\nglobal \"move_to_folder\";\n# rule:[Nach Postfach sortieren]\nif header :contains [\"to\",\"cc\",\"bcc\"] \"alt@freemail.example\"\n{\n\tif header :contains \"X-Forwarded-From\" \"student@hochschule.example\"\n\t{\n\t\taddflag \"$label1\";\n\t}\n\telsif header :contains \"X-Forwarded-From\" \"tutor@hochschule.example\"\n\t{\n\t\taddflag \"$label1\";\n\t}\n\telsif header :contains [\"X-Original-To\",\"Delivered-To\"] \"info@filmprojekt.example\"\n\t{\n\t\taddflag \"$label2\";\n\t}\n\telse\n\t{\n\t\tset \"move_to_folder\" \"Konten\";\n\t}\n}\nelsif header :contains [\"to\",\"cc\",\"bcc\"] [\"login@meinname.example\", \"dev@meinname.example\"]\n{\n\tset \"move_to_folder\" \"Konten\";\n}\nelsif header :contains [\"to\",\"cc\",\"bcc\"] [\"info@meinname.example\", \"buero@meinname.example\", \"rechnung@meinname.example\"]\n{\n\taddflag \"$label3\";\n\tif header :contains [\"to\",\"cc\",\"bcc\"] \"rechnung@meinname.example\"\n\t{\n\t\taddflag \"$label4\";\n\t}\n}\nelsif header :contains [\"to\",\"cc\",\"bcc\"] \"kontakt@agentur.example\"\n{\n\taddflag \"$label5\";\n}\nelsif header :contains [\"to\",\"cc\",\"bcc\"] \"privat@meinname.example\"\n{\n\taddflag \"$label6\";\n}\nelsif header :contains [\"to\",\"cc\",\"bcc\"] \"admin@server.example\"\n{\n\tset \"move_to_folder\" \"Admin\";\n}\nelse\n{\n\tkeep;\n}\n"
-  },
-  "Sortierung": {
-    "rules": {
-      "items": [
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Bildung/Hochschule",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "hochschule.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "Hochschule",
-          "otherwise": null,
-          "type": "rule"
         },
         {
           "actions": [
             {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Bildung/Verteiler",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "X-Original-To",
-                    "Delivered-To"
-                  ],
-                  "keys": [
-                    "verteiler@lists.hochschule.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "contains"
-                    }
-                  },
-                  "type": "header"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
+              "flags": [
+                "\\Seen"
+              ],
+              "op": "add",
+              "type": "flags"
+            },
             {
               "copy": false,
               "create": false,
               "flags": null,
-              "mailbox": "Konten/Bildung/Akademie",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "akademie.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "Weiterbildung",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Reisen/Bahn",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "bahn.example",
-                    "nahverkehr.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "Reisen",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Reisen/Flüge",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "fluglinie.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Reisen/Unterkünfte",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "hotels.example",
-                    "ferienwohnung.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Einkaufen/Versandhaus",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "versandhaus.example",
-                    "versandhaus.example.co.uk"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "Einkaufen",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Einkaufen/Bücher",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "buchladen.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Einkaufen/Elektronik",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "elektronik.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Einkaufen/Versand",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "Paketdienst"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "contains"
-                    }
-                  },
-                  "type": "header"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Einkaufen/Musikhaus",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "musikhaus.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Einkaufen/Apotheke",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "apotheke.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Banken/Direktbank",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "direktbank.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "Finanzen",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Banken/Sparkasse",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "sparkasse.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Banken/Kreditkarte",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "kreditkarte.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Banken/Depot",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "depot.example",
-                    "broker.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Versicherungen",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "versicherung.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "Versicherungen",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Dienste/Cloud",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "cloudspeicher.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "Online-Dienste",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Dienste/Musik",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "musikstreaming.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Dienste/Video",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "videostreaming.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Dienste/Code",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "codehost.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Dienste/Hosting",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "domains.example",
-                    "hosting.example"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "is"
-                    }
-                  },
-                  "part": "domain",
-                  "type": "address"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Konten/Dienste/Kalender",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
-              {
-                "negate": false,
-                "test": {
-                  "headers": [
-                    "from"
-                  ],
-                  "keys": [
-                    "Kalender"
-                  ],
-                  "matcher": {
-                    "comparator": null,
-                    "matchType": {
-                      "type": "contains"
-                    }
-                  },
-                  "type": "header"
-                }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Newsletter",
+              "mailbox": "Reading/Newsletters",
               "type": "fileInto"
             }
           ],
@@ -1337,36 +308,16 @@
                   ],
                   "type": "exists"
                 }
-              }
-            ],
-            "join": "any"
-          },
-          "elsif": [],
-          "enabled": true,
-          "name": "Newsletter",
-          "otherwise": null,
-          "type": "rule"
-        },
-        {
-          "actions": [
-            {
-              "copy": false,
-              "create": false,
-              "flags": null,
-              "mailbox": "Vereine/Sport",
-              "type": "fileInto"
-            }
-          ],
-          "conditions": {
-            "items": [
+              },
               {
-                "negate": false,
+                "negate": true,
                 "test": {
                   "headers": [
                     "from"
                   ],
                   "keys": [
-                    "sportverein.example"
+                    "work.example",
+                    "family.example"
                   ],
                   "matcher": {
                     "comparator": null,
@@ -1379,11 +330,11 @@
                 }
               }
             ],
-            "join": "any"
+            "join": "all"
           },
           "elsif": [],
           "enabled": true,
-          "name": "Vereine",
+          "name": "Newsletters from strangers",
           "otherwise": null,
           "type": "rule"
         },
@@ -1393,7 +344,47 @@
               "copy": false,
               "create": false,
               "flags": null,
-              "mailbox": "Vereine/Chor",
+              "mailbox": "Shopping",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "subject"
+                  ],
+                  "keys": [
+                    "your order",
+                    "order confirmation"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "contains"
+                    }
+                  },
+                  "type": "header"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Orders",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Shopping/Books",
               "type": "fileInto"
             }
           ],
@@ -1406,7 +397,7 @@
                     "from"
                   ],
                   "keys": [
-                    "chor.example"
+                    "bookshop.example"
                   ],
                   "matcher": {
                     "comparator": null,
@@ -1426,17 +417,589 @@
           "name": "",
           "otherwise": null,
           "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Shopping/Electronics",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "electronics.example",
+                    "gadgets.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "address": "archive@work.example",
+              "copy": false,
+              "type": "redirect"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "to"
+                  ],
+                  "keys": [
+                    "legacy@work.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "contains"
+                    }
+                  },
+                  "type": "header"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": false,
+          "name": "Old forwarding",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "code": "# Mark every message that passed this script\naddheader \"X-Sorted-By\" \"sieve\";",
+          "type": "raw"
         }
       ],
       "preamble": null,
       "requires": [
+        "copy",
+        "editheader",
         "fileinto",
+        "imap4flags",
         "include",
         "variables"
       ],
       "singleFolder": true
     },
-    "source": "require [\"fileinto\",\"include\",\"variables\"];\nglobal \"move_to_folder\";\n# rule:[Hochschule]\nif address :domain :is \"from\" \"hochschule.example\"\n{\n\tset \"move_to_folder\" \"Konten/Bildung/Hochschule\";\n}\nif header :contains [\"X-Original-To\",\"Delivered-To\"] \"verteiler@lists.hochschule.example\"\n{\n\tset \"move_to_folder\" \"Konten/Bildung/Verteiler\";\n}\n# rule:[Weiterbildung]\nif address :domain :is \"from\" \"akademie.example\"\n{\n\tset \"move_to_folder\" \"Konten/Bildung/Akademie\";\n}\n# rule:[Reisen]\nif address :domain :is \"from\" [\"bahn.example\", \"nahverkehr.example\"]\n{\n\tset \"move_to_folder\" \"Konten/Reisen/Bahn\";\n}\nif address :domain :is \"from\" \"fluglinie.example\"\n{\n\tset \"move_to_folder\" \"Konten/Reisen/Flüge\";\n}\nif address :domain :is \"from\" [\"hotels.example\", \"ferienwohnung.example\"]\n{\n\tset \"move_to_folder\" \"Konten/Reisen/Unterkünfte\";\n}\n# rule:[Einkaufen]\nif address :domain :is \"from\" [\"versandhaus.example\", \"versandhaus.example.co.uk\"]\n{\n\tset \"move_to_folder\" \"Konten/Einkaufen/Versandhaus\";\n}\nif address :domain :is \"from\" \"buchladen.example\"\n{\n\tset \"move_to_folder\" \"Konten/Einkaufen/Bücher\";\n}\nif address :domain :is \"from\" \"elektronik.example\"\n{\n\tset \"move_to_folder\" \"Konten/Einkaufen/Elektronik\";\n}\nif header :contains \"from\" \"Paketdienst\"\n{\n\tset \"move_to_folder\" \"Konten/Einkaufen/Versand\";\n}\nif address :domain :is \"from\" \"musikhaus.example\"\n{\n\tset \"move_to_folder\" \"Konten/Einkaufen/Musikhaus\";\n}\nif address :domain :is \"from\" \"apotheke.example\"\n{\n\tset \"move_to_folder\" \"Konten/Einkaufen/Apotheke\";\n}\n# rule:[Finanzen]\nif address :domain :is \"from\" \"direktbank.example\"\n{\n\tset \"move_to_folder\" \"Konten/Banken/Direktbank\";\n}\nif address :domain :is \"from\" \"sparkasse.example\"\n{\n\tset \"move_to_folder\" \"Konten/Banken/Sparkasse\";\n}\nif address :domain :is \"from\" \"kreditkarte.example\"\n{\n\tset \"move_to_folder\" \"Konten/Banken/Kreditkarte\";\n}\nif address :domain :is \"from\" [\"depot.example\", \"broker.example\"]\n{\n\tset \"move_to_folder\" \"Konten/Banken/Depot\";\n}\n# rule:[Versicherungen]\nif address :domain :is \"from\" \"versicherung.example\"\n{\n\tset \"move_to_folder\" \"Konten/Versicherungen\";\n}\n# rule:[Online-Dienste]\nif address :domain :is \"from\" \"cloudspeicher.example\"\n{\n\tset \"move_to_folder\" \"Konten/Dienste/Cloud\";\n}\nif address :domain :is \"from\" \"musikstreaming.example\"\n{\n\tset \"move_to_folder\" \"Konten/Dienste/Musik\";\n}\nif address :domain :is \"from\" \"videostreaming.example\"\n{\n\tset \"move_to_folder\" \"Konten/Dienste/Video\";\n}\nif address :domain :is \"from\" \"codehost.example\"\n{\n\tset \"move_to_folder\" \"Konten/Dienste/Code\";\n}\nif address :domain :is \"from\" [\"domains.example\", \"hosting.example\"]\n{\n\tset \"move_to_folder\" \"Konten/Dienste/Hosting\";\n}\nif header :contains \"from\" \"Kalender\"\n{\n\tset \"move_to_folder\" \"Konten/Dienste/Kalender\";\n}\n# rule:[Newsletter]\nif exists \"List-Unsubscribe\"\n{\n\tset \"move_to_folder\" \"Newsletter\";\n}\n# rule:[Vereine]\nif address :domain :is \"from\" \"sportverein.example\"\n{\n\tset \"move_to_folder\" \"Vereine/Sport\";\n}\nif address :domain :is \"from\" \"chor.example\"\n{\n\tset \"move_to_folder\" \"Vereine/Chor\";\n}\n"
+    "source": "require [\"copy\",\"editheader\",\"fileinto\",\"imap4flags\",\"include\",\"variables\"];\r\nglobal \"move_to_folder\";\r\n\r\n# rule:[Family]\r\nif address :domain :is \"from\" [\r\n\t\"family.example\",\r\n\t\"grandma.example\"\r\n] {\r\n\taddflag [\"$label1\",\"\\\\Flagged\"];\r\n}\r\n\r\n# rule:[By address]\r\nif header :contains [\"to\",\"cc\",\"bcc\"] \"me@work.example\" {\r\n\tif address :domain :is \"from\" \"client-a.example\" {\r\n\t\taddflag \"$label2\";\r\n\t\tset \"move_to_folder\" \"Work/Clients\";\r\n\t} elsif header :contains \"subject\" [\r\n\t\t\"urgent\",\r\n\t\t\"asap\"\r\n\t] {\r\n\t\taddflag [\"\\\\Flagged\",\"$label5\"];\r\n\t} else {\r\n\t\tset \"move_to_folder\" \"Work\";\r\n\t}\r\n} elsif header :contains [\"to\",\"cc\",\"bcc\"] \"hello@side-project.example\" {\r\n\taddflag \"$label3\";\r\n\tif header :contains \"subject\" \"invoice\" {\r\n\t\taddflag \"$label4\";\r\n\t}\r\n} elsif header :contains [\"to\",\"cc\",\"bcc\"] \"old@freemail.example\" {\r\n\tredirect :copy \"me@personal.example\";\r\n} else {\r\n\tkeep;\r\n}\r\n\r\n# rule:[Newsletters from strangers]\r\nif allof (\r\n\texists \"List-Unsubscribe\",\r\n\tnot address :domain :is \"from\" [\r\n\t\t\"work.example\",\r\n\t\t\"family.example\"\r\n\t]\r\n) {\r\n\taddflag \"\\\\Seen\";\r\n\tset \"move_to_folder\" \"Reading/Newsletters\";\r\n}\r\n\r\n# rule:[Orders]\r\nif header :contains \"subject\" [\r\n\t\"your order\",\r\n\t\"order confirmation\"\r\n] {\r\n\tset \"move_to_folder\" \"Shopping\";\r\n}\r\n\r\nif address :domain :is \"from\" \"bookshop.example\" {\r\n\tset \"move_to_folder\" \"Shopping/Books\";\r\n}\r\n\r\nif address :domain :is \"from\" [\r\n\t\"electronics.example\",\r\n\t\"gadgets.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Shopping/Electronics\";\r\n}\r\n\r\n# rule:[Old forwarding]\r\nif false # header :contains \"to\" \"legacy@work.example\"\r\n{\r\n\tredirect \"archive@work.example\";\r\n}\r\n\r\n# Mark every message that passed this script\naddheader \"X-Sorted-By\" \"sieve\";\r\n"
+  },
+  "Sorting": {
+    "rules": {
+      "items": [
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Accounts/Finance/Bank",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "bank.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Bank",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Accounts/Finance/Credit card",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "card.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Accounts/Finance/Investments",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "broker.example",
+                    "savings.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Accounts/Travel/Trains",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "rail.example",
+                    "transit.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Travel",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Accounts/Travel/Flights",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "airline.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Accounts/Travel/Stays",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "hotels.example",
+                    "rentals.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Accounts/Services/Cloud",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "cloud.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Services",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Accounts/Services/Streaming",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "music.example",
+                    "video.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Accounts/Services/Code",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "code-host.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Clubs/Sports",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "sports-club.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Clubs",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "copy": false,
+              "create": false,
+              "flags": null,
+              "mailbox": "Clubs/Choir",
+              "type": "fileInto"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "from"
+                  ],
+                  "keys": [
+                    "choir.example"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "part": "domain",
+                  "type": "address"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "flags": [
+                "$label6"
+              ],
+              "op": "add",
+              "type": "flags"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "limit": 20971520,
+                  "over": true,
+                  "type": "size"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Big attachments",
+          "otherwise": null,
+          "type": "rule"
+        }
+      ],
+      "preamble": null,
+      "requires": [
+        "imap4flags",
+        "include",
+        "variables"
+      ],
+      "singleFolder": true
+    },
+    "source": "require [\"imap4flags\",\"include\",\"variables\"];\r\nglobal \"move_to_folder\";\r\n\r\n# rule:[Bank]\r\nif address :domain :is \"from\" \"bank.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Finance/Bank\";\r\n}\r\n\r\nif address :domain :is \"from\" \"card.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Finance/Credit card\";\r\n}\r\n\r\nif address :domain :is \"from\" [\r\n\t\"broker.example\",\r\n\t\"savings.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Finance/Investments\";\r\n}\r\n\r\n# rule:[Travel]\r\nif address :domain :is \"from\" [\r\n\t\"rail.example\",\r\n\t\"transit.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Travel/Trains\";\r\n}\r\n\r\nif address :domain :is \"from\" \"airline.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Travel/Flights\";\r\n}\r\n\r\nif address :domain :is \"from\" [\r\n\t\"hotels.example\",\r\n\t\"rentals.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Travel/Stays\";\r\n}\r\n\r\n# rule:[Services]\r\nif address :domain :is \"from\" \"cloud.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Services/Cloud\";\r\n}\r\n\r\nif address :domain :is \"from\" [\r\n\t\"music.example\",\r\n\t\"video.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Services/Streaming\";\r\n}\r\n\r\nif address :domain :is \"from\" \"code-host.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Services/Code\";\r\n}\r\n\r\n# rule:[Clubs]\r\nif address :domain :is \"from\" \"sports-club.example\" {\r\n\tset \"move_to_folder\" \"Clubs/Sports\";\r\n}\r\n\r\nif address :domain :is \"from\" \"choir.example\" {\r\n\tset \"move_to_folder\" \"Clubs/Choir\";\r\n}\r\n\r\n# rule:[Big attachments]\r\nif size :over 20M {\r\n\taddflag \"$label6\";\r\n}\r\n"
   },
   "Spam": {
     "rules": {
@@ -1470,7 +1033,7 @@
                     "from"
                   ],
                   "keys": [
-                    "angebote@werbung.example"
+                    "offers@ads.example"
                   ],
                   "matcher": {
                     "comparator": null,
@@ -1488,7 +1051,7 @@
                     "from"
                   ],
                   "keys": [
-                    "gewinn@lotterie.example"
+                    "prize@lottery.example"
                   ],
                   "matcher": {
                     "comparator": null,
@@ -1522,7 +1085,7 @@
           },
           "elsif": [],
           "enabled": true,
-          "name": "Bekannte Störenfriede",
+          "name": "Known pests",
           "otherwise": null,
           "type": "rule"
         },
@@ -1550,10 +1113,9 @@
                         "from"
                       ],
                       "keys": [
-                        "*mein-verein.example",
-                        "*familie.example",
-                        "*firma.example",
-                        "*freunde.example"
+                        "*work.example",
+                        "*family.example",
+                        "*friends.example"
                       ],
                       "matcher": {
                         "comparator": null,
@@ -1688,9 +1250,13 @@
           },
           "elsif": [],
           "enabled": true,
-          "name": "Vom Server als Spam erkannt",
+          "name": "Flagged as spam by the server",
           "otherwise": null,
           "type": "rule"
+        },
+        {
+          "code": "# A rule sieve-gui shows as code: it doesn't summarise editheader.\nif header :contains \"subject\" \"[SPAM]\"\n{\n\tdeleteheader \"X-Spam-Score\";\n}",
+          "type": "raw"
         }
       ],
       "preamble": null,
@@ -1704,6 +1270,6 @@
       ],
       "singleFolder": true
     },
-    "source": "require [\"body\",\"fileinto\",\"imap4flags\",\"include\",\"regex\",\"variables\"];\nglobal \"move_to_folder\";\n# rule:[Bekannte Störenfriede]\nif anyof (header :contains \"from\" \"angebote@werbung.example\", header :contains \"from\" \"gewinn@lotterie.example\", header :contains \"from\" \"news@spam-shop.example\")\n{\n\tsetflag \"\\\\Seen\";\n\tset \"move_to_folder\" \"Junk\";\n\treturn;\n}\n# rule:[Vom Server als Spam erkannt]\nif anyof (header :contains \"x-spam-flag\" \"yes\", allof (header :regex \"X-DSPAM-Result\" \"^(Spam|Virus|Bl[ao]cklisted)$\", not header :contains \"X-DSPAM-Reclassified\" \"Innocent\"), allof (not header :regex \"subject\" \"[[:graph:]]\", body :regex \"^[[:space:]]*http://[[:graph:]]+[[:space:]]*$\"))\n{\n\tif not address :domain :matches \"from\" [\"*mein-verein.example\", \"*familie.example\", \"*firma.example\", \"*freunde.example\"]\n\t{\n\t\tset \"move_to_folder\" \"Junk\";\n\t\treturn;\n\t}\n}\n"
+    "source": "require [\"body\",\"fileinto\",\"imap4flags\",\"include\",\"regex\",\"variables\"];\r\nglobal \"move_to_folder\";\r\n\r\n# rule:[Known pests]\r\nif anyof (\r\n\theader :contains \"from\" \"offers@ads.example\",\r\n\theader :contains \"from\" \"prize@lottery.example\",\r\n\theader :contains \"from\" \"news@spam-shop.example\"\r\n) {\r\n\tsetflag \"\\\\Seen\";\r\n\tset \"move_to_folder\" \"Junk\";\r\n\treturn;\r\n}\r\n\r\n# rule:[Flagged as spam by the server]\r\nif anyof (\r\n\theader :contains \"x-spam-flag\" \"yes\",\r\n\tallof (\r\n\t\theader :regex \"X-DSPAM-Result\" \"^(Spam|Virus|Bl[ao]cklisted)$\",\r\n\t\tnot header :contains \"X-DSPAM-Reclassified\" \"Innocent\"\r\n\t),\r\n\tallof (\r\n\t\tnot header :regex \"subject\" \"[[:graph:]]\",\r\n\t\tbody :text :regex \"^[[:space:]]*http://[[:graph:]]+[[:space:]]*$\"\r\n\t)\r\n) {\r\n\tif not address :domain :matches \"from\" [\r\n\t\t\"*work.example\",\r\n\t\t\"*family.example\",\r\n\t\t\"*friends.example\"\r\n\t] {\r\n\t\tset \"move_to_folder\" \"Junk\";\r\n\t\treturn;\r\n\t}\r\n}\r\n\r\n# A rule sieve-gui shows as code: it doesn't summarise editheader.\nif header :contains \"subject\" \"[SPAM]\"\n{\n\tdeleteheader \"X-Spam-Score\";\n}\r\n"
   }
 }

@@ -4,7 +4,7 @@ A lightweight, cross-platform desktop editor for **server-side Sieve mail filter
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
-  <img alt="sieve-gui: a sorting script drawn as a route with numbered cases, a nested check and the inspector editing case 1.1" src="docs/screenshot-light.png">
+  <img alt="sieve-gui: a script drawn as a route. Labels and a flag, a rule with four cases where case 1 decides further and case 2 adds a check, forwarding, a condition group, a folder section, a rule that is off and a block kept as code; on the right the inspector edits case 1.1" src="docs/screenshot-light.png">
 </picture>
 
 > **Status:** early development. Visual rule editing, script management, trying rules with a sample message and saving via ManageSieve work. See [`docs/concept.md`](docs/concept.md).
@@ -135,7 +135,7 @@ The longer fuzz runs take `SIEVE_FUZZ_ITERS` and `SIEVE_FUZZ_SEED`.
 
 ### Browser preview
 
-`pnpm dev` without Tauri opens the UI in a normal browser at `http://localhost:1420` with a fake backend (`src/lib/dev/mock.ts`). Rule data comes from fixtures sieve-core produced: from the Roundcube and MailPlus test scripts (`fixtures.json`, `fixtures-mailplus.json`) and from made-up showcase scripts (`fixtures-showcase.json`). Add `?mac` to the URL to see the macOS title bar (the window controls are drawn in). Script generation needs the desktop app.
+`pnpm dev` without Tauri opens the UI in a normal browser at `http://localhost:1420` with a fake backend (`src/lib/dev/mock.ts`). Rule data comes from fixtures sieve-core produced: from the Roundcube and MailPlus test scripts (`fixtures.json`, `fixtures-mailplus.json`) and from made-up English showcase scripts (`fixtures-showcase.json`, also what the screenshot above shows). Add `?mac` to the URL to see the macOS title bar (the window controls are drawn in). Script generation needs the desktop app.
 
 ---
 

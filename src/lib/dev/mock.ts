@@ -3,14 +3,21 @@
 // the app (loaded only when `import.meta.env.DEV` and Tauri is absent).
 // fixtures.json and fixtures-mailplus.json are produced by sieve-core from
 // the Roundcube and MailPlus fixtures; fixtures-showcase.json from made-up
-// scripts as complex as real ones (long chains, nested checks, 25+ rules).
+// English scripts that show most kinds of rules at once (cases, nested
+// checks, condition groups, folder sections, labels, forwarding, code, a rule
+// that is off). It is also what the README screenshot shows.
 
 import { mockIPC } from "@tauri-apps/api/mocks";
-import fixtures from "./fixtures.json";
+import roundcubeFixtures from "./fixtures.json";
 import mailplusFixtures from "./fixtures-mailplus.json";
 import showcaseFixtures from "./fixtures-showcase.json";
 
 type Fixture = { source: string; rules: unknown };
+// The Roundcube fixtures under English names (their keys are the scripts' names in the fixture set).
+const RENAMED: Record<string, string> = { Allgemein: "General", Gemischt: "Mixed", Urlaub: "Vacation", Verzweigt: "Branching" };
+const fixtures = Object.fromEntries(
+  Object.entries(roundcubeFixtures as Record<string, Fixture>).map(([name, f]) => [RENAMED[name] ?? name, f]),
+);
 /** A fake ManageSieve server: its scripts and which one is active. */
 type Server = {
   scripts: Record<string, Fixture>;
@@ -26,12 +33,12 @@ function showcaseRoot(names: string[]): string {
   return [ROOT_HEADER, 'global "move_to_folder";', ...includes].join("\n");
 }
 const servers: Record<string, Server> = {
-  // Runs Spam, Postfächer and Sortierung through sieve-gui's root script.
+  // Runs Spam, Inboxes and Sorting through sieve-gui's root script.
   preview: {
     scripts: {
       ...(showcaseFixtures as Record<string, Fixture>),
-      ...(fixtures as Record<string, Fixture>),
-      "sieve-gui": { source: showcaseRoot(["Spam", "Postfächer", "Sortierung"]), rules: null },
+      ...fixtures,
+      "sieve-gui": { source: showcaseRoot(["Spam", "Inboxes", "Sorting"]), rules: null },
     },
     active: "sieve-gui",
     saved: new Map(),
@@ -54,23 +61,23 @@ const scriptList = (server: Server) =>
 
 const account = {
   id: "preview",
-  label: "Vorschau",
+  label: "Personal",
   host: "mail.example.com",
   port: 4190,
   security: "startTls",
   certificate: null as string | null,
-  username: "lukas",
+  username: "me",
   imap: { host: "mail.example.com", port: 993, security: "implicitTls", certificate: null as string | null },
   multipleScripts: true,
   lastMoveWins: true,
   roundcube: false,
   keywordNames: {
-    $label1: "Hochschule",
-    $label2: "Filmprojekt",
-    $label3: "Büro",
-    $label4: "Rechnung",
-    $label5: "Agentur",
-    $label6: "Privat",
+    $label1: "Family",
+    $label2: "Client A",
+    $label3: "Side project",
+    $label4: "Invoices",
+    $label5: "Urgent",
+    $label6: "Large",
   } as Record<string, string>,
 };
 
@@ -99,52 +106,40 @@ let copyResolved = false;
 const folders = (
   [
     ["INBOX"],
-    ["Archiv", "archive"],
-    ["Archiv/2025"],
-    ["Entw&APw-rfe", "drafts"],
-    ["Gesendet", "sent"],
+    ["Archive", "archive"],
+    ["Archive/2025"],
+    ["Drafts", "drafts"],
+    ["Sent", "sent"],
+    ["Trash", "trash"],
+    ["Junk", "junk"],
     ["Lists"],
     ["Lists/Rust"],
-    ["Papierkorb", "trash"],
-    ["Spam", "junk"],
-    ["Steuern"],
-    ["Steuern/Gesch&AOQ-ftlich"],
-    ["Steuern/Privat"],
-    ["Junk", "junk"],
-    ["Admin"],
-    ["Konten"],
-    ["Konten/Banken"],
-    ["Konten/Banken/Depot"],
-    ["Konten/Banken/Direktbank"],
-    ["Konten/Banken/Kreditkarte"],
-    ["Konten/Banken/Sparkasse"],
-    ["Konten/Bildung"],
-    ["Konten/Bildung/Akademie"],
-    ["Konten/Bildung/Hochschule"],
-    ["Konten/Bildung/Verteiler"],
-    ["Konten/Dienste"],
-    ["Konten/Dienste/Cloud"],
-    ["Konten/Dienste/Code"],
-    ["Konten/Dienste/Hosting"],
-    ["Konten/Dienste/Kalender"],
-    ["Konten/Dienste/Musik"],
-    ["Konten/Dienste/Video"],
-    ["Konten/Einkaufen"],
-    ["Konten/Einkaufen/Apotheke"],
-    ["Konten/Einkaufen/B&APw-cher"],
-    ["Konten/Einkaufen/Elektronik"],
-    ["Konten/Einkaufen/Musikhaus"],
-    ["Konten/Einkaufen/Versand"],
-    ["Konten/Einkaufen/Versandhaus"],
-    ["Konten/Reisen"],
-    ["Konten/Reisen/Bahn"],
-    ["Konten/Reisen/Fl&APw-ge"],
-    ["Konten/Reisen/Unterk&APw-nfte"],
-    ["Konten/Versicherungen"],
-    ["Newsletter"],
-    ["Vereine"],
-    ["Vereine/Chor"],
-    ["Vereine/Sport"],
+    ["Taxes"],
+    ["Taxes/Business"],
+    ["Taxes/Private"],
+    ["Work"],
+    ["Work/Clients"],
+    ["Reading"],
+    ["Reading/Newsletters"],
+    ["Shopping"],
+    ["Shopping/Books"],
+    ["Shopping/Electronics"],
+    ["Accounts"],
+    ["Accounts/Finance"],
+    ["Accounts/Finance/Bank"],
+    ["Accounts/Finance/Credit card"],
+    ["Accounts/Finance/Investments"],
+    ["Accounts/Travel"],
+    ["Accounts/Travel/Trains"],
+    ["Accounts/Travel/Flights"],
+    ["Accounts/Travel/Stays"],
+    ["Accounts/Services"],
+    ["Accounts/Services/Cloud"],
+    ["Accounts/Services/Streaming"],
+    ["Accounts/Services/Code"],
+    ["Clubs"],
+    ["Clubs/Sports"],
+    ["Clubs/Choir"],
   ] as [string, string?][]
 ).map(([name, specialUse]) => ({ name, delimiter: "/", selectable: true, specialUse: specialUse ?? null }));
 
@@ -169,7 +164,7 @@ export function installMock() {
         }
         return {
           tls: true,
-          capabilities: { implementation: "Dovecot Pigeonhole", sasl: ["PLAIN"], sieve, starttls: true, maxRedirects: 4, notify: [], language: null, owner: "lukas", version: "1.0", unauthenticate: false, other: [] },
+          capabilities: { implementation: "Dovecot Pigeonhole", sasl: ["PLAIN"], sieve, starttls: true, maxRedirects: 4, notify: [], language: null, owner: "me", version: "1.0", unauthenticate: false, other: [] },
           scripts: scriptList(server),
         };
       case "list_folders":
@@ -227,10 +222,10 @@ export function installMock() {
         return {
           dir: `~/Library/Application Support/sieve-gui/copies/${a.id}`,
           differences: [
-            { name: "Steuern", server: null, local: "# rule:[Taxes]\nif true { keep; }\n", changed: ["server"], sameRules: false, serverRules: null, localRules: null },
-            { name: "Gemischt", server: source(server, "Gemischt"), local: "# older version\n" + source(server, "Gemischt"), changed: ["local"], sameRules: true, serverRules: null, localRules: null },
+            { name: "Taxes", server: null, local: "# rule:[Taxes]\nif true { keep; }\n", changed: ["server"], sameRules: false, serverRules: null, localRules: null },
+            { name: "Mixed", server: source(server, "Mixed"), local: "# older version\n" + source(server, "Mixed"), changed: ["local"], sameRules: true, serverRules: null, localRules: null },
           ],
-          active: { server: "Allgemein", local: "sieve-gui" },
+          active: { server: "General", local: "sieve-gui" },
         };
       }
       case "resolve_copy":

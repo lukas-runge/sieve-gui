@@ -23,6 +23,8 @@
   $effect(() => localStorage.setItem("showCode", showCode ? "1" : "0"));
   // Wide windows show the code beside the rules, narrow ones instead of them.
   const wide = new MediaQuery("min-width: 1100px");
+  // Below this, the sidebar steps aside while the panel is open, so the route keeps its columns.
+  const roomy = new MediaQuery("min-width: 1500px");
   // Medium windows make room for the panel by folding the sidebar away.
   const medium = new MediaQuery("min-width: 860px");
 
@@ -67,10 +69,10 @@
   $effect(() => localStorage.setItem("sidebar", sidebarOpen ? "1" : "0"));
   /** The panel sits beside the route (else it takes its place). */
   const beside = $derived(wide.current || medium.current);
-  /** In medium windows the sidebar steps aside while the panel is open. */
+  /** Unless the window is roomy, the sidebar steps aside while the panel is open. */
   let windowWidth = $state(window.innerWidth);
   let sidebarPinned = $state(false);
-  const sidebarShown = $derived(sidebarOpen && (wide.current || !rightPanel || sidebarPinned));
+  const sidebarShown = $derived(sidebarOpen && (roomy.current || !rightPanel || sidebarPinned));
   $effect(() => {
     if (!rightPanel) sidebarPinned = false;
   });
@@ -266,6 +268,8 @@
               trial={trial.active ? trialRun : null}
               trialOpen={trial.open}
               onshowtrial={toggleTrial}
+              order={active && root ? root.scripts : []}
+              onopen={async (name) => (await session.confirmLeave()) && session.openScript(editor.accountId, name)}
             />
           </div>
         </div>

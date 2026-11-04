@@ -29,6 +29,8 @@
     trial = null,
     trialOpen = false,
     onshowtrial,
+    order = [],
+    onopen,
   }: {
     editor: ScriptEditor;
     delimiter: string | null;
@@ -41,6 +43,10 @@
     trial?: ScriptRun | null;
     trialOpen?: boolean;
     onshowtrial?: () => void;
+    /** The running scripts in the order every message passes them. */
+    order?: string[];
+    /** Opens another script of the account. */
+    onopen?: (name: string) => void;
   } = $props();
 
   /** How the sample message fares at a rule: applied cases, or why it wasn't decided. */
@@ -90,6 +96,13 @@
   /** A folder or label clicked on the route: everything that goes there, in every script. */
   let target = $state<(Target & { text: string; folder: boolean }) | null>(null);
   let others = $state<{ name: string; rules: { items: RuleItem[] } }[] | null>(null);
+  let withInactive = $state(false);
+  /** Scripts that don't run but would file there too. */
+  const inactiveTargets = $derived.by(() => {
+    if (!target || withInactive || !others) return 0;
+    const t = target;
+    return others.filter((o) => !session.runs(editor.accountId, o.name) && o.rules.items.some((item) => goesTo(item, t))).length;
+  });
   $effect(() => {
     if (!searching && !target) return;
     const id = editor.accountId;
@@ -108,7 +121,9 @@
         const hit = (item: RuleItem) => (target ? goesTo(item, target) : matches(item, words, keywords));
         return { name, hits: items.flatMap((item, index) => (hit(item) ? [{ item, index }] : [])) };
       })
-      .filter((r) => r.hits.length > 0);
+      .filter((r) => r.hits.length > 0)
+      // Where mail actually goes: what runs, unless asked for more.
+      .filter((r) => !target || withInactive || session.runs(editor.accountId, r.name));
   });
   /** Showing matches of all scripts instead of the route. */
   const listing = $derived(!!target || (scope === "all" && searching));
@@ -140,6 +155,7 @@
 
   function showTarget(o: Outcome) {
     if (!o.target) return;
+    withInactive = false;
     target = { ...o.target, text: o.kind === "move" || o.kind === "copy" ? o.path.join(" / ") : o.text, folder: o.target.kind === "folder" };
     query = "";
   }
@@ -246,7 +262,7 @@
 
 <section class="route-sheet rounded-box border border-base-300 bg-base-100" aria-label={t("route.heading")} bind:this={sheet}>
   <!-- Search: sticks to the top while the list scrolls. -->
-  <div class="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-t-box border-b border-base-300 bg-base-100/95 px-3 py-2 backdrop-blur">
+  <div class="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-t-box border-b border-base-300 bg-base-100 px-3 py-2">
     {#if target}
       <div class="flex min-w-0 grow items-center gap-2 px-1.5 py-1 text-sm">
         <span class="whitespace-nowrap text-base-content/70">{t("target.heading")}</span>
@@ -256,7 +272,9 @@
             <Icon name="x" size={13} />
           </button>
         </span>
-        <span class="whitespace-nowrap text-[0.8rem] text-base-content/65" role="status">{t("target.count", { count: resultCount, scripts: results.length })}</span>
+        <span class="whitespace-nowrap text-[0.8rem] text-base-content/65" role="status">{withInactive
+            ? t(resultCount === 1 ? "search.hitOne" : "search.countAll", { count: resultCount })
+            : t(resultCount === 1 ? "target.countOne" : "target.count", { count: resultCount })}</span>
       </div>
     {:else}
     <label class="flex min-w-48 grow basis-48 items-center gap-2 rounded-field px-1.5 py-1 focus-within:bg-base-200">
@@ -273,7 +291,7 @@
       {#if searching}
         <span class="text-[0.8rem] whitespace-nowrap text-base-content/65" role="status">
           {scope === "all"
-            ? t("search.countAll", { count: resultCount })
+            ? resultCount === 1 ? t("search.hitOne") : t("search.countAll", { count: resultCount })
             : t("search.count", { shown: shownCount, total: editor.rules.items.length })}
         </span>
       {/if}
@@ -325,7 +343,7 @@
             {#if !session.runs(editor.accountId, r.name)}
               <span class="rounded-full bg-base-200 px-2 text-[0.8rem] leading-5 font-medium text-base-content/65">{t("status.off")}</span>
             {/if}
-            <span class="font-normal text-base-content/65">{t("search.hits", { count: r.hits.length })}</span>
+            <span class="font-normal text-base-content/65">{r.hits.length === 1 ? t("search.hitOne") : t("search.hits", { count: r.hits.length })}</span>
           </h3>
           {#each r.hits as hit (hit.index)}
             <div class="rounded-field px-2.5 py-2 ring-1 ring-base-300 hover:bg-base-200/50">
@@ -337,6 +355,7 @@
                   singleFolder={editor.rules.singleFolder}
                   {words}
                   filter={caseFilter}
+                  compact
                   ontarget={showTarget}
                   onpick={(path) => openMatch(r.name, hit.index, path)}
                 />
@@ -352,6 +371,11 @@
       {:else}
         <p class="px-1 py-2 text-sm text-base-content/65">{others === null ? t("search.loading") : t("search.none")}</p>
       {/each}
+      {#if inactiveTargets}
+        <button class="btn btn-ghost btn-sm justify-self-start text-base-content/70" onclick={() => (withInactive = true)}>
+          {t("target.inactive", { count: inactiveTargets })}
+        </button>
+      {/if}
     </div>
   {:else}
   <ol class="route relative py-1" role="list">
@@ -359,7 +383,26 @@
     <li class="route-item text-[0.875rem] text-base-content/65">
       <span></span>
       <span class="route-node grid place-items-center"><Icon name="mail" size={15} /></span>
-      <span class="py-2">{t("route.entry")}</span>
+      <span class="flex flex-wrap items-center gap-x-1.5 gap-y-1 py-2">
+        {#if order.length > 1}
+          <!-- Every mail passes the running scripts in this order. -->
+          <span>{t("route.entryOrder")}</span>
+          {#each order as name, i (name)}
+            {#if i > 0}<Icon name="chevronRight" size={13} class="text-base-content/45" />{/if}
+            {#if name === editor.name}
+              <span class="inline-flex items-center gap-1 rounded-full bg-primary/12 py-0.5 pr-2 pl-0.5 font-semibold text-primary" aria-current="step">
+                <span class="grid size-[1.1rem] place-items-center rounded-full bg-primary text-[0.7rem] text-primary-content">{i + 1}</span>{name}
+              </span>
+            {:else}
+              <button class="inline-flex items-center gap-1 rounded-full py-0.5 pr-2 pl-0.5 hover:bg-base-200" onclick={() => onopen?.(name)}>
+                <span class="grid size-[1.1rem] place-items-center rounded-full bg-base-content/10 text-[0.7rem] font-semibold">{i + 1}</span>{name}
+              </button>
+            {/if}
+          {/each}
+        {:else}
+          {t("route.entry")}
+        {/if}
+      </span>
     </li>
 
     {#each editor.rules.items as item, index (item.uid)}
@@ -507,7 +550,7 @@
           <span class="text-base-content/70">{t("search.elsewhere")}</span>
           {#each elsewhere as r (r.name)}
             <button class="btn btn-sm btn-soft btn-primary gap-1" onclick={() => (scope = "all")}>
-              {r.name} <span class="font-normal">· {t("search.hits", { count: r.hits.length })}</span>
+              {r.name} <span class="font-normal">· {r.hits.length === 1 ? t("search.hitOne") : t("search.hits", { count: r.hits.length })}</span>
             </button>
           {/each}
         </div>
@@ -528,7 +571,11 @@
       <span></span>
       <span class="route-node grid place-items-center pt-0.5"><span class="route-mark route-mark-end"></span></span>
       <span class="py-2">
-        {#if !running}{t("route.exitOff")}{:else if next}{t("route.exitNext", { name: next })}{:else}{t("route.exitInbox")}{/if}
+        {#if !running}{t("route.exitOff")}{:else if next}
+          <button class="inline-flex items-center gap-1.5 rounded-full bg-base-200 px-2.5 py-0.5 font-medium text-base-content/80 hover:bg-base-300" onclick={() => onopen?.(next)}>
+            {t("route.exitNext", { name: next })}<Icon name="chevronRight" size={14} />
+          </button>
+        {:else}{t("route.exitInbox")}{/if}
       </span>
     </li>
   </ol>
@@ -599,7 +646,7 @@
     border-color: var(--color-success);
   }
   .route-unreached > :not(.route-node) {
-    opacity: 0.4;
+    opacity: 0.55;
   }
   .route-off .route-mark {
     border-color: var(--spine);

@@ -24,6 +24,7 @@
     hideParent = false,
     trial = null,
     filter = null,
+    compact = false,
     ontarget,
     onpick,
   }: {
@@ -43,9 +44,27 @@
     trial?: { hits: CasePath[]; reached: boolean } | null;
     /** Only cases this accepts are shown at full strength (e.g. those filing into a folder). */
     filter?: ((c: Case) => boolean) | null;
+    /** In a list of matches: cases that don't match fold into one line. */
+    compact?: boolean;
     ontarget?: (o: Outcome) => void;
     onpick: (path: CasePath) => void;
   } = $props();
+
+  /** A case that neither the search nor the filter is about. */
+  const unrelated = (c: Case) => (words.length > 0 && !caseMatches(c, words, keywords, delimiter)) || (filter !== null && !filter(c));
+
+  /** The cases in order, runs of unrelated ones folded into one entry when compact. */
+  function segments(list: Case[]) {
+    const out: ({ kind: "case"; c: Case; i: number } | { kind: "folded"; count: number; i: number })[] = [];
+    for (const [i, c] of list.entries()) {
+      const last = out.at(-1);
+      if (compact && unrelated(c)) {
+        if (last?.kind === "folded") last.count++;
+        else out.push({ kind: "folded", count: 1, i });
+      } else out.push({ kind: "case", c, i });
+    }
+    return out;
+  }
 
   /** Applied to the sample message: true; tried and not applied: false; no test: null. */
   const applies = (path: CasePath) => (trial ? trial.hits.includes(path) : null);
@@ -82,7 +101,7 @@
       "route-row case-row w-full rounded-field py-1 pr-1 text-left transition-opacity hover:bg-base-content/[0.04]",
       picked === path && "bg-primary/10 ring-1 ring-primary/35",
       hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
-      dim && "opacity-50",
+      dim && "opacity-60",
     ]}
     style="--row-indent: calc(7rem + 0.375rem)"
     aria-current={picked === path ? "true" : undefined}
@@ -110,7 +129,16 @@
   {@const list = cases(b)}
   {@const single = list.length === 1}
   <ul class="rails" style="--rail: var(--rail-{Math.min(depth, 3)}); --elbow: 0.95rem">
-    {#each list as c, i}
+    {#each segments(list) as seg}
+      {#if seg.kind === "folded"}
+        <li>
+          <button class="w-full rounded-field px-1 py-0.5 text-left text-[0.875rem] text-base-content/65 hover:bg-base-content/[0.04]" onclick={() => onpick(prefix + seg.i)}>
+            {seg.count === 1 ? t("route.otherCase") : t("route.otherCases", { count: seg.count })}
+          </button>
+        </li>
+      {:else}
+      {@const c = seg.c}
+      {@const i = seg.i}
       {@const path = prefix + i}
       {@const num = single || c.kind === "else" ? null : pre ? `${pre}.${c.number}` : String(c.number)}
       {@const own = single ? pre : pre ? `${pre}.${c.number}` : String(c.number)}
@@ -124,7 +152,7 @@
             class="my-1 ml-1 rounded-field border-l-2 py-1.5 pr-1.5 pl-2"
             style="border-color: {color}; background: color-mix(in oklab, {color} 6%, transparent)"
           >
-            <p class={["mb-1 pl-1 text-[0.875rem] text-base-content/70", applies(path) === false && "opacity-50"]}>
+            <p class={["mb-1 pl-1 text-[0.875rem] text-base-content/70", applies(path) === false && "opacity-60"]}>
               <span class="font-semibold" style="color: {color}">
                 {#if c.kind === "else"}{t("route.nestedInOtherwise")}{:else if own}{t("route.nestedIn", { n: own })}{:else}{t("route.nestedHeadingSingle")}{/if}</span
               >{multi ? t("route.firstMatchTail") : ""}
@@ -133,6 +161,7 @@
           </div>
         {/each}
       </li>
+      {/if}
     {/each}
   </ul>
 {/snippet}
@@ -140,7 +169,7 @@
 {#if simple}
   {@const hit = applies("0")}
   <button
-    class={["w-full rounded-field text-left transition-opacity", hit && "trial-hit-row", hit === false && "opacity-40"]}
+    class={["w-full rounded-field text-left transition-opacity", hit && "trial-hit-row", hit === false && "opacity-60"]}
     aria-current={picked === "" ? "true" : undefined}
     onclick={() => onpick("")}
   >
@@ -153,7 +182,7 @@
     </span>
   </button>
 {:else}
-  <button class={["flex w-full flex-wrap items-baseline gap-x-2 text-left", trial && !trial.hits.length && "opacity-40"]} onclick={() => onpick("")}>
+  <button class={["flex w-full flex-wrap items-baseline gap-x-2 text-left", trial && !trial.hits.length && "opacity-60"]} onclick={() => onpick("")}>
     <span class="font-semibold"><Mark text={rule.name || t("route.switch")} {words} /></span>
     {#if top.length > 1}
       <span class="text-[0.875rem] text-base-content/65">{t("route.casesFirst", { count: top.length })}</span>

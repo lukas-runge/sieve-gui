@@ -27,6 +27,17 @@
        "which case". -->
   {@const negative = shape.mode === "none" || shape.mode === "notAll"}
   {@const joiner = shape.mode === "any" || shape.mode === "none" ? t("route.or") : t("route.and")}
+  {#if nested}
+    <!-- A group inside a group reads as one line in a light bracket: its
+         joiner says how its parts combine; "none"/"not all" say so first. -->
+    <span class="inline-flex max-w-full flex-wrap items-baseline gap-x-1.5 gap-y-0.5 rounded-md bg-base-content/[0.045] px-1.5 py-0.5 ring-1 ring-base-content/10">
+      {#if negative}<span class="text-[0.75rem] font-bold tracking-wide text-error uppercase">{t(heading[shape.mode])}</span>{/if}
+      {#each shape.items as item, i}
+        {#if i > 0}<span class="rounded bg-base-content/[0.07] px-1.5 text-[0.75rem] font-bold tracking-wide text-base-content/70 uppercase">{joiner}</span>{/if}
+        {#if item.kind === "token"}<Token token={item.token} {words} />{:else}<Self shape={item.shape} {words} nested />{/if}
+      {/each}
+    </span>
+  {:else}
   <div class="grid gap-0.5">
     <span class={["text-[0.75rem] font-bold tracking-wide uppercase", negative ? "text-error" : "text-base-content/75"]}>{t(heading[shape.mode])}</span>
     <ul class="ml-0.5 grid gap-y-0.5 border-l-2 border-base-content/25 pl-2.5">
@@ -42,4 +53,5 @@
       {/each}
     </ul>
   </div>
+  {/if}
 {/if}

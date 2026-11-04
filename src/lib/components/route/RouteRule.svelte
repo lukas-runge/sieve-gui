@@ -112,7 +112,7 @@
   <button
     class={[
       "route-row case-row w-full rounded-field py-1 pr-1 text-left transition-opacity hover:bg-base-content/[0.04]",
-      picked === path && "bg-primary/10 ring-1 ring-primary/35",
+      picked === path && "bg-primary/10 ring-2 ring-primary/60",
       hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
       dim && "opacity-70",
     ]}
@@ -144,6 +144,7 @@
       {@const innerCases = c.nested.length === 1 ? cases(c.nested[0]) : []}
       {@const numbered = innerCases.filter((x) => x.kind !== "else").length}
       <Possible
+        compact
         items={nestedOutcomes(c, keywords, delimiter)}
         heading={innerCases.length > 1 && num
           ? t(innerCases.length > numbered ? "route.dependsOnElse" : "route.dependsOn", { from: `${num}.1`, to: `${num}.${numbered}` })

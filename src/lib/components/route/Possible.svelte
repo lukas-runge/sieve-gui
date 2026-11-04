@@ -6,13 +6,30 @@
   import { t } from "../../i18n.svelte";
   import Outcomes from "./Outcomes.svelte";
 
-  let { items, heading, words = [] }: { items: Outcome[]; heading: string; words?: string[] } = $props();
+  let {
+    items,
+    heading,
+    words = [],
+    compact = false,
+  }: {
+    items: Outcome[];
+    heading: string;
+    words?: string[];
+    /** Just a quiet line of names (the cases below show the details). */
+    compact?: boolean;
+  } = $props();
 
   const folders = $derived(items.filter((o) => o.kind === "move" || o.kind === "copy" || o.kind === "keep"));
   const labels = $derived(items.filter((o) => o.kind === "label" || o.kind === "setLabels"));
   const rest = $derived(items.filter((o) => !folders.includes(o) && !labels.includes(o)));
 </script>
 
+{#if compact}
+  <span class="block text-[0.8125rem] leading-snug text-base-content/70">
+    <span class="italic">{heading}</span>
+    {items.map((o) => (o.kind === "move" || o.kind === "copy" ? (o.path.at(-1) ?? o.text) : o.text)).join(" · ")}
+  </span>
+{:else}
 <span class="grid gap-1 rounded-field border border-dashed border-base-content/25 px-2 py-1.5 text-[0.875rem]">
   <span class="text-[0.8125rem] font-medium text-base-content/70">{heading}</span>
   <span class="grid gap-1 opacity-85">
@@ -25,3 +42,4 @@
     {#if rest.length}<Outcomes items={rest} {words} />{/if}
   </span>
 </span>
+{/if}

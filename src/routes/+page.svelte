@@ -103,6 +103,15 @@
     window.addEventListener("pointerup", up);
   }
 
+  /** From the inspector in its own view back to the route, at the rule just edited. */
+  function backToRoute(ed: NonNullable<typeof editor>) {
+    const id = ed.selected;
+    ed.selected = null;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => document.querySelector(`[data-uid="${id}"]`)?.scrollIntoView({ block: "center" })),
+    );
+  }
+
   /** Code, inspector and the test share the place on the right. */
   function toggleCode() {
     showCode = !showCode;
@@ -236,7 +245,7 @@
           {#if showCode}
             <div class="flex min-h-0 grow flex-col gap-2 p-3">{@render codePanel(editor.code)}</div>
           {:else if editor.selected}
-            <Inspector {editor} extensions={session.extensions} serverFolders={serverFolders} onback={() => (editor.selected = null)} />
+            <Inspector {editor} extensions={session.extensions} serverFolders={serverFolders} onback={() => backToRoute(editor)} />
           {:else}
             <TrialPanel {editor} {delimiter} keywords={session.keywordNames(editor.accountId)} onback={() => (trial.open = false)} />
           {/if}

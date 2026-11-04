@@ -124,7 +124,7 @@
 
   /** Search this script, or every script of the account. */
   // "Where do mails from X go?" spans scripts, so searching starts there.
-  let scope = $state<"script" | "all">("all");
+  let scope = $state<"running" | "all" | "script">("running");
   /** A folder or label clicked on the route: everything that goes there, in every script. */
   let target = $state<(Target & { text: string; folder: boolean }) | null>(null);
   let others = $state<{ name: string; rules: { items: RuleItem[] } }[] | null>(null);
@@ -155,10 +155,10 @@
       })
       .filter((r) => r.hits.length > 0)
       // Where mail actually goes: what runs, unless asked for more.
-      .filter((r) => !target || withInactive || session.runs(editor.accountId, r.name));
+      .filter((r) => (target ? withInactive : scope === "all") || session.runs(editor.accountId, r.name));
   });
   /** Showing matches of all scripts instead of the route. */
-  const listing = $derived(!!target || (scope === "all" && searching));
+  const listing = $derived(!!target || (scope !== "script" && searching));
   const results = $derived(listing ? allResults : []);
   const resultCount = $derived(results.reduce((n, r) => n + r.hits.length, 0));
   /** While searching this script: matches in the others, to point at them. */
@@ -193,7 +193,7 @@
     if (shownFor !== null && name !== shownFor) {
       target = null;
       query = "";
-      scope = "all";
+      scope = "running";
     }
     shownFor = name;
   });
@@ -373,7 +373,7 @@
       />
       {#if searching}
         <span class="text-[0.8125rem] whitespace-nowrap text-base-content/70" role="status">
-          {scope === "all"
+          {scope !== "script"
             ? resultCount === 1 ? t("search.hitOne") : t("search.countAll", { count: resultCount })
             : t("search.count", { shown: shownCount, total: editor.rules.items.length })}
         </span>
@@ -383,11 +383,11 @@
     <!-- Where to search: only while searching. -->
     <!-- Where to search, as a segmented control: only while searching. -->
     <div class={["flex rounded-field bg-base-200 p-0.5", (target || !searching) && "hidden"]} role="group" aria-label={t("search.scope")}>
-      {#each [["all", t("search.allScripts")], ["script", t("search.thisScript")]] as [value, label] (value)}
+      {#each [["running", t("search.running")], ["all", t("search.allScripts")], ["script", t("search.thisScript")]] as [value, label] (value)}
         <button
           class={["rounded-[calc(var(--radius-field)-2px)] px-2.5 py-1 text-[0.8125rem] font-medium", scope === value ? "bg-base-100 shadow-sm" : "text-base-content/70 hover:text-base-content"]}
           aria-pressed={scope === value}
-          onclick={() => (scope = value as "all" | "script")}>{label}</button
+          onclick={() => (scope = value as "running" | "all" | "script")}>{label}</button
         >
       {/each}
     </div>
@@ -444,10 +444,14 @@
   {:else if listing}
     <!-- Matches in every script of the account, in the order the scripts run. -->
     <div class="grid gap-4 px-3 py-3">
-      <p class="px-1 text-[0.8125rem] text-base-content/70">
-        {target && !withInactive ? t("scope.running", { account: accountLabel }) : t("scope.all", { account: accountLabel })}
-        {#if target}· {t("dest.notFinal")}{/if}
-      </p>
+      <!-- Account-wide: said as a heading, so the script's title above doesn't suggest otherwise. -->
+      <div class="flex flex-wrap items-baseline gap-x-2 border-b border-base-300 px-1 pb-2">
+        <h2 class="flex items-center gap-1.5 font-semibold"><Icon name="server" size={15} class="text-base-content/70" />{t("scope.account", { account: accountLabel })}</h2>
+        <span class="text-[0.8125rem] text-base-content/75">
+          {(target ? !withInactive : scope === "running") ? t("scope.runningShort") : t("scope.allShort")}
+          {#if target}· {t("dest.notFinal")}{/if}
+        </span>
+      </div>
       {#each results as r (r.name)}
         <section class="grid gap-1" aria-label={r.name}>
           <h3 class="flex items-center gap-2 px-1 text-[0.875rem] font-semibold">
@@ -538,6 +542,7 @@
       {@const shape = item.type === "raw" ? "square" : isSimple(item) ? "dot" : "diamond"}
       {@const tr = trialAt(index)}
       <li
+        data-uid={item.uid}
         animate:flip={{ duration: 150 }}
         hidden={!shown[index]}
         class={[
@@ -601,7 +606,7 @@
         <span class="route-node grid place-items-center pt-[0.95rem]" title={t(`route.shape.${shape}`)}>
           <span class="route-mark route-mark-{shape}" class:selected class:trial-hit={!!tr?.hits.length}></span>
         </span>
-        <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected ? "bg-primary/[0.05] ring-1 ring-primary/25" : "hover:bg-base-200/50"]}>
+        <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected ? "bg-primary/[0.05] ring-2 ring-primary/45" : "hover:bg-base-200/50"]}>
           <div class="min-w-0 grow rounded-field px-2.5 py-2">
             {#if item.type === "rule"}
               <RouteRule
@@ -686,7 +691,7 @@
         <div class="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 text-sm">
           <span class="text-base-content/70">{t("search.elsewhere")}</span>
           {#each elsewhere as r (r.name)}
-            <button class="btn btn-sm btn-soft btn-primary gap-1" onclick={() => (scope = "all")}>
+            <button class="btn btn-sm btn-soft btn-primary gap-1" onclick={() => (scope = session.runs(editor.accountId, r.name) ? "running" : "all")}>
               {r.name}{#if !session.runs(editor.accountId, r.name)}<span class="font-normal">({t("status.off")})</span>{/if} <span class="font-normal">· {r.hits.length === 1 ? t("search.hitOne") : t("search.hits", { count: r.hits.length })}</span>
             </button>
           {/each}

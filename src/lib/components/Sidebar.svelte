@@ -245,8 +245,9 @@
           <span class="loading loading-spinner loading-xs"></span>{t("accounts.connecting")}
         </p>
       {:else if server.status === "error"}
-        <div role="alert" class="mx-1 grid gap-2 rounded-field bg-error/8 px-2.5 py-2 text-[0.875rem]">
-          <p class="text-error">{server.error}</p>
+        <!-- A problem of this account only: said quietly, with the way out. -->
+        <div role="alert" class="mx-1 grid gap-1.5 px-2 py-1 text-[0.8125rem]">
+          <p class="flex items-start gap-1.5 text-base-content/80"><Icon name="alert" size={14} class="mt-0.5 shrink-0 text-error" />{server.error}</p>
           {#if server.certificate}
             {@const untrusted = server.certificate}
             <button class="btn btn-xs self-start" onclick={() => session.showCertificate(account.id, untrusted)}>{t("certificate.show")}</button>

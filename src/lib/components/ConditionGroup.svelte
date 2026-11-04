@@ -17,6 +17,8 @@
   import ConditionRow from "./ConditionRow.svelte";
   import Self from "./ConditionGroup.svelte";
   import Icon from "./Icon.svelte";
+  import RouteConditions from "./route/Conditions.svelte";
+  import { conditionShape } from "../rules/route";
 
   let {
     group,
@@ -37,6 +39,15 @@
     /** Removes a nested group. */
     onremove?: () => void;
   } = $props();
+
+  /** A group inside the conditions starts folded once it has more than two parts. */
+  let folded = $state(false);
+  let decided = false;
+  $effect(() => {
+    if (decided || top) return;
+    decided = true;
+    folded = group.items.length > 2;
+  });
 
   const top = $derived(holder === null);
 
@@ -123,7 +134,21 @@
 {:else}
   <div role="group" aria-label={t("conditions.group")} class="grid gap-2 rounded-field border border-base-300 border-l-2 border-l-base-content/25 p-2">
     <div class="flex items-center gap-2">
-      {@render joinSelect()}
+      <!-- A group folds to how it reads on the route. -->
+      <button
+        class="btn btn-ghost btn-sm btn-square -mr-1"
+        aria-expanded={!folded}
+        aria-label={folded ? t("conditions.unfold") : t("conditions.fold")}
+        title={folded ? t("conditions.unfold") : t("conditions.fold")}
+        onclick={() => (folded = !folded)}><Icon name={folded ? "chevronRight" : "chevronDown"} size={15} /></button
+      >
+      {#if folded && holder}
+        <button class="min-w-0 grow text-left" onclick={() => (folded = false)}>
+          <RouteConditions shape={conditionShape({ join: "all", items: [holder] })} />
+        </button>
+      {:else}
+        {@render joinSelect()}
+      {/if}
       <button
         class="btn btn-ghost btn-sm btn-square ml-auto"
         aria-label={t("conditions.removeGroup")}
@@ -131,6 +156,6 @@
         onclick={() => onremove?.()}><Icon name="x" size={15} /></button
       >
     </div>
-    {@render body()}
+    {#if !folded}{@render body()}{/if}
   </div>
 {/if}

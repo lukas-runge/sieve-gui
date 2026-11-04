@@ -13,7 +13,7 @@
   import { closesMenu } from "../../menu";
   import { isSimple, outcomes } from "../../rules/route";
   import { goesTo, matches, queryWords, type Target } from "../../rules/search";
-  import { caseGoesTo, type Outcome } from "../../rules/route";
+  import { caseGoesTo, cases, type Outcome } from "../../rules/route";
   import type { ScriptRun } from "../../rules/simulate";
   import { trial as sample } from "../../trial.svelte";
   import { accountView } from "../../scope.svelte";
@@ -405,7 +405,7 @@
         >
       {/each}
     </div>
-    <div class={["join", target && "hidden"]}>
+    <div class={["join", (listing || view === "dest") && "hidden"]}>
       <button class="btn btn-primary btn-sm join-item gap-1" onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
       <div class="dropdown dropdown-end">
         <div tabindex="0" role="button" class="btn btn-primary btn-sm join-item border-l-primary-content/25 px-1.5" aria-label={t("route.moreAdd")}>
@@ -553,7 +553,7 @@
 
     {#each editor.rules.items as item, index (item.uid)}
       {@const selected = editor.selected === item.uid}
-      {@const shape = item.type === "raw" ? "square" : isSimple(item) ? "dot" : "diamond"}
+      {@const shape = item.type === "raw" ? "square" : cases(item).length === 1 ? "dot" : "diamond"}
       {@const tr = trialAt(index)}
       <li
         data-uid={item.uid}
@@ -620,7 +620,7 @@
         <span class="route-node grid place-items-center pt-[0.95rem]" title={t(`route.shape.${shape}`)}>
           <span class="route-mark route-mark-{shape}" class:selected class:trial-hit={!!tr?.hits.length}></span>
         </span>
-        <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected ? "bg-primary/[0.05] ring-2 ring-primary/45" : "hover:bg-base-200/50"]}>
+        <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected ? "ring-2 ring-primary/60" : "hover:bg-base-200/50"]}>
           <div class="min-w-0 grow rounded-field px-2.5 py-2">
             {#if item.type === "rule"}
               <RouteRule

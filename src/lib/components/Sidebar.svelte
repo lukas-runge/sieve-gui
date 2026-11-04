@@ -9,6 +9,7 @@
   import { ask, askText, tell } from "../dialogs.svelte";
   import { closesMenu } from "../menu";
   import { ROOT_SCRIPT, session } from "../session.svelte";
+  import { accountView } from "../scope.svelte";
   import Icon from "./Icon.svelte";
 
   let { onaccount }: { onaccount: (account: Account | null) => void } = $props();
@@ -98,7 +99,8 @@
   <!-- index: position in the run order if it can be rearranged, -1 otherwise.
        running: the script runs, on its own or included by `node.via`. -->
   {@const name = node.name}
-  {@const current = session.editor?.accountId === id && session.editor.name === name}
+  <!-- While results span the account, the account is what's selected, not a script. -->
+  {@const current = !accountView.active && session.editor?.accountId === id && session.editor.name === name}
   {@const key = `${id}:${name}`}
   {@const root = session.roots[id]}
   {@const included = !!root?.scripts.includes(name)}
@@ -220,7 +222,7 @@
     {@const server = session.servers[account.id]}
     {@const status = !server || server.status === "connecting" ? "connecting" : server.status === "error" ? "error" : "ready"}
     <section class="grid gap-1">
-      <div class="flex items-center gap-2 px-2">
+      <div class={["flex items-center gap-2 rounded-field px-2", accountView.active && session.editor?.accountId === account.id && "bg-base-100 py-1 shadow-sm ring-1 ring-base-300"]}>
         <span
           class={["size-2 shrink-0 rounded-full", status === "ready" ? "bg-success" : status === "error" ? "bg-error" : "bg-warning animate-pulse"]}
           title={t(`accounts.status.${status}`)}

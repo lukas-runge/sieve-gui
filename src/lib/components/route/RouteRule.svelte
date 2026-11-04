@@ -102,7 +102,9 @@
   </span>
   <!-- In the test: tried and no match, or never tried. -->
   {#if missed}
-    <span class="justify-self-start rounded-full bg-base-content/10 px-2 text-[0.75rem] leading-5 font-medium text-base-content/80" title={t("trial.missed")}>{t("trial.missedShort")}</span>
+    <span class="justify-self-start rounded-full bg-base-content/10 px-2 text-[0.75rem] leading-5 font-medium text-base-content/85" title={t("trial.missed")}>{t("trial.missedShort")}</span>
+  {:else if untried}
+    <span class="text-[0.75rem] text-base-content/75 italic" title={t("trial.notTriedHint")}>{t("trial.notTried")}</span>
   {/if}
   </span>
 {/snippet}
@@ -114,7 +116,7 @@
   <button
     class={[
       "route-row case-row w-full rounded-field py-1 pr-1 text-left transition-opacity hover:bg-base-content/[0.04]",
-      picked === path && "bg-primary/10 ring-2 ring-primary/60",
+      picked === path && "ring-2 ring-primary/70",
       hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
       dim && "opacity-70",
     ]}
@@ -155,7 +157,9 @@
     </span>
     {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && c.nested.length}
       <!-- Nothing of its own: what happens is in the check below. -->
-      <Possible compact items={nestedOutcomes(c, keywords, delimiter)} heading={possibleHeading(c, num)} {words} />
+      <span class="flex items-start gap-1 text-[0.8125rem] text-base-content/75"
+        ><Icon name="chevronDown" size={13} class="mt-0.5 shrink-0" />{possibleHeading(c, num).replace(/:$/, "")}</span
+      >
     {:else}
       <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
     {/if}
@@ -206,7 +210,7 @@
   {@const list = cases(b)}
   {@const single = list.length === 1}
   {@const dead = unreachable(list)}
-  {#if single && depth > 0}
+  {#if single}
     <!-- A check with one case: one row under its heading, no tree. -->
     {@const c = list[0]}
     {@const path = prefix + "0"}
@@ -261,7 +265,8 @@
     onclick={() => onpick("")}
   >
     <span class="route-row">
-      <span class="flex min-w-0 flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+      <!-- The name sits above the condition, so conditions start at one edge. -->
+      <span class="grid min-w-0 gap-y-0.5">
         {#if rule.name}<span class="font-semibold"><Mark text={rule.name} {words} /></span>{/if}
         <Conditions shape={conditionShape(rule.conditions, false, picked === "" ? Infinity : 3)} {words} />
       </span>

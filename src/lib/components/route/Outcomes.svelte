@@ -95,7 +95,7 @@
       <!-- svelte-ignore a11y_no_noninteractive_tabindex: a link when `ontarget` is set -->
       <span
         class={["inline-flex items-center gap-1 rounded-full border px-2 py-px text-[0.875rem] font-medium whitespace-nowrap", ontarget && o.target && "target"]}
-        style="border-color: oklch(0.7 0.09 {h} / 0.55); background: oklch(0.7 0.09 {h} / 0.12)"
+        style="border-color: color-mix(in oklab, var(--color-base-content) 22%, transparent); background: color-mix(in oklab, var(--color-base-content) 4%, transparent)"
         title={o.text.startsWith("$")
           ? t("route.unnamedLabel", { name: o.text })
           : ontarget && o.target
@@ -108,7 +108,7 @@
         onclick={target(o)}
         onkeydown={target(o)}
       >
-        <span class="size-1.5 rounded-full" style="background: oklch(0.62 0.13 {h})"></span>
+        <span class="size-2 rounded-full" style="background: oklch(0.62 0.13 {h})"></span>
         {#if o.kind === "unlabel"}{t("route.remove")}{/if}{#if o.kind === "setLabels"}{t("route.only")}{/if}<Mark text={o.text} {words} />
       </span>
     {:else}

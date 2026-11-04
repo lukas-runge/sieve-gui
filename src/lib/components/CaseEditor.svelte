@@ -114,11 +114,17 @@
     const elsif = index > 0 && step.case.kind !== "else";
     mutate((r) => {
       const b = blockOf(r);
-      if (elsif) b.elsif.splice(index - 1, 1);
+      if (index === 0) {
+        // The first case goes: the next one moves up into its place.
+        const [first] = b.elsif.splice(0, 1);
+        b.conditions = first.conditions;
+        b.actions = first.actions;
+      } else if (elsif) b.elsif.splice(index - 1, 1);
       else b.otherwise = null;
     });
     const parent = path.split(".").slice(0, -1).join(".");
-    onfocus(parent ? `${parent}.${index - 1}` : String(index - 1));
+    const to = Math.max(0, index - 1);
+    onfocus(parent ? `${parent}.${to}` : String(to));
   }
 
   function addCase(otherwise: boolean) {
@@ -219,7 +225,7 @@
         onclick={() => onfocus(path.replace(/\d+$/, String(step!.index + 1)))}><Icon name="chevronRight" size={16} /></button
       >
     {/if}
-    {#if step.index > 0}
+    {#if step.index > 0 || step.block.elsif.length > 0}
       <button class="btn btn-ghost btn-sm gap-1 text-base-content/70" onclick={removeCase}><Icon name="trash" size={14} />{t("case.remove")}</button>
     {/if}
   </div>
@@ -233,7 +239,7 @@
       {#each [{ el: conditionsEl, label: t("conditions.heading") }, { el: actionsEl, label: t("actions.heading") }, { el: checksEl, label: t("case.checkOne") }] as part}
         {#if part.el}
           <button
-            class={["btn btn-xs", activePart === part.el ? "btn-primary" : "btn-soft"]}
+            class={["rounded px-1.5 py-0.5 text-[0.8125rem] underline-offset-2 hover:underline", activePart === part.el ? "font-semibold text-primary underline" : "text-base-content/80"]}
             aria-current={activePart === part.el ? "true" : undefined}
             onclick={() => part.el?.scrollIntoView({ block: "start", behavior: "smooth" })}>{part.label}</button
           >

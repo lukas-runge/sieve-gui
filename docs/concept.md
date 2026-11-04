@@ -61,7 +61,7 @@ Sieve text  ⇄  parser / generator  ⇄  rule model  ⇄  UI
 
 Rule names and enabled state are stored as structured comments in the **format of the Roundcube *managesieve* plugin** (e.g. `# rule:[Name]`), so scripts can be edited alternately in Roundcube and sieve-gui without losing names. Disabled rules are kept in the script in a non-executing form instead of being removed. Before implementing the parser, the exact encoding (names, disabled rules) is captured from real Roundcube-generated scripts and turned into test fixtures.
 
-**Keyword names:** custom flags such as Synology MailPlus labels (`$synolabel_tu0exccz`) or Roundcube's `$label1` carry no name. Each account keeps a name per keyword, shown instead of the keyword. Names are entered by the user. Whether a server exposes the names (e.g. IMAP `METADATA`) is still open.
+**Keyword names:** custom flags such as Synology MailPlus labels (`$synolabel_tu0exccz`) or Roundcube's `$label1` carry no name. Each account keeps a name per keyword, shown instead of the keyword. Names are entered by the user: no server exposes them. IMAP keywords carry no display name, neither IANA's IMAP METADATA entries nor its keyword registry define one (`$MailFlagBit0`–`2`, RFC 9979, only encode a flag color), and MailPlus keeps its label names to itself (its Dovecot runs without `imap_metadata`). Storing names on the server under a METADATA vendor entry would need a registered vendor token (RFC 5464 §3.2.1) and is off by default in Dovecot, so it isn't planned.
 
 ### Several active scripts, one folder per message
 

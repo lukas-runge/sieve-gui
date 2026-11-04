@@ -120,12 +120,12 @@
         <p class="truncate text-[0.8rem] text-base-content/65">
           {#if item.type === "raw"}{t("raw.heading")}{:else if isSimple(item)}{t("inspector.rule")}{:else}{t("inspector.switch")}{/if}
           {#if item.type === "rule" && editor.focus}
-            <span class="text-base-content/45">›</span> <span class="font-medium text-base-content/80">{casePathLabel(item, editor.focus)}</span>
+            <span class="text-base-content/65">›</span> <span class="font-medium text-base-content/80">{casePathLabel(item, editor.focus)}</span>
           {/if}
         </p>
         {#if item.type === "rule"}
           <input
-            class="w-full rounded-field bg-transparent text-lg font-semibold outline-none placeholder:font-normal placeholder:text-base-content/45 focus:bg-base-200 focus:px-1.5"
+            class="w-full rounded-field bg-transparent text-lg font-semibold outline-none placeholder:font-normal placeholder:text-base-content/65 focus:bg-base-200 focus:px-1.5"
             aria-label={t("rule.name")}
             placeholder={t("inspector.namePlaceholder")}
             value={item.name}

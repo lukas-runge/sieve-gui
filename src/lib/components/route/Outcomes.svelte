@@ -11,7 +11,8 @@
     stop = false,
     singleFolder = false,
     words = [],
-  }: { items: Outcome[]; stop?: boolean; singleFolder?: boolean; words?: string[] } = $props();
+    hideParent = false,
+  }: { items: Outcome[]; stop?: boolean; singleFolder?: boolean; words?: string[]; hideParent?: boolean } = $props();
 
   const icon: Record<Outcome["kind"], IconName> = {
     move: "folder",
@@ -45,8 +46,8 @@
         <Icon name={icon[o.kind]} size={15} class="text-primary" />
         <span class="flex min-w-0 items-baseline">
           <!-- The direct parent says enough; the full path is in the tooltip. -->
-          {#if o.path.length > 1}
-            <span class="min-w-0 truncate text-[0.84rem] text-base-content/65"
+          {#if o.path.length > 1 && !hideParent}
+            <span class="min-w-0 truncate text-[0.875rem] text-base-content/65"
               >{o.path.length > 2 ? "… / " : ""}<Mark text={o.path.at(-2) ?? ""} {words} />&nbsp;/&nbsp;</span
             >
           {/if}
@@ -56,7 +57,7 @@
     {:else if o.kind === "label" || o.kind === "unlabel" || o.kind === "setLabels"}
       {@const h = hue(o.text)}
       <span
-        class="inline-flex items-center gap-1 rounded-full border px-2 py-px text-[0.82rem] font-medium whitespace-nowrap"
+        class="inline-flex items-center gap-1 rounded-full border px-2 py-px text-[0.875rem] font-medium whitespace-nowrap"
         style="border-color: oklch(0.7 0.09 {h} / 0.55); background: oklch(0.7 0.09 {h} / 0.12)"
         title={o.kind === "setLabels" ? t("route.setLabelsTitle") : undefined}
       >
@@ -64,14 +65,14 @@
         {#if o.kind === "unlabel"}{t("route.remove")}{/if}{#if o.kind === "setLabels"}{t("route.only")}{/if}<Mark text={o.text} {words} />
       </span>
     {:else}
-      <span class="inline-flex items-center gap-1 text-[0.88rem] whitespace-nowrap text-base-content/80">
+      <span class="inline-flex items-center gap-1 text-[0.875rem] whitespace-nowrap text-base-content/80">
         <Icon name={icon[o.kind]} size={14} class="text-base-content/60" /><Mark text={o.text} {words} />
       </span>
     {/if}
   {/each}
   {#if stop}
     <span
-      class="inline-flex items-center gap-1 text-[0.82rem] whitespace-nowrap text-base-content/65"
+      class="inline-flex items-center gap-1 text-[0.875rem] whitespace-nowrap text-base-content/65"
       title={singleFolder ? t("route.stopScriptHint") : t("route.stopHint")}
     >
       <Icon name="stop" size={14} />{singleFolder ? t("route.stopScriptRules") : t("route.stopRules")}

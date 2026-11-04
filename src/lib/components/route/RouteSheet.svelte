@@ -5,11 +5,13 @@
   // a square for code sieve-gui shows as written. Clicking a rule opens it in
   // the inspector.
   import { flip } from "svelte/animate";
+  import type { RuleItem } from "#tauri/types";
+  import { session } from "../../session.svelte";
   import type { ScriptEditor } from "../../editor.svelte";
   import { uid } from "../../editor.svelte";
   import { t } from "../../i18n.svelte";
   import { closesMenu } from "../../menu";
-  import { isSimple } from "../../rules/route";
+  import { isSimple, outcomes } from "../../rules/route";
   import { matches, queryWords } from "../../rules/search";
   import { newRule } from "../../rules/view";
   import Icon from "../Icon.svelte";
@@ -37,8 +39,77 @@
   const searching = $derived(words.length > 0);
   const shown = $derived(editor.rules.items.map((item) => !searching || matches(item, words, keywords)));
   const shownCount = $derived(shown.filter(Boolean).length);
+  /**
+   * Runs of simple rules that file into the same parent folder: the parent
+   * shows once above them ("Accounts / Travel"), each row only the last folder.
+   */
+  const groups = $derived.by(() => {
+    const parents = editor.rules.items.map((item) => {
+      if (searching || item.type !== "rule" || !isSimple(item)) return null;
+      const moves = outcomes(item.actions, {}, delimiter).filter((o) => o.kind === "move");
+      return moves.length === 1 && moves[0].path.length > 1 ? moves[0].path.slice(0, -1).join(" / ") : null;
+    });
+    const head: (string | null)[] = parents.map(() => null);
+    const grouped: boolean[] = parents.map(() => false);
+    for (let i = 0; i < parents.length; ) {
+      let j = i;
+      while (parents[i] && parents[j + 1] === parents[i]) j++;
+      if (parents[i] && j > i) {
+        head[i] = parents[i];
+        grouped.fill(true, i, j + 1);
+      }
+      i = j + 1;
+    }
+    return { head, grouped };
+  });
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
+
+  /** Search this script, or every script of the account. */
+  let scope = $state<"script" | "all">("script");
+  let others = $state<{ name: string; rules: { items: RuleItem[] } }[] | null>(null);
+  $effect(() => {
+    if (scope !== "all" || !searching) return;
+    const id = editor.accountId;
+    void session.allRules(id).then((list) => {
+      if (editor.accountId === id) others = list;
+    });
+  });
+  /** Matches across scripts: the open one with its unsaved edits, the others as saved. */
+  const results = $derived.by(() => {
+    if (scope !== "all" || !searching) return [];
+    const list = others ?? [];
+    const scripts = list.some((o) => o.name === editor.name) ? list : [{ name: editor.name, rules: editor.rules }, ...list];
+    return scripts
+      .map(({ name, rules }) => {
+        const items = name === editor.name ? editor.rules.items : rules.items;
+        return {
+          name,
+          hits: items.flatMap((item, index) => (matches(item, words, keywords) ? [{ item, index }] : [])),
+        };
+      })
+      .filter((r) => r.hits.length > 0);
+  });
+  const resultCount = $derived(results.reduce((n, r) => n + r.hits.length, 0));
+
+  /** Opens a match: in this script right away, in another one after leaving this. */
+  async function openMatch(name: string, index: number, path: string) {
+    if (name === editor.name) {
+      scope = "script";
+      const item = editor.rules.items[index];
+      if (item) pick(item.uid, path);
+      return;
+    }
+    if (!(await session.confirmLeave())) return;
+    await session.openScript(editor.accountId, name);
+    const next = session.editor;
+    const item = next?.rules.items[index];
+    if (next && item) {
+      next.selected = item.uid;
+      next.focus = path;
+    }
+    scope = "script";
+  }
 
   function move(from: number, to: number) {
     const count = editor.rules.items.length;
@@ -123,29 +194,87 @@
   <!-- Search: sticks to the top while the list scrolls. -->
   <div class="sticky top-0 z-20 flex items-center gap-2 rounded-t-box border-b border-base-300 bg-base-100/95 px-3 py-2 backdrop-blur">
     <label class="flex min-w-0 grow items-center gap-2 rounded-field px-1.5 py-1 focus-within:bg-base-200">
-      <Icon name="search" size={15} class="text-base-content/45" />
+      <Icon name="search" size={15} class="text-base-content/65" />
       <input
         id="rule-search"
         type="search"
-        class="min-w-0 grow bg-transparent text-sm outline-none placeholder:text-base-content/45"
+        class="min-w-0 grow bg-transparent text-sm outline-none placeholder:text-base-content/65"
         placeholder={t("search.placeholder")}
         aria-label={t("search.label")}
         bind:value={query}
         onkeydown={(e) => e.key === "Escape" && (query = "")}
       />
       {#if searching}
-        <span class="text-xs whitespace-nowrap text-base-content/60" role="status">
-          {t("search.count", { shown: shownCount, total: editor.rules.items.length })}
+        <span class="text-[0.8rem] whitespace-nowrap text-base-content/65" role="status">
+          {scope === "all"
+            ? t("search.countAll", { count: resultCount })
+            : t("search.count", { shown: shownCount, total: editor.rules.items.length })}
         </span>
       {/if}
     </label>
-    <button class="btn btn-ghost btn-sm gap-1.5 text-base-content/70" onclick={addCode} title={t("raw.explain")}><Icon name="code" size={15} />{t("route.addCode")}</button>
-    <button class="btn btn-primary btn-sm gap-1" onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
+    <div class="join" role="group" aria-label={t("search.scope")}>
+      <button class={["btn btn-xs join-item", scope === "script" ? "btn-active" : "btn-ghost"]} aria-pressed={scope === "script"} onclick={() => (scope = "script")}>
+        {t("search.thisScript")}
+      </button>
+      <button class={["btn btn-xs join-item", scope === "all" ? "btn-active" : "btn-ghost"]} aria-pressed={scope === "all"} onclick={() => (scope = "all")}>
+        {t("search.allScripts")}
+      </button>
+    </div>
+    <div class="join">
+      <button class="btn btn-primary btn-sm join-item gap-1" onclick={addRule}><Icon name="plus" size={15} />{t("editor.addRule")}</button>
+      <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-primary btn-sm join-item border-l-primary-content/25 px-1.5" aria-label={t("route.moreAdd")}>
+          <Icon name="chevronDown" size={15} />
+        </div>
+        <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-30 mt-1 w-72 rounded-box border border-base-300 bg-base-100 p-1 shadow-lg">
+          <li>
+            <button class="grid gap-0.5 text-left" onclick={addCode}>
+              <span class="flex items-center gap-2 font-medium"><Icon name="code" size={15} />{t("route.addCodeBlock")}</span>
+              <span class="text-[0.8rem] text-base-content/70">{t("route.addCodeHint")}</span>
+            </button>
+          </li>
+        </ul>
+      </div>
+    </div>
   </div>
 
+  {#if scope === "all" && searching}
+    <!-- Matches in every script of the account, in the order the scripts run. -->
+    <div class="grid gap-4 px-3 py-3">
+      {#each results as r (r.name)}
+        <section class="grid gap-1" aria-label={r.name}>
+          <h3 class="flex items-center gap-2 px-1 text-[0.875rem] font-semibold">
+            <Icon name="text" size={15} class="text-base-content/65" />{r.name}
+            <span class="font-normal text-base-content/65">{t("search.hits", { count: r.hits.length })}</span>
+          </h3>
+          {#each r.hits as hit (hit.index)}
+            <div class="rounded-field px-2.5 py-2 ring-1 ring-base-300 hover:bg-base-200/50">
+              {#if hit.item.type === "rule"}
+                <RouteRule
+                  rule={hit.item}
+                  {delimiter}
+                  {keywords}
+                  singleFolder={editor.rules.singleFolder}
+                  {words}
+                  onpick={(path) => openMatch(r.name, hit.index, path)}
+                />
+              {:else}
+                <button class="w-full text-left" onclick={() => openMatch(r.name, hit.index, "")}>
+                  <span class="font-semibold">{t("raw.heading")}</span>
+                  <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8rem] text-base-content/65">{hit.item.code.trim()}</pre>
+                </button>
+              {/if}
+            </div>
+          {/each}
+        </section>
+      {:else}
+        <p class="px-1 py-2 text-sm text-base-content/65">{others === null ? t("search.loading") : t("search.none")}</p>
+      {/each}
+    </div>
+  {:else}
   <ol class="route relative py-1" role="list">
     <!-- Where the mail comes in. -->
-    <li class="route-item text-[0.82rem] text-base-content/55">
+    <li class="route-item text-[0.875rem] text-base-content/65">
       <span></span>
       <span class="route-node grid place-items-center"><Icon name="mail" size={15} /></span>
       <span class="py-2">{t("route.entry")}</span>
@@ -173,6 +302,16 @@
         {#if dropAt === index && dragFrom !== null}
           <div class="absolute -top-px right-2 left-8 z-10 h-0.5 rounded bg-primary"></div>
         {/if}
+        {#if groups.head[index]}
+          <!-- The folder a run of rules files into, once. -->
+          <div class="col-span-3 grid grid-cols-subgrid pt-2">
+            <span></span>
+            <span class="route-node grid place-items-center"><span class="size-1.5 rounded-full bg-[var(--spine)]"></span></span>
+            <span class="flex items-center gap-1.5 px-2.5 text-[0.875rem] font-medium text-base-content/70">
+              <Icon name="folder" size={14} class="text-primary" />{groups.head[index]}
+            </span>
+          </div>
+        {/if}
         {#if searching}
           <span></span>
         {:else}
@@ -195,8 +334,8 @@
         <span class="route-node grid place-items-center pt-[0.95rem]">
           <span class="route-mark route-mark-{shape}" class:selected></span>
         </span>
-        <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected && "bg-primary/[0.05] ring-1 ring-primary/25"]}>
-          <div class="min-w-0 grow rounded-field px-2.5 py-2 hover:bg-base-200/50">
+        <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected ? "bg-primary/[0.05] ring-1 ring-primary/25" : "hover:bg-base-200/50"]}>
+          <div class="min-w-0 grow rounded-field px-2.5 py-2">
             {#if item.type === "rule"}
               <RouteRule
                 rule={item}
@@ -205,6 +344,7 @@
                 singleFolder={editor.rules.singleFolder}
                 {words}
                 picked={selected ? editor.focus : null}
+                hideParent={groups.grouped[index]}
                 onpick={(path) => pick(item.uid, path)}
               />
             {:else}
@@ -221,12 +361,8 @@
           </div>
           <div class="flex shrink-0 items-center gap-1 pt-2 pr-1.5">
             {#if item.type === "rule" && !item.enabled}
-              <span class="rounded-full bg-base-200 px-2 text-[0.75rem] leading-5 font-medium text-base-content/60">{t("route.off")}</span>
+              <span class="rounded-full bg-base-200 px-2 text-[0.8rem] leading-5 font-medium text-base-content/60">{t("route.off")}</span>
             {/if}
-            <!-- Always there on wide sheets, so destinations line up. -->
-            <span class="hidden w-28 truncate text-right text-[0.8rem] text-base-content/45 @2xl:inline" title={item.type === "rule" ? item.name : undefined}
-              >{item.type === "rule" && isSimple(item) ? item.name : ""}</span
-            >
             {#if item.type === "rule" && editor.roundcubeRisks?.rules.includes(index)}
               <span class="badge badge-sm badge-soft badge-warning" title={t("roundcube.title")}>{t("roundcube.badge")}</span>
             {/if}
@@ -234,7 +370,7 @@
               <div
                 tabindex="0"
                 role="button"
-                class="grid size-7 place-items-center rounded-field text-base-content/45 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-base-200 {selected ? 'opacity-100' : ''}"
+                class="grid size-7 place-items-center rounded-field text-base-content/65 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-base-200 {selected ? 'opacity-100' : ''}"
                 aria-label={t("menu.more")}
               >
                 <Icon name="more" size={16} />
@@ -274,7 +410,7 @@
     {/if}
 
     <!-- Where the mail goes when no rule kept it. -->
-    <li class="route-item route-end text-[0.82rem] text-base-content/55">
+    <li class="route-item route-end text-[0.875rem] text-base-content/65">
       <span></span>
       <span class="route-node grid place-items-center pt-0.5"><span class="route-mark route-mark-end"></span></span>
       <span class="py-2">
@@ -282,6 +418,7 @@
       </span>
     </li>
   </ol>
+  {/if}
 </section>
 
 <style>

@@ -1,6 +1,7 @@
 <script lang="ts">
   // One or more text values; several values match if any of them matches.
   import { t } from "../i18n.svelte";
+  import Icon from "./Icon.svelte";
 
   let {
     values,
@@ -26,15 +27,15 @@
       />
       {#if values.length > 1}
         <button
-          class="btn btn-ghost btn-sm btn-square"
+          class="btn btn-ghost btn-sm btn-square text-base-content/65"
           aria-label={t("value.remove")}
           title={t("value.remove")}
-          onclick={() => onchange(values.filter((_, j) => j !== i), false)}>✕</button
+          onclick={() => onchange(values.filter((_, j) => j !== i), false)}><Icon name="x" size={15} /></button
         >
       {/if}
     </div>
   {/each}
-  <button class="btn btn-ghost btn-xs justify-self-start w-fit" onclick={() => onchange([...values, ""], false)}>
+  <button class="btn btn-ghost btn-xs w-fit self-start gap-1 text-base-content/75" onclick={() => onchange([...values, ""], false)}>
     + {t("value.add")}
   </button>
 </div>

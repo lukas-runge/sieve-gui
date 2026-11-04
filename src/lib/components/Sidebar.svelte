@@ -118,7 +118,7 @@
     <!-- The run order: a number for running scripts, a hollow ring for the others. -->
     {#if index >= 0 && order.length > 1}
       <button
-        class="ml-1 grid size-6 shrink-0 cursor-grab place-items-center rounded-full bg-primary/12 text-[0.72rem] font-bold text-primary hover:bg-primary/20"
+        class="ml-1 grid size-6 shrink-0 cursor-grab place-items-center rounded-full bg-primary/12 text-[0.8rem] font-bold text-primary hover:bg-primary/20"
         draggable="true"
         data-script-handle="{id}:{index}"
         aria-label="{t('scripts.drag')}: {name} (Alt+↑/↓)"
@@ -135,7 +135,7 @@
     {:else if node.depth > 0}
       <span class="ml-1 grid size-6 shrink-0 place-items-center text-base-content/35" aria-hidden="true"><Icon name="nested" size={14} /></span>
     {:else if running && position >= 0}
-      <span class="ml-1 grid size-6 shrink-0 place-items-center rounded-full bg-primary/12 text-[0.72rem] font-bold text-primary" aria-hidden="true">1</span>
+      <span class="ml-1 grid size-6 shrink-0 place-items-center rounded-full bg-primary/12 text-[0.8rem] font-bold text-primary" aria-hidden="true">1</span>
     {:else}
       <span class="ml-1 grid size-6 shrink-0 place-items-center" aria-hidden="true">
         <span class="size-2.5 rounded-full border-2 border-base-content/25"></span>
@@ -149,17 +149,17 @@
     >
       <span class={["block truncate", current && "font-semibold", !running && "text-base-content/70"]}>{name}</span>
       {#if running && node.via}
-        <span class="block truncate text-[0.75rem] text-base-content/50" title={t("scripts.viaHint", { name: node.via })}>{t("scripts.viaShort", { name: node.via })}</span>
+        <span class="block truncate text-[0.8rem] text-base-content/65" title={t("scripts.viaHint", { name: node.via })}>{t("scripts.viaShort", { name: node.via })}</span>
       {/if}
       {#if notes.length}
-        <span class="block text-[0.75rem] leading-snug break-words text-base-content/50">{notes.join(", ")}</span>
+        <span class="block text-[0.8rem] leading-snug break-words text-base-content/65">{notes.join(", ")}</span>
       {/if}
     </button>
     {#if !(running && node.via)}
       <button
         class={[
           "grid size-6 shrink-0 place-items-center rounded-full",
-          active ? "text-base-content/45 hover:bg-base-200 hover:text-base-content" : "text-primary hover:bg-primary/12",
+          active ? "text-base-content/65 hover:bg-base-200 hover:text-base-content" : "text-primary hover:bg-primary/12",
           "opacity-0 group-hover:opacity-100 focus-visible:opacity-100",
           current && "opacity-100",
         ]}
@@ -176,7 +176,7 @@
       <div
         tabindex="0"
         role="button"
-        class="grid size-6 place-items-center rounded-full text-base-content/45 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-base-200 {current ? 'opacity-100' : ''}"
+        class="grid size-6 place-items-center rounded-full text-base-content/65 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-base-200 {current ? 'opacity-100' : ''}"
         aria-label="{name}: …"
       >
         <Icon name="more" size={15} />
@@ -220,10 +220,10 @@
         ></span>
         <div class="min-w-0 grow">
           <h2 class="truncate text-[0.95rem] font-semibold" title="{account.username}@{account.host}">{account.label}</h2>
-          <p class="truncate text-[0.75rem] text-base-content/50">{account.username}@{account.host}</p>
+          <p class="truncate text-[0.8rem] text-base-content/65">{account.username}@{account.host}</p>
         </div>
         <div class="dropdown dropdown-end">
-          <div tabindex="0" role="button" class="grid size-7 place-items-center rounded-full text-base-content/50 hover:bg-base-100" aria-label="{t('accounts.edit')}: {account.label}"><Icon name="more" size={16} /></div>
+          <div tabindex="0" role="button" class="grid size-7 place-items-center rounded-full text-base-content/65 hover:bg-base-100" aria-label="{t('accounts.edit')}: {account.label}"><Icon name="more" size={16} /></div>
           <ul tabindex="-1" {@attach closesMenu} class="dropdown-content menu z-10 w-48 rounded-box border border-base-300 bg-base-100 p-1">
             <li><button onclick={() => onaccount(account)}>{t("accounts.edit")}</button></li>
             {#if session.roots[account.id]}
@@ -239,7 +239,7 @@
           <span class="loading loading-spinner loading-xs"></span>{t("accounts.connecting")}
         </p>
       {:else if server.status === "error"}
-        <div role="alert" class="mx-1 grid gap-2 rounded-field bg-error/8 px-2.5 py-2 text-[0.82rem]">
+        <div role="alert" class="mx-1 grid gap-2 rounded-field bg-error/8 px-2.5 py-2 text-[0.875rem]">
           <p class="text-error">{server.error}</p>
           {#if server.certificate}
             {@const untrusted = server.certificate}
@@ -316,7 +316,7 @@
             </li>
           {/each}
           {#if tree.running.length && tree.inactive.length}
-            <li class="mt-2.5 mb-0.5 px-2 text-[0.75rem] font-medium text-base-content/50">{t("scripts.inactiveHeading")}</li>
+            <li class="mt-2.5 mb-0.5 px-2 text-[0.8rem] font-medium text-base-content/65">{t("scripts.inactiveHeading")}</li>
           {/if}
           {#each tree.inactive as node (node.name)}
             <li animate:flip={{ duration: 150 }}>

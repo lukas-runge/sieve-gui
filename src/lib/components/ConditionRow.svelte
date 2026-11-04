@@ -184,16 +184,16 @@
           {#each view.values as value, i}
             {@const problem = value ? checkRegex(value) : null}
             {#if problem}
-              <p class="mt-1 text-xs text-error" role="alert">
+              <p class="mt-1 text-[0.8rem] text-error" role="alert">
                 {view.values.length > 1 ? t("regex.which", { n: i + 1 }) : ""}{problemText(problem)}
               </p>
             {/if}
           {/each}
           {#if regexUnsupported}
-            <p class="mt-1 text-xs text-warning" role="alert">{t("regex.unsupported")}</p>
+            <p class="mt-1 text-[0.8rem] text-warning" role="alert">{t("regex.unsupported")}</p>
           {/if}
-          <p class="mt-1 text-xs text-base-content/60">{t("op.regexHint")}</p>
-          <label class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <p class="mt-1 text-[0.8rem] text-base-content/60">{t("op.regexHint")}</p>
+          <label class="mt-2 flex flex-wrap items-center gap-2 text-[0.8rem]">
             <span class="text-base-content/70">{t("regex.try")}</span>
             <input
               class="input input-xs min-w-48 grow font-mono"
@@ -209,24 +209,24 @@
             {/if}
           </label>
         {:else if view.operator.toLowerCase().includes("matches")}
-          <p class="mt-1 text-xs text-base-content/60">{t("op.patternHint")}</p>
+          <p class="mt-1 text-[0.8rem] text-base-content/60">{t("op.patternHint")}</p>
         {:else if view.operator.endsWith("WithSubdomains")}
-          <p class="mt-1 text-xs text-base-content/60">{t("op.subdomainHint")}</p>
+          <p class="mt-1 text-[0.8rem] text-base-content/60">{t("op.subdomainHint")}</p>
         {:else if view.field === "parts"}
-          <p class="mt-1 text-xs text-base-content/60">{t("op.typeHint")}</p>
+          <p class="mt-1 text-[0.8rem] text-base-content/60">{t("op.typeHint")}</p>
         {/if}
       </div>
     {/if}
   {:else}
     <div class="grow">
       <code class="block font-mono text-sm break-all">{print(condition)}</code>
-      <p class="mt-1 text-xs text-base-content/60">{t("conditions.advanced")}</p>
+      <p class="mt-1 text-[0.8rem] text-base-content/60">{t("conditions.advanced")}</p>
     </div>
   {/if}
   <button
-    class="btn btn-ghost btn-sm btn-square ml-auto text-base-content/50"
+    class="btn btn-ghost btn-sm btn-square ml-auto text-base-content/65"
     aria-label={t("conditions.remove")}
     title={t("conditions.remove")}
-    onclick={onremove}><Icon name="x" size={15} /></button
+    onclick={onremove}><Icon name="trash" size={15} /></button
   >
 </div>

@@ -90,9 +90,9 @@
 
 {#snippet badge(text: string | number, dashed = false)}
   {#if typeof text === "number"}
-    <span class="grid size-[1.3rem] shrink-0 place-items-center rounded-full border-2 text-[0.74rem] font-bold" style="border-color: {rail}; color: {rail}">{text}</span>
+    <span class="grid size-[1.3rem] shrink-0 place-items-center rounded-full border-2 text-[0.8rem] font-bold" style="border-color: {rail}; color: {rail}">{text}</span>
   {:else}
-    <span class={["shrink-0 rounded-full border px-1.5 text-[0.74rem] leading-[1.2rem] font-semibold", dashed && "border-dashed"]} style="border-color: {rail}; color: {rail}">{text}</span>
+    <span class="shrink-0 text-[0.875rem] leading-[1.3rem] font-semibold" style="color: {rail}">{text}</span>
   {/if}
 {/snippet}
 
@@ -135,7 +135,7 @@
       aria-expanded={open.has(i)}
       onclick={() => toggle(i)}
     >
-      <Icon name={open.has(i) ? "chevronDown" : "chevronRight"} size={16} class="mt-0.5 text-base-content/50" />
+      <Icon name={open.has(i) ? "chevronDown" : "chevronRight"} size={16} class="mt-0.5 text-base-content/65" />
       {@render badge(label, dashed)}
       {#if open.has(i)}
         <span class="text-sm text-base-content/70">{i === 0 ? t("branch.firstMatch") : label === t("route.otherwise") ? t("branch.otherwiseHint") : ""}</span>
@@ -144,7 +144,7 @@
       {/if}
     </button>
     {#if remove}
-      <button class="btn btn-ghost btn-xs btn-square text-base-content/55" aria-label={t("branch.remove")} title={t("branch.remove")} onclick={() => mutate(remove)}>
+      <button class="btn btn-ghost btn-xs btn-square text-base-content/65" aria-label={t("branch.remove")} title={t("branch.remove")} onclick={() => mutate(remove)}>
         <Icon name="x" size={14} />
       </button>
     {/if}

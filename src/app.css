@@ -101,10 +101,10 @@ body {
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --rail-0: #7fa0ff;
-    --rail-1: #a889f0;
-    --rail-2: #4cc2b8;
-    --rail-3: #e0a84a;
+    --rail-0: #6f93ff;
+    --rail-1: #c9b0ff;
+    --rail-2: #3fbfb3;
+    --rail-3: #f2bd5c;
     --spine: #364254;
   }
 }
@@ -162,7 +162,7 @@ body {
   column-gap: 1.25rem;
   align-items: start;
 }
-@container route (max-width: 46rem) {
+@container route (max-width: 34rem) {
   .route-row {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 0.25rem;

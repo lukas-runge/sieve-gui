@@ -84,7 +84,7 @@
         {#each folders.labels as folder}<option value={folder}></option>{/each}
       </datalist>
       {#if missing}
-        <div id="{folderListId}-missing" class="mt-1 grid gap-1 text-xs">
+        <div id="{folderListId}-missing" class="mt-1 grid gap-1 text-[0.8rem]">
           <p class="justify-self-start rounded-field border border-warning/40 bg-warning/10 px-2 py-0.5">{t("action.folderMissing")}</p>
           {#if extensions.includes("mailbox") && (!singleFolder || action.copy || action.create)}
             <label class="flex items-center gap-2">
@@ -136,7 +136,7 @@
             {/if}
             <button
               type="button"
-              class="grid size-5 place-items-center rounded-full text-base-content/50 hover:bg-base-200 hover:text-base-content"
+              class="grid size-5 place-items-center rounded-full text-base-content/65 hover:bg-base-200 hover:text-base-content"
               aria-label={t("action.flagRemove", { name: flagName(flag, keywordNames) })}
               onclick={() => onchange({ ...action, flags: flags.filter((_, j) => j !== i) }, false)}><Icon name="x" size={12} /></button
             >
@@ -166,7 +166,7 @@
         </datalist>
       </div>
       {#if flags.some((f) => isKeyword(f) && !keywordNames[f])}
-        <p class="text-xs text-base-content/65">{t("action.flagNameHint")}</p>
+        <p class="text-[0.8rem] text-base-content/65">{t("action.flagNameHint")}</p>
       {/if}
     </div>
   {:else if action.type === "vacation"}
@@ -213,10 +213,10 @@
   {/if}
 
   <button
-    class="btn btn-ghost btn-sm btn-square ml-auto text-base-content/50"
+    class="btn btn-ghost btn-sm btn-square ml-auto text-base-content/65"
     aria-label={t("actions.remove")}
     title={t("actions.remove")}
-    onclick={onremove}><Icon name="x" size={15} /></button
+    onclick={onremove}><Icon name="trash" size={15} /></button
   >
 
   {#if action.type === "if"}

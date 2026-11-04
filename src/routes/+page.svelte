@@ -252,15 +252,15 @@
               {@const running = session.scriptTree(account.id).running.filter((n) => n.depth === 0)}
               {#if running.length}
                 <div class="mt-2 grid w-full gap-1 text-left">
-                  <p class="px-1 text-[0.8rem] text-base-content/55">{t("welcome.running", { account: account.label })}</p>
+                  <p class="px-1 text-[0.8rem] text-base-content/65">{t("welcome.running", { account: account.label })}</p>
                   {#each running as node, i (node.name)}
                     <button
                       class="flex items-center gap-2.5 rounded-field bg-base-100 px-3 py-2 text-left ring-1 ring-base-300 hover:ring-primary/40"
                       onclick={async () => (await session.confirmLeave()) && session.openScript(account.id, node.name)}
                     >
-                      <span class="grid size-6 place-items-center rounded-full bg-primary/12 text-[0.72rem] font-bold text-primary">{i + 1}</span>
+                      <span class="grid size-6 place-items-center rounded-full bg-primary/12 text-[0.8rem] font-bold text-primary">{i + 1}</span>
                       <span class="grow font-medium">{node.name}</span>
-                      <Icon name="chevronRight" size={16} class="text-base-content/40" />
+                      <Icon name="chevronRight" size={16} class="text-base-content/55" />
                     </button>
                   {/each}
                 </div>

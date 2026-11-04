@@ -27,8 +27,10 @@ export interface ConditionToken {
   fieldTitle: string | null;
   /** "not" etc.: the comparison is negated. */
   negated: boolean;
-  /** Comparisons without a value ("exists") or with words ("larger than"). */
+  /** How the values are compared ("ends with", "exists", ">" …); none for "contains". */
   word: string | null;
+  /** Values are patterns or regular expressions: shown in the code font. */
+  pattern: boolean;
   values: ValueToken[];
   /** Values beyond those shown. */
   more: string[];
@@ -78,33 +80,34 @@ const NEGATED: Record<string, string> = {
   notHasType: "hasType",
 };
 
+/** How a value is compared, as a word before it; none for "contains". */
+function compareWord(op: string, part: string): string | null {
+  switch (op) {
+    case "is":
+      return part === "domain" ? null : t("route.op.is");
+    case "isWithSubdomains":
+      return null;
+    case "startsWith":
+      return t("route.op.startsWith");
+    case "endsWith":
+      return t("route.op.endsWith");
+    case "matches":
+      return t("route.op.matches");
+    case "regex":
+      return t("route.op.regex");
+    default:
+      return null;
+  }
+}
+
 function valueToken(op: string, part: string, value: string): ValueToken {
   let before = "";
   let after = "";
-  switch (op) {
-    case "is":
-      before = "= ";
-      break;
-    case "isWithSubdomains":
-      before = "= ";
-      after = " " + t("route.withSubdomains");
-      break;
-    case "startsWith":
-      after = "…";
-      break;
-    case "endsWith":
-      before = "…";
-      break;
-    case "regex":
-      before = "/";
-      after = "/";
-      break;
-  }
+  if (op === "isWithSubdomains") after = " " + t("route.withSubdomains");
   // The address part shows as part of the address: @domain, name@, +detail.
-  // A domain that "is" something needs no "=": @example.org says it.
-  if (part === "domain") before = (op === "is" || op === "isWithSubdomains" ? "" : before) + "@";
-  else if (part === "localPart" || part === "user") after = after + "@";
-  else if (part === "detail") before += "+";
+  if (part === "domain") before = "@";
+  else if (part === "localPart" || part === "user") after += "@";
+  else if (part === "detail") before = "+";
   return { before, text: value || "…", after };
 }
 
@@ -114,10 +117,19 @@ function sentence(v: ConditionView, chip: string): string {
   return `${chip}${part} ${t(`op.${v.operator}` as MessageKey)}${hasValues(v.operator) ? " " + values : ""}`;
 }
 
-export function conditionToken(c: Condition): ConditionToken {
+export function conditionToken(c: Condition, max = MAX_VALUES): ConditionToken {
   const v = viewCondition(c);
   if (!v) {
-    return { field: t("field.other"), fieldTitle: null, negated: false, word: null, values: [], more: [], sentence: t("field.other") };
+    return {
+      field: t("field.other"),
+      fieldTitle: null,
+      negated: false,
+      word: null,
+      pattern: false,
+      values: [],
+      more: [],
+      sentence: t("field.other"),
+    };
   }
   const chip = fieldChip(v);
   const negated = v.operator in NEGATED;
@@ -134,6 +146,7 @@ export function conditionToken(c: Condition): ConditionToken {
   } else if (op === "hasType") {
     values = v.values.map((x) => ({ before: "", text: x, after: "" }));
   } else {
+    word = compareWord(op, v.part);
     values = v.values.map((x) => valueToken(op, v.part, x));
   }
   return {
@@ -141,8 +154,9 @@ export function conditionToken(c: Condition): ConditionToken {
     fieldTitle: chip.title,
     negated,
     word,
-    values: values.slice(0, MAX_VALUES),
-    more: v.values.slice(MAX_VALUES),
+    pattern: op === "matches" || op === "regex",
+    values: values.slice(0, max),
+    more: v.values.slice(max),
     sentence: sentence(v, chip.title ?? chip.label),
   };
 }
@@ -164,14 +178,14 @@ function sameComparison(items: Condition[]): boolean {
   return new Set(views.map((v) => key(v!))).size === 1;
 }
 
-export function conditionShape(conditions: Conditions, negate = false): ConditionShape {
+export function conditionShape(conditions: Conditions, negate = false, max = MAX_VALUES): ConditionShape {
   const { items, join } = conditions;
   if (items.length === 0) return { kind: "always" };
   const flat = items.every((c) => c.test.type !== "group");
-  if (!negate && items.length === 1 && flat) return { kind: "line", token: conditionToken(items[0]) };
+  if (!negate && items.length === 1 && flat) return { kind: "line", token: conditionToken(items[0], max) };
   // "From contains a" or "From contains b": one token with both values.
   if (!negate && flat && join === "any" && sameComparison(items)) {
-    const tokens = items.map(conditionToken);
+    const tokens = items.map((c) => conditionToken(c, Infinity));
     const all = tokens.flatMap((tk) => [...tk.values]);
     const first = tokens[0];
     const raw = items.flatMap((c) => viewCondition(c)!.values);
@@ -179,8 +193,8 @@ export function conditionShape(conditions: Conditions, negate = false): Conditio
       kind: "line",
       token: {
         ...first,
-        values: all.slice(0, MAX_VALUES),
-        more: raw.slice(MAX_VALUES),
+        values: all.slice(0, max),
+        more: raw.slice(max),
         sentence: tokens.map((tk) => tk.sentence).join(` ${t("sentence.or")} `),
       },
     };
@@ -191,8 +205,8 @@ export function conditionShape(conditions: Conditions, negate = false): Conditio
     mode,
     items: items.map((c) =>
       c.test.type === "group"
-        ? { kind: "group", shape: conditionShape({ join: c.test.join, items: c.test.items }, c.negate) }
-        : { kind: "token", token: conditionToken(c) },
+        ? { kind: "group", shape: conditionShape({ join: c.test.join, items: c.test.items }, c.negate, max) }
+        : { kind: "token", token: conditionToken(c, max) },
     ),
   };
 }
@@ -285,7 +299,7 @@ export function outcomes(actions: Action[], keywords: Record<string, string>, de
         // `setflag` replaces all flags: "Only read".
         const system = a.flags.filter((f) => SYSTEM_FLAGS[f.toLowerCase()]);
         const labels = a.flags.filter((f) => !SYSTEM_FLAGS[f.toLowerCase()]);
-        const only = a.op === "set" ? t("route.only") : a.op === "remove" ? t("route.remove") : "";
+        const only = a.op === "set" ? t("route.replaceFlags") : a.op === "remove" ? t("route.remove") : "";
         for (const f of system) {
           const name = flagName(f, keywords);
           const kindOf: OutcomeKind = a.op === "remove" && f.toLowerCase() === "\\seen" ? "unread" : f.toLowerCase() === "\\seen" ? "read" : f.toLowerCase() === "\\flagged" ? "flag" : "system";

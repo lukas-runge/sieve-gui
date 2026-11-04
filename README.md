@@ -2,7 +2,10 @@
 
 A lightweight, cross-platform desktop editor for **server-side Sieve mail filters**. It talks to your mail server via **ManageSieve** (RFC 5804), so filters keep running even when no mail client is open. Built with Tauri and Svelte.
 
-<img alt="sieve-gui: a mail filter script drawn as a route. Family mail gets a label and a folder, a Clients rule picks one of three folders, newsletters go to Reading, receipts sit in a folded folder section" src="docs/screenshot.png" width="960">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
+  <img alt="sieve-gui: a mail filter script drawn as a route. Family mail gets a label and a folder, a Clients rule picks one of three folders, newsletters go to Reading, receipts sit in a folded folder section" src="docs/screenshot.png" width="960">
+</picture>
 
 > **Status:** early development. Visual rule editing, script management, trying rules with a sample message and saving via ManageSieve work. See [`docs/concept.md`](docs/concept.md).
 
@@ -103,7 +106,7 @@ sieve-gui/
 │   └── generated/tauri/        # auto-generated TS bindings (do not edit)
 ├── scripts/fetch-pigeonhole.sh # downloads the Pigeonhole test suite for parser tests
 ├── docs/concept.md             # product and architecture concept
-└── docs/screenshot.png         # the README screenshot (preview with `?mac&hero`)
+└── docs/screenshot*.png        # the README screenshot, light and dark (preview with `?mac&hero`)
 ```
 
 ---

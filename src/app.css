@@ -52,8 +52,8 @@
   --color-base-100: #1b222d;
   --color-base-200: #131820;
   --color-base-300: #2b3543;
-  --color-base-content: #e4e9f0;
-  --color-primary: #7fa0ff;
+  --color-base-content: #edf1f6;
+  --color-primary: #6d8ef0;
   --color-primary-content: #0f1626;
   --color-secondary: #9aa5b5;
   --color-secondary-content: #131820;
@@ -105,7 +105,7 @@ body {
     --rail-1: #c9b0ff;
     --rail-2: #3fbfb3;
     --rail-3: #f2bd5c;
-    --spine: #364254;
+    --spine: #586579;
   }
 }
 

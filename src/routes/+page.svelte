@@ -15,6 +15,7 @@
   import { i18n, t } from "../lib/i18n.svelte";
   import { ROOT_SCRIPT, session } from "../lib/session.svelte";
   import { trial } from "../lib/trial.svelte";
+  import { accountView } from "../lib/scope.svelte";
 
   let accountDialog = $state<{ account: Account | null } | null>(null);
   let deploying = $state(false);
@@ -31,6 +32,7 @@
   const large = new MediaQuery("min-width: 1200px");
 
   const editor = $derived(session.editor);
+  const accountLabel = $derived(session.accounts.find((a) => a.id === editor?.accountId)?.label ?? "");
   const active = $derived(editor ? session.runs(editor.accountId, editor.name) : false);
   const root = $derived(editor ? session.roots[editor.accountId] : null);
   /**
@@ -201,7 +203,18 @@
         </button>
         <div class="min-w-0 grow">
           <div class="flex min-w-0 items-center gap-3">
-            <h1 class="truncate text-[1.35rem] leading-tight font-semibold">{editor.name}</h1>
+            {#if accountView.active}
+              <!-- Results across scripts: the account is what's shown, the script only where it came from. -->
+              <h1 class="flex min-w-0 items-baseline gap-2 truncate text-[1.35rem] leading-tight font-semibold">
+                <Icon name="server" size={18} class="self-center text-base-content/70" />{accountLabel}
+                <span class="truncate text-base font-normal text-base-content/70">
+                  {accountView.kind === "dest" ? t("scope.headerDest") : t("scope.headerSearch")}
+                </span>
+              </h1>
+            {:else}
+              <h1 class="truncate text-[1.35rem] leading-tight font-semibold">{editor.name}</h1>
+            {/if}
+            {#if !accountView.active}
             <span
               class={[
                 "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.8rem] font-medium",
@@ -211,6 +224,7 @@
               <span class={["size-1.5 rounded-full", active ? "bg-success" : "bg-base-content/40"]}></span>
               {#if !active}{t("status.off")}{:else if position}{t("status.runsAt", position)}{:else}{t("status.runs")}{/if}
             </span>
+            {/if}
           </div>
           <div class="-ml-1 flex items-center gap-0.5 text-sm text-base-content/60">
             <button class="btn btn-ghost btn-sm btn-square" disabled={!editor.canUndo} onclick={() => editor.undo()} aria-label={t("editor.undo")} title="{t('editor.undo')} (⌘Z)">
@@ -220,6 +234,7 @@
               <Icon name="redo" size={15} />
             </button>
             <p class="ml-1 flex items-center gap-1.5 truncate" aria-live="polite">
+              {#if accountView.active}<span class="font-medium text-base-content/80">{t("scope.open", { name: editor.name })}</span> ·{/if}
               {#if editor.dirty}<span class="size-1.5 rounded-full bg-warning"></span>{t("editor.unsaved")}{:else}{t("editor.saved")}{/if}
             </p>
           </div>

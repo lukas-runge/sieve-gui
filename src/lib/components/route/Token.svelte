@@ -37,7 +37,7 @@
   /* A long pattern stays on one line (in full as a tooltip and once picked). */
   :global(.pattern-value) {
     display: inline-block;
-    max-width: 22ch;
+    max-width: 36ch;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -16,6 +16,7 @@
   import { caseGoesTo, type Outcome } from "../../rules/route";
   import type { ScriptRun } from "../../rules/simulate";
   import { trial as sample } from "../../trial.svelte";
+  import { accountView } from "../../scope.svelte";
   import { newRule } from "../../rules/view";
   import { addresses } from "../../rules/simulate";
   import { templateRule, type TemplateKind } from "../../rules/templates";
@@ -185,6 +186,13 @@
     next.focus();
     next.scrollIntoView({ block: "nearest" });
   }
+
+  // Account-wide results: the page header says so instead of the script's name.
+  $effect(() => {
+    accountView.active = listing || view === "dest";
+    accountView.kind = view === "dest" && !target ? "dest" : "search";
+    return () => (accountView.active = false);
+  });
 
   // Another script opened: start over.
   let shownFor: string | null = null;

@@ -158,8 +158,9 @@ export function conditionToken(c: Condition, max = MAX_VALUES): ConditionToken {
     negated,
     word,
     pattern: op === "matches" || op === "regex",
-    values: values.slice(0, max),
-    more: v.values.slice(max),
+    // "and 1 more" would hide a value to save the room it takes: show it.
+    values: values.slice(0, v.values.length === max + 1 ? max + 1 : max),
+    more: v.values.length === max + 1 ? [] : v.values.slice(max),
     sentence: sentence(v, chip.title ?? chip.label),
   };
 }
@@ -196,8 +197,8 @@ export function conditionShape(conditions: Conditions, negate = false, max = MAX
       kind: "line",
       token: {
         ...first,
-        values: all.slice(0, max),
-        more: raw.slice(max),
+        values: all.slice(0, raw.length === max + 1 ? max + 1 : max),
+        more: raw.length === max + 1 ? [] : raw.slice(max),
         sentence: tokens.map((tk) => tk.sentence).join(` ${t("sentence.or")} `),
       },
     };

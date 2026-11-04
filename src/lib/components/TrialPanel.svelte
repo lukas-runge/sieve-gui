@@ -43,6 +43,20 @@
     return outcomes(actions, keywords, delimiter);
   });
 
+  function deliveryOf(r: NonNullable<typeof result>): Outcome[] {
+    const d = r.delivery;
+    const actions: Action[] = d.folders.map((mailbox) => ({ type: "fileInto", mailbox, copy: false, create: false, flags: null }));
+    if (d.inbox) actions.push({ type: "keep", flags: null });
+    if (d.flags.length) actions.push({ type: "flags", op: "add", flags: d.flags });
+    return outcomes(actions, keywords, delimiter);
+  }
+  /** Whether the unsaved edits change where the message ends up. */
+  const changed = $derived.by(() => {
+    if (!result || !trial.before) return false;
+    const key = (r: NonNullable<typeof result>) => JSON.stringify({ ...r.delivery, sources: null });
+    return key(result) !== key(trial.before);
+  });
+
   /** What each script contributed to the result, in the order they ran. */
   const contributions = $derived.by(() => {
     if (!result) return [];
@@ -162,6 +176,13 @@
       <section class="mt-4 rounded-box border border-success/35 bg-success/[0.07] px-3.5 py-3" aria-live="polite">
         <h3 class="mb-1.5 text-[0.8125rem] font-semibold tracking-wide text-success uppercase">{t("trial.result")}</h3>
         <div class="text-[1.05rem]"><Outcomes items={delivery} fullPath /></div>
+        {#if changed && trial.before}
+          <!-- Unsaved edits change where this message goes: before and after. -->
+          <div class="mt-2 rounded-field bg-base-100/70 px-2.5 py-1.5 text-[0.875rem]">
+            <span class="text-[0.8125rem] font-medium text-base-content/75">{t("trial.before")}</span>
+            <span class="line-through decoration-base-content/40 opacity-80"><Outcomes items={deliveryOf(trial.before)} fullPath /></span>
+          </div>
+        {/if}
         {#if contributions.length > 1}
           <!-- Several scripts had a hand in it: which did what. -->
           <ul class="mt-2 grid gap-0.5 text-[0.8125rem] text-base-content/75">

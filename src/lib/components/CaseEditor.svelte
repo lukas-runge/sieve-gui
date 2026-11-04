@@ -44,7 +44,16 @@
   let conditionsEl = $state<HTMLElement>();
   let actionsEl = $state<HTMLElement>();
   let checksEl = $state<HTMLElement>();
-  /** Whether the case's actions are in view (else a summary sticks to the bottom). */
+  let checksVisible = $state(false);
+  $effect(() => {
+    const el = checksEl;
+    if (!el) return;
+    const observer = new IntersectionObserver(([entry]) => (checksVisible = entry.isIntersecting));
+    observer.observe(el);
+    return () => observer.disconnect();
+  });
+
+  /** Whether the case's actions are in view (else a summary shows in the jump bar). */
   let actionsVisible = $state(true);
   $effect(() => {
     const el = actionsEl;
@@ -53,6 +62,8 @@
     observer.observe(el);
     return () => observer.disconnect();
   });
+  /** The part of the case in view, marked in the jump bar. */
+  const activePart = $derived(checksVisible ? checksEl : actionsVisible ? actionsEl : conditionsEl);
   const step = $derived(chain?.at(-1) ?? null);
   const depth = $derived((chain?.length ?? 1) - 1);
   const rail = $derived(`var(--rail-${Math.min(depth, 3)})`);
@@ -221,7 +232,11 @@
       <span class="mr-1 text-[0.8125rem] text-base-content/70">{t("case.jump")}</span>
       {#each [{ el: conditionsEl, label: t("conditions.heading") }, { el: actionsEl, label: t("actions.heading") }, { el: checksEl, label: t("case.checkOne") }] as part}
         {#if part.el}
-          <button class="btn btn-xs btn-soft" onclick={() => part.el?.scrollIntoView({ block: "start", behavior: "smooth" })}>{part.label}</button>
+          <button
+            class={["btn btn-xs", activePart === part.el ? "btn-primary" : "btn-soft"]}
+            aria-current={activePart === part.el ? "true" : undefined}
+            onclick={() => part.el?.scrollIntoView({ block: "start", behavior: "smooth" })}>{part.label}</button
+          >
         {/if}
       {/each}
       {#if !actionsVisible}

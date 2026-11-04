@@ -38,6 +38,22 @@ class TrialState {
     return runTrial(scripts, this.mail, !!root?.lastMoveWins);
   });
 
+  /**
+   * Where the message went with the rules as saved, while the open script
+   * has unsaved changes: what the edit changes for it.
+   */
+  readonly before = $derived.by((): Trial | null => {
+    const editor = session.editor;
+    if (!editor || !this.active || !editor.dirty || this.saved?.account !== editor.accountId) return null;
+    const scripts: TrialScript[] = [];
+    for (const name of this.order) {
+      const rules = this.saved.scripts.find((s) => s.name === name)?.rules;
+      if (rules) scripts.push({ name, items: rules.items, singleFolder: rules.singleFolder });
+    }
+    const root = session.roots[editor.accountId];
+    return runTrial(scripts, this.mail, !!root?.lastMoveWins);
+  });
+
   /** Reads the other scripts of the account (again after saving). */
   async load(account: string) {
     const scripts = await session.allRules(account);

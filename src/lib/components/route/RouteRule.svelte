@@ -84,8 +84,9 @@
 
 <!-- The case label: "1 if", "2 else if", "otherwise"; nested cases count on
      from their case: "1.2 else if". Fixed width, so conditions line up. -->
-{#snippet label(c: Case, num: string | null, hit: boolean, missed: boolean)}
-  <span class="case-label flex w-[7rem] shrink-0 items-center gap-1.5 pt-px" style="color: var(--rail)">
+{#snippet label(c: Case, num: string | null, hit: boolean, missed: boolean, untried = false)}
+  <span class="case-label grid w-[7rem] shrink-0 gap-0.5 pt-px">
+  <span class="flex items-center gap-1.5" style="color: var(--rail)">
     {#if hit}
       <span class="grid size-[1.25rem] shrink-0 place-items-center rounded-full bg-success text-success-content" title={t("trial.applies")}
         ><Icon name="check" size={13} /></span
@@ -99,10 +100,17 @@
       {#if c.kind === "else"}{t("route.otherwise")}{:else if c.kind === "if"}{t("route.if")}{:else}{t("route.elseIf")}{/if}
     </span>
   </span>
+  <!-- In the test: tried and no match, or never tried. -->
+  {#if missed}
+    <span class="justify-self-start rounded-full bg-base-content/10 px-2 text-[0.75rem] leading-5 font-medium text-base-content/80" title={t("trial.missed")}>{t("trial.missedShort")}</span>
+  {:else if untried}
+    <span class="text-[0.75rem] text-base-content/70 italic" title={t("trial.notTriedHint")}>{t("trial.notTried")}</span>
+  {/if}
+  </span>
 {/snippet}
 
 <!-- What a case tests (left) and does (right, in the column shared by all rows). -->
-{#snippet caseRow(c: Case, num: string | null, path: CasePath, dead = false)}
+{#snippet caseRow(c: Case, num: string | null, path: CasePath, dead = false, pre = "", depth = 0)}
   {@const hit = applies(path)}
   {@const dim = (words.length > 0 && !caseMatches(c, words, keywords, delimiter)) || hit === false || (filter !== null && !filter(c))}
   <button
@@ -121,13 +129,14 @@
     }}
   >
     <span class="case-head flex min-w-0 items-start gap-1.5">
-      {@render label(c, num, !!hit, !!trial?.misses.includes(path))}
+      {@render label(
+        c,
+        num,
+        !!hit,
+        !!trial?.misses.includes(path),
+        !!trial && (trial.hits.length > 0 || trial.misses.length > 0) && !trial.hits.includes(path) && !trial.misses.includes(path),
+      )}
       <span class="min-w-0">
-        {#if trial?.misses.includes(path)}
-          <span class="mr-1.5 inline-flex items-center gap-1 rounded-full bg-base-content/10 px-2 text-[0.75rem] leading-5 font-medium text-base-content/80" title={t("trial.missed")}
-            >{t("trial.missedShort")}</span
-          >
-        {/if}
         {#if c.conditions}
           <Conditions shape={conditionShape(c.conditions, false, picked === path ? Infinity : 3)} {words} />
           {#if dead}
@@ -136,7 +145,10 @@
             </span>
           {/if}
         {:else}
-          <span class="text-[0.94rem] text-base-content/70">{t("route.allOthers")}</span>
+          <!-- Inside a check, "the rest" is the rest of that case's mail. -->
+          <span class="text-[0.94rem] text-base-content/75"
+            >{pre ? t("route.allOthersIn", { n: pre }) : depth > 0 ? t("route.allOthersAbove") : t("route.allOthers")}</span
+          >
         {/if}
       </span>
     </span>
@@ -186,7 +198,7 @@
       <li>
         <!-- A case with checks inside: row and checks in one frame, so they read as one. -->
         <div class={c.nested.length > 0 ? "case-frame" : undefined}>
-        {@render caseRow(c, num, path, dead.has(i))}
+        {@render caseRow(c, num, path, dead.has(i), pre, depth)}
         {#each c.nested as n, j}
           {@const multi = cases(n).length > 1}
           {@const color = `var(--rail-${Math.min(depth + 1, 3)})`}

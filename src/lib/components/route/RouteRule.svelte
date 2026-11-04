@@ -90,10 +90,6 @@
       <span class="grid size-[1.25rem] shrink-0 place-items-center rounded-full bg-success text-success-content" title={t("trial.applies")}
         ><Icon name="check" size={13} /></span
       >
-    {:else if missed}
-      <span class="grid size-[1.25rem] shrink-0 place-items-center rounded-full bg-base-content/10 text-base-content/70" title={t("trial.missed")}
-        ><Icon name="x" size={12} /></span
-      >
     {:else if num}
       <span class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full border-2 px-[0.3rem] text-[0.8125rem] font-bold" style="border-color: var(--rail)"
         >{num}</span
@@ -127,6 +123,11 @@
     <span class="case-head flex min-w-0 items-start gap-1.5">
       {@render label(c, num, !!hit, !!trial?.misses.includes(path))}
       <span class="min-w-0">
+        {#if trial?.misses.includes(path)}
+          <span class="mr-1.5 inline-flex items-center gap-1 rounded-full bg-base-content/10 px-2 text-[0.75rem] leading-5 font-medium text-base-content/80" title={t("trial.missed")}
+            >{t("trial.missedShort")}</span
+          >
+        {/if}
         {#if c.conditions}
           <Conditions shape={conditionShape(c.conditions, false, picked === path ? Infinity : 3)} {words} />
           {#if dead}
@@ -269,7 +270,7 @@
   {#if folded}
     <!-- Folded: where its mail can go, in one line. -->
     <button class="route-row mt-1 w-full rounded-field py-1 pl-6 text-left hover:bg-base-content/[0.04]" onclick={() => onpick("")}>
-      <span class="text-[0.875rem] text-base-content/70">{t("route.casesFirst", { count: top.length })}</span>
+      <span></span>
       <Possible items={blockOutcomes(rule, keywords, delimiter)} heading={t("route.foldedSummary")} {words} />
     </button>
   {:else}

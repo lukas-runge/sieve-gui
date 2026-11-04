@@ -20,7 +20,7 @@
   {#if token.word}<span class="text-[0.875rem] text-base-content/70">{token.word}</span>{/if}
   {#if noneOf}<span class="neg">{t("route.noneOf")}</span>{/if}
   {#each token.values as v, i}
-    <span class={["max-w-full [overflow-wrap:break-word] text-base-content", token.pattern ? "font-mono text-[0.875rem]" : "text-[0.94rem]"]}
+    <span class={["max-w-full [overflow-wrap:break-word] text-base-content", token.pattern ? "pattern-value font-mono text-[0.875rem]" : "text-[0.94rem]"]}
       >{#if v.before}<span class="text-base-content/65">{v.before}</span>{/if}<Mark text={v.text} {words} breaks={!token.pattern} />{#if v.after}<span
           class="font-normal text-base-content/70">{v.after}</span
         >{/if}{#if i < token.values.length - 1}<span class="font-normal text-base-content/70">{noneOf ? ", " : t("route.listOr")}</span>{/if}</span
@@ -34,6 +34,19 @@
 </span>
 
 <style>
+  /* A long pattern stays on one line (in full as a tooltip and once picked). */
+  :global(.pattern-value) {
+    display: inline-block;
+    max-width: 22ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
+  }
+  :global([aria-current="true"] .pattern-value) {
+    max-width: none;
+    white-space: normal;
+  }
   /* "not" turns the whole condition around: a token of its own, not an error. */
   .neg {
     align-self: center;

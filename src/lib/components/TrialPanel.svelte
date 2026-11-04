@@ -191,7 +191,7 @@
         {#each result.scripts as run, i (run.name)}
           {@const steps = result.steps.filter((s) => s.script === run.name)}
           <li class="grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2">
-            <span class="grid size-6 place-items-center rounded-full bg-primary/12 text-[0.8125rem] font-bold text-primary">{i + 1}</span>
+            <span class="grid size-6 place-items-center rounded-md bg-primary/12 text-[0.8125rem] font-bold text-primary">{i + 1}</span>
             <p class={["pt-0.5 font-semibold", run.name === editor.name && "text-primary"]}>{run.name}</p>
             <span></span>
             <div class="grid gap-1 pt-1">

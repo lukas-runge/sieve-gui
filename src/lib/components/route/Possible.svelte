@@ -26,7 +26,7 @@
 
 {#if compact}
   <span class="block text-[0.8125rem] leading-snug text-base-content/70">
-    <span class="italic">{heading}</span>
+    <span>{heading}</span>
     {items.map((o) => (o.kind === "move" || o.kind === "copy" ? (o.path.at(-1) ?? o.text) : o.text)).join(" · ")}
   </span>
 {:else}

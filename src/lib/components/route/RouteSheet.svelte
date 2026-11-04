@@ -273,6 +273,12 @@
     target = null;
     editor.selected = item.uid;
     fresh = item.uid;
+    // Straight to the first thing to fill in.
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() =>
+        [...document.querySelectorAll<HTMLInputElement>("[data-inspector] input:not([type=checkbox]):not([data-name])")].find((i) => i.value === "")?.focus(),
+      ),
+    );
   }
   /** The rule just added, marked until another one is picked. */
   let fresh = $state<string | null>(null);
@@ -285,7 +291,7 @@
   }
 
   function addTemplate(kind: TemplateKind, value = "") {
-    insert({ type: "rule", ...templateRule(kind, t(`template.${kind}Name`), value), uid: uid() });
+    insert({ type: "rule", ...templateRule(kind, "", value), uid: uid() });
   }
 
   /** The sender's domain of the sample message, for a rule made from it. */
@@ -462,7 +468,7 @@
             <span class="font-normal text-base-content/70">{r.hits.length === 1 ? t("search.hitOne") : t("search.hits", { count: r.hits.length })}</span>
           </h3>
           {#each r.hits as hit (hit.index)}
-            <div class="rounded-field border-l-2 border-base-300 px-2.5 py-2 hover:border-primary/50 hover:bg-base-200/50">
+            <div class="rounded-field px-2.5 py-2 hover:bg-base-200/50">
               {#if hit.item.type === "rule"}
                 <RouteRule
                   rule={hit.item}
@@ -479,7 +485,7 @@
                 <button class="w-full text-left" onclick={() => openMatch(r.name, hit.index, "")}>
                   <span class="font-semibold">{t("raw.heading")}</span>
                   <span class="text-[0.8125rem] text-base-content/70">{t("route.codeNote")}</span>
-                  <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] text-base-content/70">{hit.item.code.trim()}</pre>
+                  <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] break-all whitespace-pre-wrap text-base-content/70">{hit.item.code.trim()}</pre>
                 </button>
               {/if}
             </div>
@@ -508,11 +514,11 @@
             {#if i > 0}<Icon name="chevronRight" size={13} class="text-base-content/45" />{/if}
             {#if name === editor.name}
               <span class="inline-flex items-center gap-1 rounded-full bg-primary/12 py-0.5 pr-2 pl-0.5 font-semibold text-primary" aria-current="step">
-                <span class="grid size-[1.1rem] place-items-center rounded-full bg-primary text-[0.7rem] text-primary-content">{i + 1}</span>{name}
+                <span class="grid size-[1.1rem] place-items-center rounded bg-primary text-[0.75rem] text-primary-content">{i + 1}</span>{name}
               </span>
             {:else}
               <button class="inline-flex items-center gap-1 rounded-full py-0.5 pr-2 pl-0.5 hover:bg-base-200" onclick={() => onopen?.(name)}>
-                <span class="grid size-[1.1rem] place-items-center rounded-full bg-base-content/10 text-[0.7rem] font-semibold">{i + 1}</span>{name}
+                <span class="grid size-[1.1rem] place-items-center rounded bg-base-content/10 text-[0.75rem] font-semibold">{i + 1}</span>{name}
               </button>
             {/if}
           {/each}
@@ -632,7 +638,7 @@
                     <span class="badge badge-sm badge-soft badge-warning">{t("roundcube.badge")}</span>
                   {/if}
                 </span>
-                <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] leading-snug text-base-content/70">{item.code.trim() || "…"}</pre>
+                <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8125rem] leading-snug break-all whitespace-pre-wrap text-base-content/70">{item.code.trim() || "…"}</pre>
               </button>
             {/if}
           </div>

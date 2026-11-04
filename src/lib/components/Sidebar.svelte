@@ -118,7 +118,7 @@
     <!-- The run order: a number for running scripts, a hollow ring for the others. -->
     {#if index >= 0 && order.length > 1}
       <button
-        class="ml-1 grid size-6 shrink-0 cursor-grab place-items-center rounded-full bg-primary/12 text-[0.8rem] font-bold text-primary hover:bg-primary/20"
+        class="ml-1 grid size-6 shrink-0 cursor-grab place-items-center rounded-md bg-primary/12 text-[0.8rem] font-bold text-primary hover:bg-primary/20"
         draggable="true"
         data-script-handle="{id}:{index}"
         aria-label="{t('scripts.drag')}: {name} (Alt+↑/↓)"
@@ -135,7 +135,7 @@
     {:else if node.depth > 0}
       <span class="ml-1 grid size-6 shrink-0 place-items-center text-base-content/35" aria-hidden="true"><Icon name="nested" size={14} /></span>
     {:else if running && position >= 0}
-      <span class="ml-1 grid size-6 shrink-0 place-items-center rounded-full bg-primary/12 text-[0.8rem] font-bold text-primary" aria-hidden="true">1</span>
+      <span class="ml-1 grid size-6 shrink-0 place-items-center rounded-md bg-primary/12 text-[0.8rem] font-bold text-primary" aria-hidden="true">1</span>
     {:else}
       <span class="ml-1 grid size-6 shrink-0 place-items-center" aria-hidden="true">
         <span class="size-2.5 rounded-full border-2 border-base-content/25"></span>
@@ -169,6 +169,7 @@
             current && "opacity-100",
           ]}
           checked={active}
+          tabindex={current ? 0 : -1}
           aria-label="{name}: {active ? t('scripts.deactivate') : t('scripts.activate')}"
           title={active ? t("scripts.deactivate") : t("scripts.activate")}
           onchange={(e) => {
@@ -180,7 +181,7 @@
     {/if}
     <div class="dropdown dropdown-end">
       <div
-        tabindex="0"
+        tabindex={current ? 0 : -1}
         role="button"
         class="grid size-6 place-items-center rounded-full text-base-content/65 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-base-200 {current ? 'opacity-100' : ''}"
         aria-label="{name}: …"

@@ -110,7 +110,7 @@
 <svelte:window {onkeydown} />
 
 {#if item}
-  <aside class="flex h-full min-w-0 flex-col border-l border-base-300 bg-base-100" aria-label={t("inspector.label")}>
+  <aside class="flex h-full min-w-0 flex-col border-l border-base-300 bg-base-100" aria-label={t("inspector.label")} data-inspector>
     <header class="flex items-start gap-2 border-b border-base-300 px-4 pt-3 pb-2.5">
       {#if onback}
         <button class="btn btn-ghost btn-sm -ml-1.5 gap-1" title={t("inspector.back")} onclick={onback}>
@@ -132,6 +132,7 @@
           <input
             class="w-full bg-transparent text-lg font-semibold outline-none placeholder:font-normal placeholder:text-base-content/65"
             aria-label={t("rule.name")}
+            data-name
             placeholder={t("inspector.namePlaceholder")}
             value={item.name}
             oninput={(e) => change((r) => (r.name = e.currentTarget.value), true)}

@@ -169,6 +169,16 @@
 
 <svelte:window {onkeydown} />
 
+<!-- Keyboard: past the sidebar straight to the rules. -->
+<a
+  href="#rule-search"
+  class="sr-only z-50 rounded-field bg-primary px-3 py-2 text-primary-content focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+  onclick={(e) => {
+    e.preventDefault();
+    document.getElementById("rule-search")?.focus();
+  }}>{t("skip.rules")}</a
+>
+
 <div
   class="grid h-screen"
   style:grid-template-columns="{sidebarShown ? '16rem' : '0'} minmax(0, 1fr){rightPanel && beside ? ` ${panelWidth}px` : ''}"
@@ -323,7 +333,7 @@
                       class="flex items-center gap-2.5 rounded-field bg-base-100 px-3 py-2 text-left ring-1 ring-base-300 hover:ring-primary/40"
                       onclick={async () => (await session.confirmLeave()) && session.openScript(account.id, node.name)}
                     >
-                      <span class="grid size-6 place-items-center rounded-full bg-primary/12 text-[0.8rem] font-bold text-primary">{i + 1}</span>
+                      <span class="grid size-6 place-items-center rounded-md bg-primary/12 text-[0.8rem] font-bold text-primary">{i + 1}</span>
                       <span class="grow font-medium">{node.name}</span>
                       <Icon name="chevronRight" size={16} class="text-base-content/55" />
                     </button>

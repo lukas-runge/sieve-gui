@@ -40,14 +40,10 @@
   {:else}
   <div class="grid gap-0.5">
     <span class={["text-[0.75rem] font-bold tracking-wide uppercase", negative ? "text-error" : "text-base-content/75"]}>{t(heading[shape.mode])}</span>
-    <ul class="ml-0.5 grid gap-y-0.5 border-l-2 border-base-content/25 pl-2.5">
-      {#each shape.items as item, i}
-        {#if i > 0}
-          <li class="py-px" aria-hidden="true">
-            <span class="rounded bg-base-content/[0.07] px-1.5 text-[0.75rem] font-bold tracking-wide text-base-content/70 uppercase">{joiner}</span>
-          </li>
-        {/if}
-        <li class="min-w-0">
+    <ul class="ml-0.5 grid border-l-2 border-base-content/25 pl-2.5">
+      <!-- The lead-in says how they combine, so no "or" between them. -->
+      {#each shape.items as item}
+        <li class="min-w-0 py-0.5" aria-label={joiner}>
           {#if item.kind === "token"}<Token token={item.token} {words} />{:else}<Self shape={item.shape} {words} nested />{/if}
         </li>
       {/each}

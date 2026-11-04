@@ -141,7 +141,11 @@
     </span>
     <span class="grid min-w-0 gap-1">
       {#if c.conditions}<RouteConditions shape={conditionShape(c.conditions, false, 2)} />{:else}<span class="text-base-content/70">{t("route.allOthers")}</span>{/if}
-      <RouteOutcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} />
+      {#if outcomes(c.actions, keywords, delimiter).length || stops(c.actions)}
+        <RouteOutcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} />
+      {:else if c.nested.length}
+        <Possible compact items={nestedOutcomes(c, keywords, delimiter)} heading={t("route.dependsOnCheck")} />
+      {/if}
       {#if c.nested.length && !context}
         <span class="flex items-center gap-1 text-[0.8125rem] text-base-content/70"><Icon name="nested" size={13} />{c.nested.length === 1 ? t("case.hasCheck") : t("case.hasChecks", { count: c.nested.length })}</span>
       {/if}
@@ -213,13 +217,23 @@
 
   {#if step.case.nested.length}
     <!-- A long case: jump to its parts. -->
-    <nav class="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap items-center gap-1 bg-base-100 px-1 py-1" aria-label={t("case.parts")}>
+    <nav class="sticky top-0 z-10 -mx-1 mb-3 flex flex-wrap items-center gap-1 border-b border-base-200 bg-base-100 px-1 py-1" aria-label={t("case.parts")}>
       <span class="mr-1 text-[0.8125rem] text-base-content/70">{t("case.jump")}</span>
       {#each [{ el: conditionsEl, label: t("conditions.heading") }, { el: actionsEl, label: t("actions.heading") }, { el: checksEl, label: t("case.checkOne") }] as part}
         {#if part.el}
           <button class="btn btn-xs btn-soft" onclick={() => part.el?.scrollIntoView({ block: "start", behavior: "smooth" })}>{part.label}</button>
         {/if}
       {/each}
+      {#if !actionsVisible}
+        <!-- While the conditions fill the panel: what this case does stays in sight. -->
+        <span class="basis-full pt-1 text-[0.8125rem]">
+          {#if outcomes(step.case.actions, keywords, delimiter).length || stops(step.case.actions)}
+            <Outcomes items={outcomes(step.case.actions, keywords, delimiter)} stop={stops(step.case.actions)} {singleFolder} />
+          {:else}
+            <Possible compact items={nestedOutcomes(step.case, keywords, delimiter)} heading={t("route.dependsOnCheck")} />
+          {/if}
+        </span>
+      {/if}
     </nav>
   {/if}
 
@@ -286,19 +300,4 @@
       {/if}
       <p class="basis-full px-1 text-[0.8125rem] text-base-content/70">{t("case.addElsifHint")}</p>
   </div>
-
-  {#if !actionsVisible}
-    <!-- While the conditions fill the panel: what this case does stays in sight. -->
-    <button
-      class="sticky bottom-0 z-10 -mx-4 mt-3 flex w-[calc(100%+2rem)] items-start gap-2 border-t border-base-300 bg-base-100 px-4 py-2 text-left shadow-[0_-4px_12px_-8px_rgb(0_0_0/0.25)]"
-      onclick={() => actionsEl?.scrollIntoView({ block: "start", behavior: "smooth" })}
-    >
-      <span class="shrink-0 pt-0.5 text-sm font-semibold text-base-content/75">{t("actions.heading")}</span>
-      {#if outcomes(step.case.actions, keywords, delimiter).length || stops(step.case.actions)}
-        <Outcomes items={outcomes(step.case.actions, keywords, delimiter)} stop={stops(step.case.actions)} {singleFolder} />
-      {:else}
-        <Possible items={nestedOutcomes(step.case, keywords, delimiter)} heading={t("route.seeBelow")} />
-      {/if}
-    </button>
-  {/if}
 {/if}

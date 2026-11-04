@@ -124,7 +124,7 @@
 {/snippet}
 
 {#if top}
-  <section class="mt-1 grid gap-2" aria-label={heading ?? t("conditions.heading")}>
+  <section class="mt-1 grid grid-cols-1 gap-2" aria-label={heading ?? t("conditions.heading")}>
     <div class="flex items-center gap-2">
       <h4 class="text-sm font-semibold text-base-content/70">{heading ?? t("conditions.heading")}</h4>
       {@render joinSelect()}
@@ -132,7 +132,7 @@
     {@render body()}
   </section>
 {:else}
-  <div role="group" aria-label={t("conditions.group")} class="grid gap-2 rounded-field border border-base-300 border-l-2 border-l-base-content/25 p-2">
+  <div role="group" aria-label={t("conditions.group")} class="grid grid-cols-1 gap-2 rounded-field border border-base-300 border-l-2 border-l-base-content/25 p-2">
     <div class="flex items-center gap-2">
       <!-- A group folds to how it reads on the route. -->
       <button

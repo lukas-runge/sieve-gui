@@ -97,7 +97,7 @@
 {/snippet}
 
 {#snippet actions(list: Action[], where: Where, casePath: string)}
-  <section class="grid gap-1.5" aria-label={t("actions.heading")}>
+  <section class="grid grid-cols-1 gap-1.5" aria-label={t("actions.heading")}>
     <h4 class="text-sm font-semibold text-base-content/75">{t("actions.heading")}</h4>
     {#each list as action, i}
       <ActionRow
@@ -152,13 +152,13 @@
 {/snippet}
 
 {#if !several}
-  <div class="grid gap-4" data-case="{path}0">
+  <div class="grid grid-cols-1 gap-4" data-case="{path}0">
     <ConditionGroup group={block.conditions} heading={depth > 0 ? t("branch.andIf") : undefined} {extensions} mutate={conditionsMutate((b) => b.conditions)} />
     {@render actions(block.actions, { branch: "if" }, `${path}0`)}
   </div>
 {:else}
-  <ol class="rails grid gap-2.5" style="--rail: {rail}; --elbow: 0.85rem" aria-label={t("branch.cases")}>
-    <li class="grid gap-3" data-case="{path}0">
+  <ol class="rails grid grid-cols-1 gap-2.5" style="--rail: {rail}; --elbow: 0.85rem" aria-label={t("branch.cases")}>
+    <li class="grid grid-cols-1 gap-3" data-case="{path}0">
       {@render caseHead(0, 1, false, block.conditions, block.actions, null)}
       {#if open.has(0)}
         <ConditionGroup group={block.conditions} {extensions} mutate={conditionsMutate((b) => b.conditions)} />
@@ -166,7 +166,7 @@
       {/if}
     </li>
     {#each block.elsif as branch, index}
-      <li class="grid gap-3" data-case="{path}{index + 1}">
+      <li class="grid grid-cols-1 gap-3" data-case="{path}{index + 1}">
         {@render caseHead(index + 1, index + 2, false, branch.conditions, branch.actions, (b) => b.elsif.splice(index, 1))}
         {#if open.has(index + 1)}
           <ConditionGroup group={branch.conditions} heading={t("branch.elsif")} {extensions} mutate={conditionsMutate((b) => b.elsif[index].conditions)} />
@@ -175,7 +175,7 @@
       </li>
     {/each}
     {#if block.otherwise}
-      <li class="grid gap-3" data-case="{path}{count - 1}">
+      <li class="grid grid-cols-1 gap-3" data-case="{path}{count - 1}">
         {@render caseHead(count - 1, t("route.otherwise"), true, null, block.otherwise, (b) => (b.otherwise = null))}
         {#if open.has(count - 1)}
           {@render actions(block.otherwise, { branch: "else" }, `${path}${count - 1}`)}

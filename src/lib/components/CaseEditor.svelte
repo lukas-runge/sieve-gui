@@ -146,7 +146,7 @@
     class="flex w-full min-w-0 items-start gap-2 rounded-field px-2 py-1.5 text-left hover:bg-base-200"
     onclick={() => onfocus(to)}
   >
-    <span class="flex w-[6.2rem] shrink-0 items-center gap-1.5" style="color: {color}">
+    <span class="flex w-[7rem] shrink-0 items-center gap-1.5" style="color: {color}">
       {#if n}<span class="rounded-full border-2 px-1.5 text-[0.8125rem] leading-[1.05rem] font-bold" style="border-color: {color}">{n}</span>{/if}
       <span class="text-[0.875rem] font-semibold whitespace-nowrap">{word(c, list.length === 1)}</span>
     </span>
@@ -168,7 +168,7 @@
   <!-- All cases: pick one to change it. -->
   <p class="mb-2 text-sm text-base-content/70">{t("case.pick")}</p>
   {@const list = cases(rule)}
-  <ul class="rails grid gap-1" style="--rail: var(--rail-0); --elbow: 1rem">
+  <ul class="rails grid grid-cols-1 gap-1" style="--rail: var(--rail-0); --elbow: 1rem">
     {#each list as c, i}
       <li>{@render caseLine(c, list, "", String(i), "var(--rail-0)")}</li>
     {/each}
@@ -182,7 +182,7 @@
 {:else}
   <!-- Where the case sits: the cases above it, one line each. -->
   {#if chain!.length > 1 || cases(rule).length > 1}
-  <nav class="mb-4 grid gap-0.5 rounded-box bg-base-200/60 p-1.5" aria-label={t("case.context")}>
+  <nav class="mb-4 grid grid-cols-1 gap-0.5 rounded-box bg-base-200/60 p-1.5" aria-label={t("case.context")}>
     {#if cases(rule).length > 1}
       <button class="flex items-center gap-1.5 rounded-field px-2 py-1 text-left text-[0.8125rem] font-medium text-base-content/70 hover:bg-base-200" onclick={() => onfocus("")}>
         <Icon name="arrowLeft" size={13} />{t("case.all", { count: cases(rule).length })}
@@ -252,7 +252,7 @@
     </nav>
   {/if}
 
-  <div class="grid gap-4">
+  <div class="grid grid-cols-1 gap-4">
     <div bind:this={conditionsEl} class="scroll-mt-12"></div>
     {#if step.case.kind !== "else"}
       <ConditionGroup
@@ -262,7 +262,7 @@
       />
     {/if}
 
-    <section class="grid scroll-mt-12 gap-1.5" aria-label={t("actions.heading")} bind:this={actionsEl}>
+    <section class="grid scroll-mt-12 grid-cols-1 gap-1.5" aria-label={t("actions.heading")} bind:this={actionsEl}>
       <h4 class="text-sm font-semibold text-base-content/75">{t("actions.heading")}</h4>
       {#each step.case.actions as action, i}
         {#if action.type === "if"}
@@ -284,7 +284,7 @@
                 onclick={() => mutate((r) => actionsIn(blockOf(r), step!.index).splice(i, 1))}><Icon name="trash" size={14} /></button
               >
             </div>
-            <ul class="rails grid gap-0.5" style="--rail: {inner}; --elbow: 1rem">
+            <ul class="rails grid grid-cols-1 gap-0.5" style="--rail: {inner}; --elbow: 1rem">
               {#each list as c, k}
                 <li>{@render caseLine(c, list, caseNumber(chain!), `${path}.${j}.${k}`, inner)}</li>
               {/each}

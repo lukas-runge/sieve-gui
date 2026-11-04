@@ -11,7 +11,7 @@
 
 <!-- Field, comparison and first value stay on one line (a long value is cut,
      in full as a tooltip); further values may wrap. -->
-<span class="inline-flex max-w-full flex-wrap items-baseline gap-x-1.5 gap-y-0.5" title={token.sentence}>
+<span class="inline-flex max-w-full min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5" title={token.sentence}>
   <span class="token-head inline-flex max-w-full min-w-0 items-baseline gap-x-1.5 whitespace-nowrap">
     <span
       class="shrink-0 rounded-md bg-base-content/[0.07] px-1.5 py-px text-[0.8125rem] font-medium text-base-content/85"

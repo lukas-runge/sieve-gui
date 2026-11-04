@@ -176,6 +176,9 @@
       <section class="mt-4 rounded-box border border-success/35 bg-success/[0.07] px-3.5 py-3" aria-live="polite">
         <h3 class="mb-1.5 text-[0.8125rem] font-semibold tracking-wide text-success uppercase">{t("trial.result")}</h3>
         <div class="text-[1.05rem]"><Outcomes items={delivery} fullPath /></div>
+        {#if result.delivery.folders.length + (result.delivery.inbox ? 1 : 0) > 1}
+          <p class="mt-1 text-[0.8125rem] text-base-content/80">{t("trial.copies")}</p>
+        {/if}
         {#if changed && trial.before}
           <!-- Unsaved edits change where this message goes: before and after. -->
           <div class="mt-2 rounded-field bg-base-100/70 px-2.5 py-1.5 text-[0.875rem]">

@@ -155,9 +155,11 @@
 
     <div class="min-h-0 grow overflow-y-auto px-4 py-4" bind:this={body}>
       {#if item.type === "rule"}
-        <label class="mb-4 flex items-center gap-2.5 text-sm">
+        <!-- For the whole rule, apart from the case below it. -->
+        <label class="-mx-4 -mt-4 mb-4 flex items-center gap-2.5 border-b border-base-300 bg-base-200/50 px-4 py-2 text-sm">
           <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={item.enabled} onchange={(e) => change((r) => (r.enabled = e.currentTarget.checked))} />
           <span>{item.enabled ? t("inspector.on") : t("inspector.off")}</span>
+          {#if cases(item).length > 1}<span class="text-[0.8125rem] text-base-content/70">{t("inspector.allCases", { count: cases(item).length })}</span>{/if}
         </label>
         {#if isSimple(item)}
           <BranchesEditor

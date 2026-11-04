@@ -13,6 +13,8 @@
   import { closesMenu } from "../../menu";
   import { isSimple, outcomes } from "../../rules/route";
   import { matches, queryWords } from "../../rules/search";
+  import type { ScriptRun } from "../../rules/simulate";
+  import { trial as sample } from "../../trial.svelte";
   import { newRule } from "../../rules/view";
   import Icon from "../Icon.svelte";
   import RouteRule from "./RouteRule.svelte";
@@ -23,6 +25,9 @@
     keywords,
     next,
     running,
+    trial = null,
+    trialOpen = false,
+    onshowtrial,
   }: {
     editor: ScriptEditor;
     delimiter: string | null;
@@ -31,7 +36,21 @@
     next: string | null;
     /** Whether this script runs at all. */
     running: boolean;
+    /** A sample message's way through this script, while trying rules. */
+    trial?: ScriptRun | null;
+    trialOpen?: boolean;
+    onshowtrial?: () => void;
   } = $props();
+
+  /** How the sample message fares at a rule: applied cases, or why it wasn't decided. */
+  function trialAt(index: number) {
+    if (!trial) return null;
+    return {
+      hits: trial.hits.get(index) ?? [],
+      unknown: trial.unknown.includes(index),
+      reached: !trial.skipped && (trial.stoppedAt === null || index <= trial.stoppedAt),
+    };
+  }
 
   let query = $state("");
   const words = $derived(queryWords(query));
@@ -238,6 +257,16 @@
     </div>
   </div>
 
+  {#if trial && !trialOpen}
+    <!-- While trying rules with the panel closed: say why rows are green. -->
+    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-success/25 bg-success/[0.08] px-4 py-2 text-sm">
+      <Icon name="flask" size={15} class="text-success" />
+      <p class="grow">{t("trial.active")}</p>
+      <button class="btn btn-xs" onclick={onshowtrial}>{t("trial.show")}</button>
+      <button class="btn btn-ghost btn-xs" onclick={() => sample.clear()}>{t("trial.end")}</button>
+    </div>
+  {/if}
+
   {#if scope === "all" && searching}
     <!-- Matches in every script of the account, in the order the scripts run. -->
     <div class="grid gap-4 px-3 py-3">
@@ -283,6 +312,7 @@
     {#each editor.rules.items as item, index (item.uid)}
       {@const selected = editor.selected === item.uid}
       {@const shape = item.type === "raw" ? "square" : isSimple(item) ? "dot" : "diamond"}
+      {@const tr = trialAt(index)}
       <li
         animate:flip={{ duration: 150 }}
         hidden={!shown[index]}
@@ -290,7 +320,9 @@
           "route-item group relative",
           dragFrom === index && "opacity-40",
           item.type === "rule" && !item.enabled && "route-off",
+          tr && !tr.reached && "route-unreached",
         ]}
+        title={tr && !tr.reached ? t("trial.notReached") : undefined}
         ondragover={(e) => {
           if (dragFrom === null) return;
           e.preventDefault();
@@ -332,7 +364,7 @@
           </button>
         {/if}
         <span class="route-node grid place-items-center pt-[0.95rem]">
-          <span class="route-mark route-mark-{shape}" class:selected></span>
+          <span class="route-mark route-mark-{shape}" class:selected class:trial-hit={!!tr?.hits.length}></span>
         </span>
         <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected ? "bg-primary/[0.05] ring-1 ring-primary/25" : "hover:bg-base-200/50"]}>
           <div class="min-w-0 grow rounded-field px-2.5 py-2">
@@ -345,6 +377,7 @@
                 {words}
                 picked={selected ? editor.focus : null}
                 hideParent={groups.grouped[index]}
+                trial={tr}
                 onpick={(path) => pick(item.uid, path)}
               />
             {:else}
@@ -360,6 +393,11 @@
             {/if}
           </div>
           <div class="flex shrink-0 items-center gap-1 pt-2 pr-1.5">
+            {#if tr?.unknown}
+              <span class="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 text-[0.8rem] leading-5 font-medium" title={t("trial.uncertain")}
+                ><Icon name="helpCircle" size={13} />{t("trial.unknown")}</span
+              >
+            {/if}
             {#if item.type === "rule" && !item.enabled}
               <span class="rounded-full bg-base-200 px-2 text-[0.8rem] leading-5 font-medium text-base-content/60">{t("route.off")}</span>
             {/if}
@@ -479,6 +517,13 @@
   }
   .route-mark.selected {
     background: var(--rail-0);
+  }
+  .route-mark.trial-hit {
+    background: var(--color-success);
+    border-color: var(--color-success);
+  }
+  .route-unreached > :not(.route-node) {
+    opacity: 0.4;
   }
   .route-off .route-mark {
     border-color: var(--spine);

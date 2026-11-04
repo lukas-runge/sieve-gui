@@ -10,9 +10,11 @@
   import Inspector from "../lib/components/Inspector.svelte";
   import RouteSheet from "../lib/components/route/RouteSheet.svelte";
   import Sidebar from "../lib/components/Sidebar.svelte";
+  import TrialPanel from "../lib/components/TrialPanel.svelte";
   import { dialogs } from "../lib/dialogs.svelte";
   import { i18n, t } from "../lib/i18n.svelte";
   import { ROOT_SCRIPT, session } from "../lib/session.svelte";
+  import { trial } from "../lib/trial.svelte";
 
   let accountDialog = $state<{ account: Account | null } | null>(null);
   let deploying = $state(false);
@@ -54,7 +56,9 @@
   /** The server's folder hierarchy delimiter, to show folder paths. */
   const delimiter = $derived(serverFolders?.find((f) => f.delimiter)?.delimiter ?? null);
   /** The code or the picked rule beside the route. */
-  const rightPanel = $derived(!!editor && (showCode || !!editor.selected));
+  const rightPanel = $derived(!!editor && (showCode || !!editor.selected || trial.open));
+  /** The open script's part of the sample message's way, while trying rules. */
+  const trialRun = $derived(editor ? (trial.result?.scripts.find((s) => s.name === editor.name) ?? null) : null);
 
   // The sidebar can be folded away; both choices persist.
   let sidebarOpen = $state(localStorage.getItem("sidebar") !== "0");
@@ -74,13 +78,24 @@
     window.addEventListener("pointerup", up);
   }
 
-  /** Code and inspector share the place on the right. */
+  /** Code, inspector and the test share the place on the right. */
   function toggleCode() {
     showCode = !showCode;
     if (showCode && editor) editor.selected = null;
+    if (showCode) trial.open = false;
+  }
+  function toggleTrial() {
+    trial.open = !trial.open;
+    if (trial.open) {
+      showCode = false;
+      if (editor) editor.selected = null;
+    }
   }
   $effect(() => {
-    if (editor?.selected) showCode = false;
+    if (editor?.selected) {
+      showCode = false;
+      trial.open = false;
+    }
   });
 
   const movesItself = $derived(
@@ -167,6 +182,15 @@
         </div>
         <div class="ml-auto flex items-center gap-1.5">
           <button
+            class={["btn btn-ghost btn-sm gap-1.5", trial.open && "btn-active", trial.active && "text-success"]}
+            aria-pressed={trial.open}
+            title={t("trial.buttonTitle")}
+            onclick={toggleTrial}
+          >
+            <Icon name="flask" size={16} />
+            {t("trial.button")}
+          </button>
+          <button
             class={["btn btn-ghost btn-sm gap-1.5", showCode && "btn-active"]}
             aria-pressed={showCode}
             title={showCode ? t("editor.hideCode") : t("editor.showCode")}
@@ -186,8 +210,10 @@
         <section class="flex min-h-0 grow flex-col">
           {#if showCode}
             <div class="flex min-h-0 grow flex-col gap-2 p-3">{@render codePanel(editor.code)}</div>
-          {:else}
+          {:else if editor.selected}
             <Inspector {editor} extensions={session.extensions} serverFolders={serverFolders} onback={() => (editor.selected = null)} />
+          {:else}
+            <TrialPanel {editor} {delimiter} keywords={session.keywordNames(editor.accountId)} onback={() => (trial.open = false)} />
           {/if}
         </section>
       {:else}
@@ -222,6 +248,9 @@
               keywords={session.keywordNames(editor.accountId)}
               {next}
               running={active}
+              trial={trial.active ? trialRun : null}
+              trialOpen={trial.open}
+              onshowtrial={toggleTrial}
             />
           </div>
         </div>
@@ -289,8 +318,10 @@
       <aside class="flex min-w-0 flex-col gap-2 overflow-hidden border-l border-base-300 bg-base-100 p-3" aria-label={t("code.heading")}>
         {@render codePanel(editor!.code)}
       </aside>
-    {:else}
+    {:else if editor!.selected}
       <Inspector editor={editor!} extensions={session.extensions} serverFolders={serverFolders} />
+    {:else}
+      <TrialPanel editor={editor!} {delimiter} keywords={session.keywordNames(editor!.accountId)} />
     {/if}
     </div>
   {/if}

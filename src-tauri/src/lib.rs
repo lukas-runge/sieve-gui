@@ -34,6 +34,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_app_info,
             rules::import_rules,
+            rules::import_rules_single_folder,
             rules::export_rules,
             rules::roundcube_risks,
             rules::root_script,

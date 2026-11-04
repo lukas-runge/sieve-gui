@@ -18,8 +18,22 @@ pub fn import(src: &str) -> Result<RuleSet, ParseError> {
     Ok(import_script(&script, src))
 }
 
+/// Like [`import`], but reads `src` in single-folder mode even if it lacks
+/// the `global` command: `set "move_to_folder" "<folder>"` is a move and
+/// `return` is "stop". For scripts that sieve-gui wrote in single-folder
+/// mode and another editor saved since; Roundcube drops `global` (fixture
+/// `roundcube/23b`).
+pub fn import_single_folder(src: &str) -> Result<RuleSet, ParseError> {
+    let script = parse(src)?;
+    Ok(import_with(&script, src, true))
+}
+
 /// Maps an already parsed script; `src` must be the text it was parsed from.
 pub fn import_script(script: &Script, src: &str) -> RuleSet {
+    import_with(script, src, false)
+}
+
+fn import_with(script: &Script, src: &str, assume_single_folder: bool) -> RuleSet {
     let mut set = RuleSet::default();
     let commands = &script.commands;
     let mut i = 0;
@@ -70,6 +84,7 @@ pub fn import_script(script: &Script, src: &str) -> RuleSet {
             i += 1;
         }
     }
+    set.single_folder |= assume_single_folder;
     let single_folder = set.single_folder;
 
     while i < commands.len() {

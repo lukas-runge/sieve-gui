@@ -129,6 +129,7 @@ export function installMock() {
         return scriptList(server);
       case "get_script":
         return source(server, a.name) ?? "";
+      case "import_rules_single_folder":
       case "import_rules": {
         const hit = allFixtures.find((s) => s.source === a.source)?.rules ?? generated.get(a.source);
         return hit ? structuredClone(hit) : { preamble: null, requires: [], singleFolder: false, items: [] };
@@ -144,7 +145,7 @@ export function installMock() {
         const lines = [...a.source.matchAll(/^include :personal :optional (".*");( # unchanged)?$/gm)];
         const scripts = lines.map((m) => JSON.parse(m[1]));
         const unchanged = lines.filter((m) => m[2]).map((m) => JSON.parse(m[1]));
-        return { scripts, unchanged, lastMoveWins: a.source.includes("global ") };
+        return { scripts, unchanged, lastMoveWins: a.source.includes("global "), damaged: false };
       }
       case "script_links": {
         // Rough stand-in for sieve-core's script_links.

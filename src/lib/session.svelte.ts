@@ -11,6 +11,7 @@ import {
   exportRules,
   getScript,
   importRules,
+  importRulesSingleFolder,
   listAccounts,
   listFolders,
   listScripts,
@@ -334,7 +335,9 @@ class Session {
     const supported = this.supported(id);
     return {
       multipleScripts: !!account?.multipleScripts && !!supported?.multipleScripts,
-      lastMoveWins: !!account?.lastMoveWins && !!supported?.lastMoveWins,
+      // Roundcube drops the `global` and `return` this needs whenever it
+      // saves a script, and then no message is moved at all.
+      lastMoveWins: !!account?.lastMoveWins && !!supported?.lastMoveWins && !account?.roundcube,
     };
   }
 
@@ -387,21 +390,29 @@ class Session {
         const scripts = settings.multipleScripts ? root.scripts : root.scripts.slice(0, 1);
         // Scripts included unchanged are never rewritten.
         const managed = (names: string[]) => names.filter((n) => !root.unchanged.includes(n));
-        if (settings.lastMoveWins && !root.lastMoveWins) {
+        if (settings.lastMoveWins && (!root.lastMoveWins || root.damaged)) {
+          // A damaged root lost its `global` to another editor (Roundcube
+          // drops it on save), and its scripts probably did too.
           await this.#writeRoot(id, scripts, true);
-          for (const name of managed(scripts)) await this.#setSingleFolder(id, name, true);
+          for (const name of managed(scripts)) await this.#setSingleFolder(id, name, true, root.lastMoveWins);
         } else if (!settings.lastMoveWins && root.lastMoveWins) {
-          for (const name of managed(root.scripts)) await this.#setSingleFolder(id, name, false);
+          for (const name of managed(root.scripts)) await this.#setSingleFolder(id, name, false, true);
           await this.#writeRoot(id, scripts, false);
         } else if (scripts.length !== root.scripts.length) {
           await this.#writeRoot(id, scripts, root.lastMoveWins);
+        } else if (settings.lastMoveWins) {
+          // A script saved by an editor that drops `global` (Roundcube does)
+          // records its moves where the root doesn't see them; set it up again.
+          let changed = false;
+          for (const name of managed(scripts)) changed = (await this.#setSingleFolder(id, name, true, true)) || changed;
+          if (!changed) return;
         } else {
           return;
         }
       } else if (root) {
         // Back to a single active script, the first of the root.
         for (const name of root.scripts.filter((n) => !root.unchanged.includes(n))) {
-          await this.#setSingleFolder(id, name, false);
+          await this.#setSingleFolder(id, name, false, root.lastMoveWins);
         }
         await activateScript(id, root.scripts[0] ?? null);
         await deleteScript(id, ROOT_SCRIPT);
@@ -491,7 +502,7 @@ class Session {
     const root = this.roots[id];
     if (!root?.scripts.includes(name) || root.unchanged.includes(name) || !(await this.#canRewrite(id, [name]))) return;
     try {
-      if (root.lastMoveWins) await this.#setSingleFolder(id, name, false);
+      if (root.lastMoveWins) await this.#setSingleFolder(id, name, false, true);
       await this.#writeRoot(id, root.scripts, root.lastMoveWins, [...root.unchanged, name]);
     } catch (e) {
       this.error = describeError(e);
@@ -625,7 +636,7 @@ class Session {
     const keep = (unchanged ?? this.roots[id]?.unchanged ?? []).filter((n) => scripts.includes(n));
     const source = await rootScript(scripts, keep, lastMoveWins);
     await deployScript(id, ROOT_SCRIPT, source, null);
-    this.roots[id] = { scripts, unchanged: keep, lastMoveWins };
+    this.roots[id] = { scripts, unchanged: keep, lastMoveWins, damaged: false };
     this.rootSources[id] = source;
   }
 
@@ -639,11 +650,17 @@ class Session {
     return true;
   }
 
-  /** Rewrites a script on the server in or out of single-folder mode. */
-  async #setSingleFolder(id: string, name: string, on: boolean) {
+  /**
+   * Rewrites a script on the server in or out of single-folder mode. `wasOn`:
+   * the root runs it in single-folder mode, so its moves and stops are read
+   * as such even if an editor that drops `global` (Roundcube does) saved it
+   * since. Returns whether the script changed.
+   */
+  async #setSingleFolder(id: string, name: string, on: boolean, wasOn = false): Promise<boolean> {
     const source = await getScript(id, name);
-    const rules = await importRules(source);
-    if (rules.singleFolder === on) return;
+    let rules = await importRules(source);
+    if (wasOn && !rules.singleFolder) rules = await importRulesSingleFolder(source);
+    else if (rules.singleFolder === on) return false;
     rules.singleFolder = on;
     const code = await exportRules(rules, this.#roundcube(id));
     await deployScript(id, name, code, source);
@@ -651,6 +668,7 @@ class Session {
     if (this.editor?.accountId === id && this.editor.name === name) {
       this.editor = await ScriptEditor.open(id, name, code, this.#roundcube(id));
     }
+    return true;
   }
 
   async rename(id: string, name: string, newName: string) {

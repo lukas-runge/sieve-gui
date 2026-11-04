@@ -4,8 +4,9 @@
 use std::path::Path;
 
 use sieve_core::compat::roundcube_risks;
-use sieve_core::model::{Join, RuleItem};
-use sieve_core::{export, import, PrintOptions};
+use sieve_core::model::{Action, Join, RuleItem};
+use sieve_core::root::parse_root;
+use sieve_core::{export, import, import_single_folder, PrintOptions};
 
 fn fixtures() -> Vec<(String, String)> {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/roundcube");
@@ -59,11 +60,12 @@ fn roundcube_rules_become_cards() {
         let set = import(&src).unwrap();
         for item in &set.items {
             if let RuleItem::Raw(raw) = item {
-                // editheader, enotify, variables, duplicate, :index, :mime, and
-                // a plain `if false` (an enabled rule whose test is `false`)
+                // editheader, enotify, variables, duplicate, :index, :mime,
+                // include, and a plain `if false` (an enabled rule whose test
+                // is `false`)
                 let unsupported = [
                     "addheader", "deleteheader", "notify", "set ", "string ", "duplicate", ":index", ":mime",
-                    "if false\r\n",
+                    "include ", "if false\r\n",
                 ];
                 assert!(
                     unsupported.iter().any(|u| raw.code.contains(u)),
@@ -123,7 +125,51 @@ fn roundcube_risks_match_what_roundcube_did() {
             "19a" => assert!(risks.bracket_comments, "{name}"),
             // edge-case names that Roundcube dropped (22b), see README
             "22a" => {}
+            // Single-folder mode, whose `global` and `return` Roundcube drops
+            // (23b, 24b). Not reported: with "I also edit filters in
+            // Roundcube" on, sieve-gui doesn't use single-folder mode.
+            "23a" | "24a" => assert!(import(&src).unwrap().single_folder, "{name}"),
             _ => assert!(risks.is_empty(), "{name}: {risks:?}"),
         }
     }
+}
+
+fn fixture(prefix: &str) -> String {
+    fixtures().into_iter().find(|(name, _)| name.starts_with(prefix)).unwrap().1
+}
+
+/// Roundcube drops `global` and `return` from a script in single-folder mode
+/// (23b). Read in single-folder mode anyway, its moves are moves again; the
+/// stops are lost.
+#[test]
+fn roundcube_drops_single_folder_mode() {
+    let damaged = fixture("23b");
+    assert!(!import(&damaged).unwrap().single_folder);
+    let set = import_single_folder(&damaged).unwrap();
+    assert!(set.single_folder);
+    let rules: Vec<_> = set
+        .items
+        .iter()
+        .map(|item| match item {
+            RuleItem::Rule(rule) => rule,
+            RuleItem::Raw(raw) => panic!("raw block:\n{}", raw.code),
+        })
+        .collect();
+    assert_eq!(rules.iter().map(|r| r.name.as_str()).collect::<Vec<_>>(), ["Tax office", "Newsletter", "Copy lists"]);
+    assert!(matches!(rules[0].actions.as_slice(), [Action::FileInto { mailbox, copy: false, .. }] if mailbox == "Taxes"));
+    let out = export(&set, &PrintOptions::roundcube());
+    assert!(out.contains("global \"move_to_folder\";\r\n"), "{out}");
+    // An intact script reads the same either way.
+    let intact = fixture("23a");
+    assert_eq!(import_single_folder(&intact).unwrap(), import(&intact).unwrap());
+}
+
+/// Roundcube drops `global` from the root too (24b); it is still recognized.
+#[test]
+fn roundcube_damages_the_root() {
+    let before = parse_root(&fixture("24a")).unwrap();
+    assert!(before.last_move_wins && !before.damaged);
+    let after = parse_root(&fixture("24b")).unwrap();
+    assert!(after.last_move_wins && after.damaged);
+    assert_eq!(after.scripts, before.scripts);
 }

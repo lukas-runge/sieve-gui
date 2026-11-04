@@ -56,6 +56,11 @@ pub struct Root {
     pub unchanged: Vec<String>,
     /// Whether it files the message into the folder recorded last.
     pub last_move_wins: bool,
+    /// Whether it lost its `global` command, so the folder the included
+    /// scripts record never reaches it and no message is moved. Roundcube
+    /// drops `global` whenever it saves the script (fixture
+    /// `roundcube/24b`). Only set with `last_move_wins`.
+    pub damaged: bool,
 }
 
 /// The root script including `scripts` in this order; those also in
@@ -107,22 +112,23 @@ pub fn parse_root(source: &str) -> Option<Root> {
     if !require.is("require") {
         return None;
     }
-    let (includes, last_move_wins) = match rest {
+    let (includes, last_move_wins, damaged) = match rest {
         [global, includes @ .., dispatch] if *global == global_command() && *dispatch == dispatch_command() => {
-            (includes, true)
+            (includes, true, false)
         }
-        includes => (includes, false),
+        [includes @ .., dispatch] if *dispatch == dispatch_command() => (includes, true, true),
+        includes => (includes, false, false),
     };
     let scripts: Vec<String> = includes.iter().map(include_name).collect::<Option<_>>()?;
     // The includes start after `require` (and `global`).
-    let first = if last_move_wins { 2 } else { 1 };
+    let first = if last_move_wins && !damaged { 2 } else { 1 };
     let unchanged = scripts
         .iter()
         .enumerate()
         .filter(|(i, _)| marked[first + i])
         .map(|(_, name)| name.clone())
         .collect();
-    Some(Root { scripts, unchanged, last_move_wins })
+    Some(Root { scripts, unchanged, last_move_wins, damaged })
 }
 
 fn is_marked_unchanged(cmd: &Command) -> bool {
@@ -247,13 +253,29 @@ mod tests {
                     // Every second script unchanged.
                     let unchanged: Vec<String> = list.iter().step_by(2).cloned().collect();
                     let root = parse_root(&root_script(&list, &unchanged, last_move_wins, &options));
-                    assert_eq!(root, Some(Root { scripts: list.clone(), unchanged, last_move_wins }));
+                    assert_eq!(root, Some(Root { scripts: list.clone(), unchanged, last_move_wins, damaged: false }));
                 }
             }
         }
         let edited = "require [\"include\", \"variables\", \"fileinto\"];\r\n# note\r\nglobal \"move_to_folder\";\r\n\
             include :optional :personal \"x\";\r\nif not string :is \"${move_to_folder}\" \"\" { fileinto \"${move_to_folder}\"; }";
-        assert_eq!(parse_root(edited), Some(Root { scripts: names(&["x"]), unchanged: vec![], last_move_wins: true }));
+        assert_eq!(
+            parse_root(edited),
+            Some(Root { scripts: names(&["x"]), unchanged: vec![], last_move_wins: true, damaged: false })
+        );
+    }
+
+    /// Roundcube drops `global` when it saves the root (fixture
+    /// `roundcube/24b`); the root is still recognized, as damaged.
+    #[test]
+    fn reads_a_root_that_lost_global() {
+        let text = "require [\"fileinto\", \"include\", \"variables\"];\n\
+            include :personal :optional \"x\"; # unchanged\ninclude :personal :optional \"y\";\n\
+            if not string :is \"${move_to_folder}\" \"\" { fileinto \"${move_to_folder}\"; }";
+        assert_eq!(
+            parse_root(text),
+            Some(Root { scripts: names(&["x", "y"]), unchanged: names(&["x"]), last_move_wins: true, damaged: true })
+        );
     }
 
     #[test]
@@ -287,9 +309,6 @@ mod tests {
             "require \"fileinto\";\nif true { fileinto \"x\"; }",
             // Global without dispatch.
             "require [\"include\", \"variables\"];\nglobal \"move_to_folder\";\ninclude :personal \"x\";",
-            // Dispatch without global.
-            "require [\"fileinto\", \"include\", \"variables\"];\ninclude :personal \"x\";\n\
-             if not string :is \"${move_to_folder}\" \"\" { fileinto \"${move_to_folder}\"; }",
             // Global include.
             "require \"include\";\ninclude :global \"x\";",
             // Something else in between.

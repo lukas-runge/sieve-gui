@@ -20,11 +20,13 @@ The files are program output. No Roundcube source code was copied or used to wri
 
 Both containers ran on a private Docker network. Roundcube was driven from outside over HTTP: log in, then post the plugin's own forms (filter form, filter-set form, out-of-office form, forwarding form) and its list actions (enable/disable, move, delete, activate set). The field values are the ones the browser UI posts. After each change the script was fetched with ManageSieve `GETSCRIPT` and written to disk unchanged.
 
+Fixtures 23 and 24 were captured on 2026-11-04 with the same method and plugin config, but against `roundcube/roundcubemail:1.7.4-apache` (digest `sha256:4d420d780a3d…`, managesieve plugin 9.6, PHP 8.4.26) and Dovecot 2.4.5 (`dovecot/dovecot:2.4.5`, as in `crates/managesieve/tests/dovecot`).
+
 `.gitattributes` marks `*.sieve` as `-text` so git never rewrites the CRLF line endings.
 
 Each scenario got its own filter set, named after the fixture. Fixtures with a letter suffix (13a/13b/…) are successive states of the same set.
 
-The `*-before.sieve` files in 17, 18, 19 and 22 are **hand-written** inputs that were uploaded with `PUTSCRIPT`. They are not Roundcube output. The matching `*-after-*.sieve` file is what Roundcube wrote back after one edit.
+The `*-before.sieve` files in 23 and 24 are **sieve-gui output** uploaded the same way. The `*-before.sieve` files in 17, 18, 19 and 22 are **hand-written** inputs that were uploaded with `PUTSCRIPT`. They are not Roundcube output. The matching `*-after-*.sieve` file is what Roundcube wrote back after one edit.
 
 ## Fixtures
 
@@ -71,6 +73,10 @@ All rules are enabled unless marked *disabled*. "allof"/"anyof"/"all messages" i
 | `21b-forward-redirect-off.sieve` | Same form: Redirect to `new-address@example.org`, status Off. |
 | `22a-metadata-variants-before.sieve` | *Hand-written* probe of comment-format edge cases: `if false` without comment, `if false # <test>` without `allof`, blank line between the name comment and `if`, an LF-only rule, `#rule:[…]` without a space, `# rule: […]` with a space before `[`, `if false #allof (…)` without a space. |
 | `22b-metadata-variants-after-roundcube-toggle.sieve` | After disabling and re-enabling rule 3 from the list, which makes Roundcube rewrite the whole script. Roundcube listed the rules as: `A plain if false` (enabled), `B no allof` (disabled), `C blank line after name`, `D lf only`, `#5`, `#6`, `G disabled no space` (disabled). |
+| `23a-single-folder-before.sieve` | *sieve-gui output*, Roundcube layout, single-folder mode ("last move wins"): `global "move_to_folder";`, moves as `set "move_to_folder" "…"`, stops as `return`. Rules `Tax office` (→ Taxes; stop), `Newsletter` (add flag `\Seen`; → Newsletters), `Copy lists` (copy to Lists/Rust), `Stop all` (all messages → stop). |
+| `23b-single-folder-after-roundcube-toggle.sieve` | Roundcube listed only `Tax office`, `Newsletter` and `Copy lists`. `Copy lists` disabled from the list. |
+| `24a-root-before.sieve` | *sieve-gui output*: the root script `sieve-gui` with "last move wins", including `single` and `second` (both 23a). Uploaded as `sieve-gui` and activated. |
+| `24b-root-after-roundcube-toggle-twice.sieve` | Roundcube opened the active set `sieve-gui` and listed the rules `#1`, `#2` (the includes) and `#3` (the final `fileinto`). Rule `#3` disabled and enabled again from the list.
 
 ## Findings
 
@@ -187,5 +193,12 @@ Roundcube re-generates the **whole** script from its own model on every save, ev
 - **Bracket comment `/* … */`** anywhere: Roundcube showed an **empty** filter list. Adding one rule and saving replaced every rule in the script, keeping only the leading `#` comment (19b). This loses the most data.
 - **Formatting** of the rules it does understand is normalised (tabs, `{` on its own line, CRLF, sorted compact `require`). Roundcube reads a bare single test as **anyof** (the edit form shows "any of"), so untouched rules come back bare (`if address :domain :is …`). Saving through the form with "all of" adds the `allof (…)` wrapper (17b, 18b `Known rule`).
 - Free-standing `#` comments other than the leading block are dropped (17b). Unnamed rules stay unnamed.
+
+### Single-folder mode and the root script (23, 24)
+
+- **`global` is dropped** on every save, from an included script (23b) and from the root (24b). So is `include` from the `require` list of an included script. `set "move_to_folder" "…"` stays, but now sets a variable local to the script, which the root never sees: after one save in Roundcube, **no message is moved** any more.
+- **`return` is dropped** everywhere. A rule whose only action was `return` (`Stop all`) is not listed and is lost.
+- `include :personal :optional "…";` is kept as written, as unnamed rules (24b), and so is the root's final `if not string … { fileinto "${move_to_folder}"; }`. The leading comment block stays, followed by one empty line.
+- Consequence: "last move wins" can't work on scripts that are also edited in Roundcube. sieve-gui doesn't offer it while the account setting "I also edit filters in Roundcube" is on, and on connect repairs a root and included scripts that lost their `global` (`sieve_core::root::Root::damaged`, `sieve_core::import_single_folder`). Lost stops can only come back from the local copy.
 
 Consequence for sieve-gui: when Roundcube owns a script, sieve-gui's raw-code blocks, nested ifs, elsif chains and bracket comments will not survive the next save in Roundcube. This supports the planned warning for webmail-owned scripts. To stay compatible, sieve-gui should write the exact forms above for anything Roundcube can represent.

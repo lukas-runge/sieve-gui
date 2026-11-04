@@ -33,6 +33,10 @@
   let copyDir = $state(initial?.copyDir ?? "");
   // Unknown (all allowed) until the account has connected.
   const supported = untrack(() => (initial ? session.supported(initial.id) : null));
+  // The stored choice is kept, so it comes back when Roundcube is turned off.
+  const lastMoveWinsUnavailable = $derived(
+    supported?.lastMoveWins === false ? t("account.unsupported") : roundcube ? t("account.lastMoveWinsRoundcube") : null,
+  );
   let saving = $state(false);
   let error = $state<string | null>(null);
 
@@ -91,13 +95,14 @@
   </div>
 {/snippet}
 
-{#snippet setting(label: string, hint: string, available: boolean, get: () => boolean, set: (value: boolean) => void)}
+<!-- `unavailable`: why the setting can't be used, shown instead of the hint. -->
+{#snippet setting(label: string, hint: string, unavailable: string | null, get: () => boolean, set: (value: boolean) => void)}
   <div>
     <label class="label text-base-content whitespace-normal">
-      <input type="checkbox" class="toggle toggle-sm" checked={get()} disabled={!available} onchange={(e) => set(e.currentTarget.checked)} />
+      <input type="checkbox" class="toggle toggle-sm" checked={!unavailable && get()} disabled={!!unavailable} onchange={(e) => set(e.currentTarget.checked)} />
       {label}
     </label>
-    <p class="label whitespace-normal">{available ? hint : t("account.unsupported")}</p>
+    <p class="label whitespace-normal">{unavailable ?? hint}</p>
   </div>
 {/snippet}
 
@@ -177,9 +182,9 @@
 
     <fieldset class="fieldset gap-2">
       <legend class="fieldset-legend">{t("account.filters")}</legend>
-      {@render setting(t("account.lastMoveWins"), t("account.lastMoveWinsHint"), supported?.lastMoveWins ?? true, () => lastMoveWins, (v) => (lastMoveWins = v))}
-      {@render setting(t("account.multipleScripts"), t("account.multipleScriptsHint"), supported?.multipleScripts ?? true, () => multipleScripts, (v) => (multipleScripts = v))}
-      {#if (lastMoveWins && supported?.lastMoveWins !== false) || (multipleScripts && supported?.multipleScripts !== false)}
+      {@render setting(t("account.lastMoveWins"), t("account.lastMoveWinsHint"), lastMoveWinsUnavailable, () => lastMoveWins, (v) => (lastMoveWins = v))}
+      {@render setting(t("account.multipleScripts"), t("account.multipleScriptsHint"), supported?.multipleScripts === false ? t("account.unsupported") : null, () => multipleScripts, (v) => (multipleScripts = v))}
+      {#if (lastMoveWins && !lastMoveWinsUnavailable) || (multipleScripts && supported?.multipleScripts !== false)}
         <p class="label whitespace-normal">
           <span>
             {t("account.rootHint", { name: ROOT_SCRIPT })}

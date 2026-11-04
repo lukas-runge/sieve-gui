@@ -22,6 +22,8 @@ const ROUNDCUBE_TESTS: &[&str] = &[
 const ROUNDCUBE_ACTIONS: &[&str] = &[
     "fileinto", "redirect", "reject", "discard", "keep", "stop", "vacation", "setflag", "addflag", "removeflag",
     "addheader", "deleteheader", "set", "notify",
+    // Kept as written although the form can't show it (fixture 24b).
+    "include",
 ];
 
 /// What Roundcube would drop or change when it saves the script next time.

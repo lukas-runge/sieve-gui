@@ -13,6 +13,13 @@ pub fn import_rules(source: String) -> AppResult<RuleSet> {
     Ok(sieve_core::import(&source)?)
 }
 
+/// Parses a script that the root runs in single-folder mode, even if it lost
+/// its `global` command since (see `sieve_core::import_single_folder`).
+#[tauri::command]
+pub fn import_rules_single_folder(source: String) -> AppResult<RuleSet> {
+    Ok(sieve_core::import_single_folder(&source)?)
+}
+
 /// Generates the script for rule cards: in the layout Roundcube uses if the
 /// account's filters are also edited there (smallest diffs), else in
 /// sieve-gui's readable layout.

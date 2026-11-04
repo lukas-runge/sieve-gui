@@ -20,7 +20,7 @@ pub mod root;
 pub mod span;
 
 pub use export::export;
-pub use import::import;
+pub use import::{import, import_single_folder};
 pub use parser::parse;
 pub use printer::{print_script, PrintOptions};
 pub use span::{LineIndex, ParseError, Span};

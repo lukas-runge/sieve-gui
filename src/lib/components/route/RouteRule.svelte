@@ -65,6 +65,7 @@
       picked === path && "bg-primary/10 ring-1 ring-primary/35",
       dim && "opacity-35",
     ]}
+    style="--row-indent: calc(6.6rem + 0.375rem)"
     aria-current={picked === path ? "true" : undefined}
     onclick={(e) => {
       e.stopPropagation();

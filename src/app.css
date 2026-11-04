@@ -162,10 +162,15 @@ body {
   column-gap: 1.25rem;
   align-items: start;
 }
-@container route (max-width: 34rem) {
+/* Too narrow for two columns (e.g. beside the inspector): what happens goes
+   below what is tested, indented to the conditions. */
+@container route (max-width: 46rem) {
   .route-row {
     grid-template-columns: minmax(0, 1fr);
-    row-gap: 0.25rem;
+    row-gap: 0.2rem;
+  }
+  .route-row > :last-child {
+    padding-left: var(--row-indent, 0);
   }
 }
 

@@ -17,7 +17,7 @@
   {#if token.word}<span class="text-[0.875rem] text-base-content/70">{token.word}</span>{/if}
   {#each token.values as v, i}
     <span class={["max-w-full font-medium [overflow-wrap:break-word]", token.pattern ? "font-mono text-[0.875rem]" : "text-[0.94rem]"]}
-      >{#if v.before}<span class="text-primary">{v.before}</span>{/if}<Mark text={v.text} {words} />{#if v.after}<span
+      >{#if v.before}<span class="text-primary">{v.before}</span>{/if}<Mark text={v.text} {words} breaks={!token.pattern} />{#if v.after}<span
           class="font-normal text-base-content/70">{v.after}</span
         >{/if}{#if i < token.values.length - 1}<span class="font-normal text-base-content/60">{t("route.listOr")}</span>{/if}</span
     >

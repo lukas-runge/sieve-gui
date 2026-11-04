@@ -2,10 +2,7 @@
 
 A lightweight, cross-platform desktop editor for **server-side Sieve mail filters**. It talks to your mail server via **ManageSieve** (RFC 5804), so filters keep running even when no mail client is open. Built with Tauri and Svelte.
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
-  <img alt="sieve-gui: a script drawn as a route. Labels and a flag, a rule with four cases where case 1 decides further and case 2 adds a check, forwarding, a condition group, a folder section, a rule that is off and a block kept as code; on the right the inspector edits case 1.1" src="docs/screenshot-light.png">
-</picture>
+<img alt="sieve-gui: a mail filter script drawn as a route. Family mail gets a label and a folder, a Clients rule picks one of three folders, newsletters go to Reading, receipts sit in a folded folder section" src="docs/screenshot.png" width="960">
 
 > **Status:** early development. Visual rule editing, script management, trying rules with a sample message and saving via ManageSieve work. See [`docs/concept.md`](docs/concept.md).
 
@@ -106,7 +103,7 @@ sieve-gui/
 │   └── generated/tauri/        # auto-generated TS bindings (do not edit)
 ├── scripts/fetch-pigeonhole.sh # downloads the Pigeonhole test suite for parser tests
 ├── docs/concept.md             # product and architecture concept
-└── docs/screenshot-*.png       # the README screenshot (light and dark)
+└── docs/screenshot.png         # the README screenshot (preview with `?mac&hero`)
 ```
 
 ---
@@ -135,7 +132,7 @@ The longer fuzz runs take `SIEVE_FUZZ_ITERS` and `SIEVE_FUZZ_SEED`.
 
 ### Browser preview
 
-`pnpm dev` without Tauri opens the UI in a normal browser at `http://localhost:1420` with a fake backend (`src/lib/dev/mock.ts`). Rule data comes from fixtures sieve-core produced: from the Roundcube and MailPlus test scripts (`fixtures.json`, `fixtures-mailplus.json`) and from made-up English showcase scripts (`fixtures-showcase.json`, also what the screenshot above shows). Add `?mac` to the URL to see the macOS title bar (the window controls are drawn in). Script generation needs the desktop app.
+`pnpm dev` without Tauri opens the UI in a normal browser at `http://localhost:1420` with a fake backend (`src/lib/dev/mock.ts`). Rule data comes from fixtures sieve-core produced: from the Roundcube and MailPlus test scripts (`fixtures.json`, `fixtures-mailplus.json`) and from made-up English showcase scripts (`fixtures-showcase.json`). `?hero` switches to the calm account of the screenshot above (`fixtures-hero.json`). Add `?mac` to the URL to see the macOS title bar (the window controls are drawn in). Script generation needs the desktop app.
 
 ---
 

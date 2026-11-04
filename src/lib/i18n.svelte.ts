@@ -465,7 +465,7 @@ const en = {
   "route.switch": "Switch",
   "route.firstMatch": "The first case that matches applies.",
   "route.cases": "{count} cases",
-  "route.casesFirst": "{count} cases, the first that matches applies",
+  "route.casesFirst": "{count} cases · first match wins",
   "route.firstMatchTail": ", the first case that matches applies",
   "route.off": "Off",
   "route.turnOff": "Turn off",

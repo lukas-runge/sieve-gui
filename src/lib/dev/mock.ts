@@ -11,6 +11,10 @@ import { mockIPC } from "@tauri-apps/api/mocks";
 import roundcubeFixtures from "./fixtures.json";
 import mailplusFixtures from "./fixtures-mailplus.json";
 import showcaseFixtures from "./fixtures-showcase.json";
+import heroFixtures from "./fixtures-hero.json";
+
+// `?hero`: one calm account for the README screenshot (see README).
+const HERO = new URLSearchParams(location.search).has("hero");
 
 type Fixture = { source: string; rules: unknown };
 // The Roundcube fixtures under English names (their keys are the scripts' names in the fixture set).
@@ -35,11 +39,13 @@ function showcaseRoot(names: string[]): string {
 const servers: Record<string, Server> = {
   // Runs Spam, Inboxes and Sorting through sieve-gui's root script.
   preview: {
-    scripts: {
-      ...(showcaseFixtures as Record<string, Fixture>),
-      ...fixtures,
-      "sieve-gui": { source: showcaseRoot(["Spam", "Inboxes", "Sorting"]), rules: null },
-    },
+    scripts: HERO
+      ? { ...(heroFixtures as Record<string, Fixture>), "sieve-gui": { source: showcaseRoot(["Spam", "Mail routing", "Archive"]), rules: null } }
+      : {
+          ...(showcaseFixtures as Record<string, Fixture>),
+          ...fixtures,
+          "sieve-gui": { source: showcaseRoot(["Spam", "Inboxes", "Sorting"]), rules: null },
+        },
     active: "sieve-gui",
     saved: new Map(),
     deleted: new Set(),
@@ -99,7 +105,8 @@ const nas = {
 };
 // `?nasChanged` starts with another certificate trusted, as after a new one.
 if (new URLSearchParams(location.search).has("nasChanged")) nas.certificate = "aa".repeat(32);
-const accounts = [account, nas];
+if (HERO) Object.assign(account, { username: "alex", host: "example.com", keywordNames: { $label1: "Family" }, icon: { text: "A", hue: 250 } });
+const accounts = HERO ? [account] : [account, nas];
 let copyResolved = false;
 
 // Modified UTF-7 names, as IMAP sends them.
@@ -140,6 +147,17 @@ const folders = (
     ["Clubs"],
     ["Clubs/Sports"],
     ["Clubs/Choir"],
+    // The `?hero` account's folders.
+    ["Personal"],
+    ["Personal/Family"],
+    ["Clients"],
+    ["Clients/Acme"],
+    ["Clients/Studio"],
+    ["Clients/Billing"],
+    ["Receipts"],
+    ["Receipts/Shop"],
+    ["Receipts/Books"],
+    ["Archive/Lists"],
   ] as [string, string?][]
 ).map(([name, specialUse]) => ({ name, delimiter: "/", selectable: true, specialUse: specialUse ?? null }));
 

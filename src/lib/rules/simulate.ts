@@ -321,6 +321,8 @@ export interface ScriptRun {
   name: string;
   /** Applied case paths per rule index. */
   hits: Map<number, string[]>;
+  /** Cases tried that didn't match, per rule index. */
+  misses: Map<number, string[]>;
   /** Rules (by index) the app couldn't evaluate: code, unknown tests. */
   unknown: number[];
   /** Index of the rule whose "stop" ended the script, if any. */
@@ -391,7 +393,7 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
   };
 
   for (const script of scripts) {
-    const run: ScriptRun = { name: script.name, hits: new Map(), unknown: [], stoppedAt: null, skipped: stoppedAll };
+    const run: ScriptRun = { name: script.name, hits: new Map(), misses: new Map(), unknown: [], stoppedAt: null, skipped: stoppedAll };
     runs.push(run);
     if (stoppedAll) continue;
 
@@ -456,6 +458,7 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
           return false;
         }
         if (v) return apply(index, prefix + i, c.actions);
+        run.misses.set(index, [...(run.misses.get(index) ?? []), prefix + i]);
       }
       return false;
     };

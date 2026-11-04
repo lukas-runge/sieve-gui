@@ -30,6 +30,7 @@ test("the first matching case applies, checks inside it run too", () => {
   });
   const trial = runTrial([{ name: "s", items: [sw], singleFolder: true }], { ...EMPTY_MAIL, from: "Shop <news@shop.example>", subject: "Ihre Rechnung" }, true);
   assert.deepEqual(trial.scripts[0].hits.get(0), ["0", "0.0.0"]);
+  assert.equal(trial.scripts[0].misses.get(0), undefined);
   assert.deepEqual(trial.delivery.folders, ["Rechnungen"]);
   assert.equal(trial.steps[0].overridden, true);
   assert.equal(trial.delivery.inbox, false);
@@ -57,6 +58,7 @@ test("nothing matches: the message stays in the inbox; code is unknown", () => {
     true,
   );
   assert.equal(trial.delivery.inbox, true);
+  assert.deepEqual(trial.scripts[0].misses.get(0), ["0"]);
   assert.equal(trial.uncertain, true);
   assert.deepEqual(trial.scripts[0].unknown, [1]);
 });

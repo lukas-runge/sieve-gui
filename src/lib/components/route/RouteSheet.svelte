@@ -54,6 +54,7 @@
     if (!trial) return null;
     return {
       hits: trial.hits.get(index) ?? [],
+      misses: trial.misses.get(index) ?? [],
       unknown: trial.unknown.includes(index),
       reached: !trial.skipped && (trial.stoppedAt === null || index <= trial.stoppedAt),
     };

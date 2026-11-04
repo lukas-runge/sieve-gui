@@ -41,7 +41,7 @@
     /** The folder path is shown once above a run of rules filing into the same parent. */
     hideParent?: boolean;
     /** A sample message's way: the cases that applied to it. */
-    trial?: { hits: CasePath[]; reached: boolean } | null;
+    trial?: { hits: CasePath[]; misses: CasePath[]; reached: boolean } | null;
     /** Only cases this accepts are shown at full strength (e.g. those filing into a folder). */
     filter?: ((c: Case) => boolean) | null;
     /** In a list of matches: cases that don't match fold into one line. */
@@ -75,11 +75,15 @@
 
 <!-- The case label: "1 if", "2 else if", "otherwise"; nested cases count on
      from their case: "1.2 else if". Fixed width, so conditions line up. -->
-{#snippet label(c: Case, num: string | null, hit: boolean)}
+{#snippet label(c: Case, num: string | null, hit: boolean, missed: boolean)}
   <span class="case-label flex w-[7rem] shrink-0 items-center gap-1.5 pt-px" style="color: var(--rail)">
     {#if hit}
       <span class="grid size-[1.25rem] shrink-0 place-items-center rounded-full bg-success text-success-content" title={t("trial.applies")}
         ><Icon name="check" size={13} /></span
+      >
+    {:else if missed}
+      <span class="grid size-[1.25rem] shrink-0 place-items-center rounded-full bg-base-content/10 text-base-content/70" title={t("trial.missed")}
+        ><Icon name="x" size={12} /></span
       >
     {:else if num}
       <span class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full border-2 px-[0.2rem] text-[0.8rem] font-bold" style="border-color: var(--rail)"
@@ -111,7 +115,7 @@
     }}
   >
     <span class="case-head flex min-w-0 items-start gap-1.5">
-      {@render label(c, num, !!hit)}
+      {@render label(c, num, !!hit, !!trial?.misses.includes(path))}
       <span class="min-w-0">
         {#if c.conditions}
           <Conditions shape={conditionShape(c.conditions, false, picked === path ? Infinity : 3)} {words} />

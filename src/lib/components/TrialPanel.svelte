@@ -1,10 +1,11 @@
 <script lang="ts">
   // Trying the rules with a sample message: where it ends up, and its way
   // through the scripts that run, case by case. Each step opens its rule.
-  import type { Action, RuleItem } from "#tauri/types";
+  import type { Action, Conditions, RuleItem } from "#tauri/types";
   import type { ScriptEditor } from "../editor.svelte";
   import { t } from "../i18n.svelte";
-  import { casePathLabel, isSimple, outcomes, stops, type Outcome } from "../rules/route";
+  import { caseChain, casePathLabel, conditionShape, isSimple, outcomes, stops, type Outcome } from "../rules/route";
+  import RouteConditions from "./route/Conditions.svelte";
   import { looksLikeMail, parseMail, type SampleMail } from "../rules/simulate";
   import { session } from "../session.svelte";
   import { trial } from "../trial.svelte";
@@ -72,10 +73,15 @@
     return i >= 0 ? (trial.order[i + 1] ?? null) : null;
   }
 
-  function stepTitle(script: string, index: number, path: string): { name: string; where: string } {
+  function stepTitle(script: string, index: number, path: string): { name: string; where: string; conditions: Conditions | null } {
     const item = itemsOf(script)[index];
-    if (!item || item.type !== "rule") return { name: t("raw.heading"), where: "" };
-    return { name: item.name || t("trial.ruleN", { n: index + 1 }), where: isSimple(item) ? "" : casePathLabel(item, path) };
+    if (!item || item.type !== "rule") return { name: t("raw.heading"), where: "", conditions: null };
+    return {
+      name: item.name || t("trial.ruleN", { n: index + 1 }),
+      where: isSimple(item) ? "" : casePathLabel(item, path),
+      // Why it applied: what the case tests.
+      conditions: caseChain(item, path)?.at(-1)?.case.conditions ?? null,
+    };
   }
 
   const fields: { key: keyof SampleMail; label: string; placeholder: string }[] = $derived([
@@ -184,6 +190,12 @@
                     <span class="truncate font-medium">{title.name}</span>
                     {#if title.where}<span class="shrink-0 text-base-content/65">› {title.where}</span>{/if}
                   </span>
+                  {#if title.conditions && title.conditions.items.length}
+                    <span class="pl-5 text-[0.875rem]" title={t("trial.because")}>
+                      <span class="text-[0.8rem] text-base-content/60">{t("trial.because")}</span>
+                      <RouteConditions shape={conditionShape(title.conditions, false, 2)} />
+                    </span>
+                  {/if}
                   {#if items.length || stops(step.actions)}
                     <span class={["pl-5", step.overridden && "line-through decoration-base-content/50 opacity-60"]} title={step.overridden ? t("trial.overridden") : undefined}>
                       <Outcomes {items} stop={stops(step.actions)} singleFolder={editor.rules.singleFolder} next={nextOf(step.script)} />

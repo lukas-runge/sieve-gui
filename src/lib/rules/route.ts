@@ -9,6 +9,7 @@ import { flagLabel } from "../keywords";
 import { i18n, t, type MessageKey } from "../i18n.svelte";
 import { formatDate, formatSize } from "./format";
 import { mailboxLabel } from "./mailbox";
+import { actionsGoTo, type Target } from "./search";
 import { actionKind, hasValues, headerNames, viewCondition, type Branches, type ConditionView } from "./view";
 
 // ── Conditions ────────────────────────────────────────────────────────────────
@@ -234,6 +235,8 @@ export interface Outcome {
   /** Folder path segments for moves and copies; the text otherwise. */
   path: string[];
   text: string;
+  /** What "everything that goes here" filters by: the folder or label as stored. */
+  target?: Target;
 }
 
 const SYSTEM_FLAGS: Record<string, MessageKey> = {
@@ -283,7 +286,7 @@ export function outcomes(actions: Action[], keywords: Record<string, string>, de
     switch (a.type) {
       case "fileInto": {
         const path = folderPath(a.mailbox, delimiter);
-        out.push({ kind: a.copy ? "copy" : "move", path, text: path.join(" / ") });
+        out.push({ kind: a.copy ? "copy" : "move", path, text: path.join(" / "), target: { kind: "folder", key: a.mailbox } });
         break;
       }
       case "flags": {
@@ -299,14 +302,21 @@ export function outcomes(actions: Action[], keywords: Record<string, string>, de
         // `setflag` replaces all flags: "Only read".
         const system = a.flags.filter((f) => SYSTEM_FLAGS[f.toLowerCase()]);
         const labels = a.flags.filter((f) => !SYSTEM_FLAGS[f.toLowerCase()]);
-        const only = a.op === "set" ? t("route.replaceFlags") : a.op === "remove" ? t("route.remove") : "";
+        // `setflag` sets these and drops all others: said once, after them.
+        const prefix = a.op === "remove" ? t("route.remove") : "";
         for (const f of system) {
           const name = flagName(f, keywords);
           const kindOf: OutcomeKind = a.op === "remove" && f.toLowerCase() === "\\seen" ? "unread" : f.toLowerCase() === "\\seen" ? "read" : f.toLowerCase() === "\\flagged" ? "flag" : "system";
-          out.push({ kind: kindOf, path: [], text: only ? only + name.toLocaleLowerCase(i18n.locale) : name });
+          out.push({ kind: kindOf, path: [], text: prefix ? prefix + name.toLocaleLowerCase(i18n.locale) : name });
         }
         for (const f of labels)
-          out.push({ kind: a.op === "remove" ? "unlabel" : a.op === "set" ? "setLabels" : "label", path: [], text: flagName(f, keywords) });
+          out.push({
+            kind: a.op === "remove" ? "unlabel" : "label",
+            path: [],
+            text: flagName(f, keywords),
+            target: a.op === "remove" ? undefined : { kind: "label", key: f },
+          });
+        if (a.op === "set") out.push({ kind: "system", path: [], text: t("route.othersCleared") });
         break;
       }
       case "redirect":
@@ -415,6 +425,11 @@ function tokenText(token: ConditionToken): string {
   return [token.field, token.fieldTitle ?? "", ...token.values.map((v) => v.text), ...token.more].join(" ");
 }
 
+/** Whether a case (with its nested checks) files into the folder or sets the label. */
+export function caseGoesTo(c: Case, target: Target): boolean {
+  return actionsGoTo(c.actions, target);
+}
+
 /** Whether a case (with its nested checks) contains one of the search words. */
 export function caseMatches(c: Case, words: string[], keywords: Record<string, string>, delimiter: string | null): boolean {
   if (words.length === 0) return true;
@@ -434,22 +449,54 @@ export function caseMatches(c: Case, words: string[], keywords: Record<string, s
  */
 export type CasePath = string;
 
-/** Readable position of a case, e.g. "Case 1 › Check › Case 3". */
-export function casePathLabel(rule: Branches, path: CasePath): string {
-  if (path === "") return "";
+/** One case on the way to a case path: the block it belongs to and its place. */
+export interface CaseStep {
+  block: Branches;
+  list: Case[];
+  index: number;
+  case: Case;
+  /** The case's path. */
+  path: CasePath;
+}
+
+/** The cases from the rule down to the case at `path`; null if there is none. */
+export function caseChain(rule: Branches, path: CasePath): CaseStep[] | null {
+  if (path === "") return null;
   const parts = path.split(".").map(Number);
-  const out: string[] = [];
+  const out: CaseStep[] = [];
   let block: Branches = rule;
   for (let i = 0; i < parts.length; i += 2) {
     const list = cases(block);
     const c = list[parts[i]];
-    if (!c) break;
-    out.push(c.kind === "else" ? t("route.otherwiseCase") : list.length === 1 ? t("route.checkCase") : t("route.caseN", { n: c.number }));
-    const next = parts[i + 1];
-    if (next === undefined) break;
-    const nested = c.nested[next];
-    if (!nested) break;
+    if (!c) return null;
+    out.push({ block, list, index: parts[i], case: c, path: parts.slice(0, i + 1).join(".") });
+    if (parts[i + 1] === undefined) break;
+    const nested = c.nested[parts[i + 1]];
+    if (!nested) return null;
     block = nested;
   }
-  return out.join(" › ");
+  return out;
+}
+
+/**
+ * The number a case shows: "3" for the third case of a rule, "1.2" for the
+ * second case of a check inside case 1. Checks with a single case add no
+ * number of their own.
+ */
+export function caseNumber(chain: CaseStep[]): string {
+  return chain.filter((s) => s.list.length > 1).map((s) => s.case.number).join(".");
+}
+
+/** Readable name of a case: "Case 1.2", "Case 3 › extra check", "Otherwise". */
+export function casePathLabel(rule: Branches, path: CasePath): string {
+  const chain = caseChain(rule, path);
+  if (!chain) return "";
+  const last = chain[chain.length - 1];
+  const number = caseNumber(chain);
+  if (last.case.kind === "else") {
+    const parent = caseNumber(chain.slice(0, -1));
+    return parent ? `${t("route.caseN", { n: parent })} › ${t("route.otherwiseCase")}` : t("route.otherwiseCase");
+  }
+  if (last.list.length === 1 && chain.length > 1) return number ? `${t("route.caseN", { n: number })} › ${t("route.checkCase")}` : t("route.checkCase");
+  return number ? t("route.caseN", { n: number }) : t("route.checkCase");
 }

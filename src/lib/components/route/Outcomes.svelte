@@ -12,7 +12,30 @@
     singleFolder = false,
     words = [],
     hideParent = false,
-  }: { items: Outcome[]; stop?: boolean; singleFolder?: boolean; words?: string[]; hideParent?: boolean } = $props();
+    next = null,
+    ontarget,
+  }: {
+    items: Outcome[];
+    stop?: boolean;
+    singleFolder?: boolean;
+    words?: string[];
+    hideParent?: boolean;
+    /** The script that runs next: a stop in single-folder mode continues there. */
+    next?: string | null;
+    /** Clicking a folder or label shows everything that goes there. */
+    ontarget?: (o: Outcome) => void;
+  } = $props();
+
+  /** Folders and labels lead to everything else that goes there. */
+  function target(o: Outcome) {
+    return (e: MouseEvent | KeyboardEvent) => {
+      if (!ontarget || !o.target) return;
+      if (e instanceof KeyboardEvent && e.key !== "Enter") return;
+      e.stopPropagation();
+      e.preventDefault();
+      ontarget(o);
+    };
+  }
 
   const icon: Record<Outcome["kind"], IconName> = {
     move: "folder",
@@ -42,13 +65,25 @@
 <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
   {#each items as o}
     {#if o.kind === "move" || o.kind === "copy"}
-      <span class="flex min-w-0 items-center gap-1.5" title={o.kind === "copy" ? t("route.copyTitle", { path: o.text }) : o.text}>
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex: a link when `ontarget` is set -->
+      <span
+        class={["flex min-w-0 items-center gap-1.5", ontarget && "target rounded-sm"]}
+        title={ontarget ? t("target.title", { name: o.text }) : o.kind === "copy" ? t("route.copyTitle", { path: o.text }) : o.text}
+        role={ontarget ? "link" : undefined}
+        tabindex={ontarget ? 0 : undefined}
+        onclick={target(o)}
+        onkeydown={target(o)}
+      >
         <Icon name={icon[o.kind]} size={15} class="text-primary" />
         <span class="flex min-w-0 items-baseline">
-          <!-- The direct parent says enough; the full path is in the tooltip. -->
+          <!-- The direct parent says enough (the full path is in the tooltip),
+               unless the search found a word higher up. -->
           {#if o.path.length > 1 && !hideParent}
             <span class="min-w-0 truncate text-[0.875rem] text-base-content/65"
-              >{o.path.length > 2 ? "… / " : ""}<Mark text={o.path.at(-2) ?? ""} {words} />&nbsp;/&nbsp;</span
+              >{#if words.length}<Mark text={o.path.slice(0, -1).join(" / ")} {words} />{:else}{o.path.length > 2 ? "… / " : ""}<Mark
+                  text={o.path.at(-2) ?? ""}
+                  {words}
+                />{/if}&nbsp;/&nbsp;</span
             >
           {/if}
           <span class="shrink-0 font-semibold"><Mark text={o.path.at(-1) ?? o.text} {words} /></span>
@@ -56,10 +91,15 @@
       </span>
     {:else if o.kind === "label" || o.kind === "unlabel" || o.kind === "setLabels"}
       {@const h = hue(o.text)}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex: a link when `ontarget` is set -->
       <span
-        class="inline-flex items-center gap-1 rounded-full border px-2 py-px text-[0.875rem] font-medium whitespace-nowrap"
+        class={["inline-flex items-center gap-1 rounded-full border px-2 py-px text-[0.875rem] font-medium whitespace-nowrap", ontarget && o.target && "target"]}
         style="border-color: oklch(0.7 0.09 {h} / 0.55); background: oklch(0.7 0.09 {h} / 0.12)"
-        title={o.kind === "setLabels" ? t("route.setLabelsTitle") : undefined}
+        title={ontarget && o.target ? t("target.title", { name: o.text }) : o.kind === "setLabels" ? t("route.setLabelsTitle") : undefined}
+        role={ontarget && o.target ? "link" : undefined}
+        tabindex={ontarget && o.target ? 0 : undefined}
+        onclick={target(o)}
+        onkeydown={target(o)}
       >
         <span class="size-1.5 rounded-full" style="background: oklch(0.62 0.13 {h})"></span>
         {#if o.kind === "unlabel"}{t("route.remove")}{/if}{#if o.kind === "setLabels"}{t("route.only")}{/if}<Mark text={o.text} {words} />
@@ -75,7 +115,21 @@
       class="inline-flex items-center gap-1 text-[0.875rem] whitespace-nowrap text-base-content/65"
       title={singleFolder ? t("route.stopScriptHint") : t("route.stopHint")}
     >
-      <Icon name="stop" size={14} />{singleFolder ? t("route.stopScriptRules") : t("route.stopRules")}
+      <Icon name="stop" size={14} />{singleFolder ? (next ? t("route.stopScriptNext", { name: next }) : t("route.stopScriptRules")) : t("route.stopRules")}
     </span>
   {/if}
 </div>
+
+<style>
+  .target {
+    cursor: pointer;
+  }
+  .target:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .target:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+</style>

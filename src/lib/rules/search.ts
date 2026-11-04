@@ -1,6 +1,6 @@
 // Searching the rule list: which items contain all words of a query.
 
-import type { RuleItem } from "#tauri/types";
+import type { Action, Branch, RuleItem } from "#tauri/types";
 import { mailboxLabel } from "./mailbox.ts";
 
 /** Model keys that only hold technical values (match types, units, …). */
@@ -43,4 +43,30 @@ export function matches(item: RuleItem, words: string[], keywordNames: Record<st
   if (words.length === 0) return true;
   const text = searchText(item, keywordNames);
   return words.every((w) => text.includes(w));
+}
+
+/** A folder or label, to find everything that goes there. */
+export interface Target {
+  kind: "folder" | "label";
+  /** The folder as stored (e.g. modified UTF-7) or the label's keyword. */
+  key: string;
+}
+
+/** Whether the actions (checks inside them included) file into the folder or set the label. */
+export function actionsGoTo(actions: Action[], target: Target): boolean {
+  return actions.some((a) => {
+    if (a.type === "fileInto") return target.kind === "folder" && a.mailbox === target.key;
+    if (a.type === "flags") return target.kind === "label" && a.op !== "remove" && a.flags.some((f) => f.split(/\s+/).includes(target.key));
+    if (a.type === "if") return blockGoesTo(a, target);
+    return false;
+  });
+}
+
+function blockGoesTo(b: { actions: Action[]; elsif: Branch[]; otherwise?: Action[] | null }, target: Target): boolean {
+  return actionsGoTo(b.actions, target) || (b.elsif ?? []).some((e) => actionsGoTo(e.actions, target)) || (!!b.otherwise && actionsGoTo(b.otherwise, target));
+}
+
+/** Whether a rule files into the folder or sets the label in any of its cases. */
+export function goesTo(item: RuleItem, target: Target): boolean {
+  return item.type === "rule" && blockGoesTo(item, target);
 }

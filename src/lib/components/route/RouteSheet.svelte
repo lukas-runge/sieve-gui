@@ -12,7 +12,8 @@
   import { t } from "../../i18n.svelte";
   import { closesMenu } from "../../menu";
   import { isSimple, outcomes } from "../../rules/route";
-  import { matches, queryWords } from "../../rules/search";
+  import { goesTo, matches, queryWords, type Target } from "../../rules/search";
+  import { caseGoesTo, type Outcome } from "../../rules/route";
   import type { ScriptRun } from "../../rules/simulate";
   import { trial as sample } from "../../trial.svelte";
   import { newRule } from "../../rules/view";
@@ -86,35 +87,60 @@
 
   /** Search this script, or every script of the account. */
   let scope = $state<"script" | "all">("script");
+  /** A folder or label clicked on the route: everything that goes there, in every script. */
+  let target = $state<(Target & { text: string; folder: boolean }) | null>(null);
   let others = $state<{ name: string; rules: { items: RuleItem[] } }[] | null>(null);
   $effect(() => {
-    if (scope !== "all" || !searching) return;
+    if (!searching && !target) return;
     const id = editor.accountId;
     void session.allRules(id).then((list) => {
       if (editor.accountId === id) others = list;
     });
   });
-  /** Matches across scripts: the open one with its unsaved edits, the others as saved. */
-  const results = $derived.by(() => {
-    if (scope !== "all" || !searching) return [];
+  /** Matches in every script: the open one with its unsaved edits, the others as saved. */
+  const allResults = $derived.by(() => {
+    if (!searching && !target) return [];
     const list = others ?? [];
     const scripts = list.some((o) => o.name === editor.name) ? list : [{ name: editor.name, rules: editor.rules }, ...list];
     return scripts
       .map(({ name, rules }) => {
         const items = name === editor.name ? editor.rules.items : rules.items;
-        return {
-          name,
-          hits: items.flatMap((item, index) => (matches(item, words, keywords) ? [{ item, index }] : [])),
-        };
+        const hit = (item: RuleItem) => (target ? goesTo(item, target) : matches(item, words, keywords));
+        return { name, hits: items.flatMap((item, index) => (hit(item) ? [{ item, index }] : [])) };
       })
       .filter((r) => r.hits.length > 0);
   });
+  /** Showing matches of all scripts instead of the route. */
+  const listing = $derived(!!target || (scope === "all" && searching));
+  const results = $derived(listing ? allResults : []);
   const resultCount = $derived(results.reduce((n, r) => n + r.hits.length, 0));
+  /** While searching this script: matches in the others, to point at them. */
+  const elsewhere = $derived(searching && scope === "script" ? allResults.filter((r) => r.name !== editor.name) : []);
+  const caseFilter = $derived(target ? (c: Parameters<typeof caseGoesTo>[0]) => caseGoesTo(c, target!) : null);
+
+  // Another script opened: start over.
+  let shownFor: string | null = null;
+  $effect(() => {
+    const name = editor.name;
+    if (shownFor !== null && name !== shownFor) {
+      target = null;
+      query = "";
+      scope = "script";
+    }
+    shownFor = name;
+  });
+
+  function showTarget(o: Outcome) {
+    if (!o.target) return;
+    target = { ...o.target, text: o.kind === "move" || o.kind === "copy" ? o.path.join(" / ") : o.text, folder: o.target.kind === "folder" };
+    query = "";
+  }
 
   /** Opens a match: in this script right away, in another one after leaving this. */
   async function openMatch(name: string, index: number, path: string) {
     if (name === editor.name) {
       scope = "script";
+      target = null;
       const item = editor.rules.items[index];
       if (item) pick(item.uid, path);
       return;
@@ -128,6 +154,7 @@
       next.focus = path;
     }
     scope = "script";
+    target = null;
   }
 
   function move(from: number, to: number) {
@@ -212,6 +239,18 @@
 <section class="route-sheet rounded-box border border-base-300 bg-base-100" aria-label={t("route.heading")}>
   <!-- Search: sticks to the top while the list scrolls. -->
   <div class="sticky top-0 z-20 flex items-center gap-2 rounded-t-box border-b border-base-300 bg-base-100/95 px-3 py-2 backdrop-blur">
+    {#if target}
+      <div class="flex min-w-0 grow items-center gap-2 px-1.5 py-1 text-sm">
+        <span class="whitespace-nowrap text-base-content/70">{t("target.heading")}</span>
+        <span class="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-primary/10 py-0.5 pr-1 pl-2.5 font-semibold text-primary">
+          <Icon name={target.folder ? "folder" : "tag"} size={14} /><span class="truncate">{target.text}</span>
+          <button class="grid size-5 place-items-center rounded-full hover:bg-primary/15" aria-label={t("target.clear")} title={t("target.clear")} onclick={() => (target = null)}>
+            <Icon name="x" size={13} />
+          </button>
+        </span>
+        <span class="whitespace-nowrap text-[0.8rem] text-base-content/65" role="status">{t("target.count", { count: resultCount, scripts: results.length })}</span>
+      </div>
+    {:else}
     <label class="flex min-w-0 grow items-center gap-2 rounded-field px-1.5 py-1 focus-within:bg-base-200">
       <Icon name="search" size={15} class="text-base-content/65" />
       <input
@@ -231,7 +270,8 @@
         </span>
       {/if}
     </label>
-    <div class="join" role="group" aria-label={t("search.scope")}>
+    {/if}
+    <div class={["join", target && "hidden"]} role="group" aria-label={t("search.scope")}>
       <button class={["btn btn-xs join-item", scope === "script" ? "btn-active" : "btn-ghost"]} aria-pressed={scope === "script"} onclick={() => (scope = "script")}>
         {t("search.thisScript")}
       </button>
@@ -267,13 +307,16 @@
     </div>
   {/if}
 
-  {#if scope === "all" && searching}
+  {#if listing}
     <!-- Matches in every script of the account, in the order the scripts run. -->
     <div class="grid gap-4 px-3 py-3">
       {#each results as r (r.name)}
         <section class="grid gap-1" aria-label={r.name}>
           <h3 class="flex items-center gap-2 px-1 text-[0.875rem] font-semibold">
             <Icon name="text" size={15} class="text-base-content/65" />{r.name}
+            {#if !session.runs(editor.accountId, r.name)}
+              <span class="rounded-full bg-base-200 px-2 text-[0.8rem] leading-5 font-medium text-base-content/65">{t("status.off")}</span>
+            {/if}
             <span class="font-normal text-base-content/65">{t("search.hits", { count: r.hits.length })}</span>
           </h3>
           {#each r.hits as hit (hit.index)}
@@ -285,6 +328,8 @@
                   {keywords}
                   singleFolder={editor.rules.singleFolder}
                   {words}
+                  filter={caseFilter}
+                  ontarget={showTarget}
                   onpick={(path) => openMatch(r.name, hit.index, path)}
                 />
               {:else}
@@ -377,6 +422,8 @@
                 {words}
                 picked={selected ? editor.focus : null}
                 hideParent={groups.grouped[index]}
+                ontarget={showTarget}
+                {next}
                 trial={tr}
                 onpick={(path) => pick(item.uid, path)}
               />
@@ -434,7 +481,21 @@
     {#if searching && shownCount === 0}
       <li class="route-item">
         <span></span><span></span>
-        <p class="py-3 text-sm text-base-content/60">{t("search.none")}</p>
+        <p class="py-3 text-sm text-base-content/70">{t("search.none")}</p>
+      </li>
+    {/if}
+    {#if elsewhere.length}
+      <!-- Not only here: the other scripts with matches, one click away. -->
+      <li class="route-item">
+        <span></span><span></span>
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 text-sm">
+          <span class="text-base-content/70">{t("search.elsewhere")}</span>
+          {#each elsewhere as r (r.name)}
+            <button class="btn btn-sm btn-soft btn-primary gap-1" onclick={() => (scope = "all")}>
+              {r.name} <span class="font-normal">· {t("search.hits", { count: r.hits.length })}</span>
+            </button>
+          {/each}
+        </div>
       </li>
     {/if}
     {#if editor.rules.items.length === 0}
@@ -448,7 +509,7 @@
     {/if}
 
     <!-- Where the mail goes when no rule kept it. -->
-    <li class="route-item route-end text-[0.875rem] text-base-content/65">
+    <li class="route-item route-end text-[0.875rem] text-base-content/65" hidden={searching}>
       <span></span>
       <span class="route-node grid place-items-center pt-0.5"><span class="route-mark route-mark-end"></span></span>
       <span class="py-2">

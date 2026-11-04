@@ -11,6 +11,7 @@
   import { casePathLabel, isSimple } from "../rules/route";
   import { session } from "../session.svelte";
   import BranchesEditor, { SUMMARY, type SummaryContext } from "./BranchesEditor.svelte";
+  import CaseEditor from "./CaseEditor.svelte";
   import CodeEditor from "./CodeEditor.svelte";
   import Icon from "./Icon.svelte";
 
@@ -151,14 +152,28 @@
           <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={item.enabled} onchange={(e) => change((r) => (r.enabled = e.currentTarget.checked))} />
           <span>{item.enabled ? t("inspector.on") : t("inspector.off")}</span>
         </label>
-        <BranchesEditor
-          block={item}
-          {extensions}
-          {folders}
-          focus={editor.focus}
-          singleFolder={editor.rules.singleFolder}
-          mutate={(fn, merge) => change((r) => fn(r), merge)}
-        />
+        {#if isSimple(item)}
+          <BranchesEditor
+            block={item}
+            {extensions}
+            {folders}
+            focus={editor.focus}
+            singleFolder={editor.rules.singleFolder}
+            mutate={(fn, merge) => change((r) => fn(r), merge)}
+          />
+        {:else}
+          <CaseEditor
+            rule={item}
+            path={editor.focus}
+            {extensions}
+            {folders}
+            singleFolder={editor.rules.singleFolder}
+            keywords={summary.keywords}
+            delimiter={summary.delimiter}
+            mutate={(fn, merge) => change(fn, merge)}
+            onfocus={(p) => (editor.focus = p)}
+          />
+        {/if}
       {:else}
         <p class="mb-3 text-sm text-base-content/70">{t("raw.explain")}</p>
         <CodeEditor value={item.code} label={t("raw.heading")} onchange={updateCode} />

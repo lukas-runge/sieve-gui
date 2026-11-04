@@ -7,7 +7,7 @@
   import type { Rule } from "#tauri/types";
   import { t } from "../../i18n.svelte";
   import type { Branches } from "../../rules/view";
-  import { caseMatches, cases, conditionShape, isSimple, outcomes, stops, type Case, type CasePath } from "../../rules/route";
+  import { caseMatches, cases, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
   import Conditions from "./Conditions.svelte";
   import Icon from "../Icon.svelte";
   import Mark from "./Mark.svelte";
@@ -18,16 +18,21 @@
     delimiter,
     keywords,
     singleFolder,
+    next = null,
     words = [],
     picked = null,
     hideParent = false,
     trial = null,
+    filter = null,
+    ontarget,
     onpick,
   }: {
     rule: Rule;
     delimiter: string | null;
     keywords: Record<string, string>;
     singleFolder: boolean;
+    /** The script that runs after this one: where "no further rules" continues. */
+    next?: string | null;
     /** Search words: matches are marked, cases without any are dimmed. */
     words?: string[];
     /** The case open in the inspector, if this rule is. */
@@ -36,6 +41,9 @@
     hideParent?: boolean;
     /** A sample message's way: the cases that applied to it. */
     trial?: { hits: CasePath[]; reached: boolean } | null;
+    /** Only cases this accepts are shown at full strength (e.g. those filing into a folder). */
+    filter?: ((c: Case) => boolean) | null;
+    ontarget?: (o: Outcome) => void;
     onpick: (path: CasePath) => void;
   } = $props();
 
@@ -46,39 +54,37 @@
   const top = $derived(cases(rule));
 </script>
 
-<!-- The case label: "1 if", "2 else if", "otherwise"; "if" / "and if" for a
-     check with a single case. Fixed width, so conditions line up. -->
-{#snippet label(c: Case, single: boolean, depth: number, hit: boolean)}
-  <span class="flex w-[6.6rem] shrink-0 items-center gap-1.5 pt-px" style="color: var(--rail)">
+<!-- The case label: "1 if", "2 else if", "otherwise"; nested cases count on
+     from their case: "1.2 else if". Fixed width, so conditions line up. -->
+{#snippet label(c: Case, num: string | null, hit: boolean)}
+  <span class="flex w-[7rem] shrink-0 items-center gap-1.5 pt-px" style="color: var(--rail)">
     {#if hit}
       <span class="grid size-[1.25rem] shrink-0 place-items-center rounded-full bg-success text-success-content" title={t("trial.applies")}
         ><Icon name="check" size={13} /></span
       >
-    {:else if c.kind !== "else" && !single}
-      <span class="grid size-[1.25rem] shrink-0 place-items-center rounded-full border-2 text-[0.8rem] font-bold" style="border-color: var(--rail)"
-        >{c.number}</span
+    {:else if num}
+      <span class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full border-2 px-[0.2rem] text-[0.8rem] font-bold" style="border-color: var(--rail)"
+        >{num}</span
       >
     {/if}
     <span class="text-[0.875rem] font-semibold whitespace-nowrap">
-      {#if c.kind === "else"}{t("route.otherwise")}{:else if single}{depth > 0 ? t("route.andIf") : t("route.if")}{:else if c.kind === "if"}{t(
-          "route.if",
-        )}{:else}{t("route.elseIf")}{/if}
+      {#if c.kind === "else"}{t("route.otherwise")}{:else if c.kind === "if"}{t("route.if")}{:else}{t("route.elseIf")}{/if}
     </span>
   </span>
 {/snippet}
 
 <!-- What a case tests (left) and does (right, in the column shared by all rows). -->
-{#snippet caseRow(c: Case, single: boolean, depth: number, path: CasePath)}
+{#snippet caseRow(c: Case, num: string | null, path: CasePath)}
   {@const hit = applies(path)}
-  {@const dim = (words.length > 0 && !caseMatches(c, words, keywords, delimiter)) || hit === false}
+  {@const dim = (words.length > 0 && !caseMatches(c, words, keywords, delimiter)) || hit === false || (filter !== null && !filter(c))}
   <button
     class={[
       "route-row case-row w-full rounded-field py-1 pr-1 text-left transition-opacity hover:bg-base-content/[0.04]",
       picked === path && "bg-primary/10 ring-1 ring-primary/35",
       hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
-      dim && "opacity-35",
+      dim && "opacity-50",
     ]}
-    style="--row-indent: calc(6.6rem + 0.375rem)"
+    style="--row-indent: calc(7rem + 0.375rem)"
     aria-current={picked === path ? "true" : undefined}
     onclick={(e) => {
       e.stopPropagation();
@@ -86,7 +92,7 @@
     }}
   >
     <span class="flex min-w-0 items-start gap-1.5">
-      {@render label(c, single, depth, !!hit)}
+      {@render label(c, num, !!hit)}
       <span class="min-w-0">
         {#if c.conditions}
           <Conditions shape={conditionShape(c.conditions, false, picked === path ? Infinity : 3)} {words} />
@@ -95,33 +101,35 @@
         {/if}
       </span>
     </span>
-    <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {words} />
+    <Outcomes items={outcomes(c.actions, keywords, delimiter)} stop={stops(c.actions)} {singleFolder} {next} {words} {ontarget} />
   </button>
 {/snippet}
 
-{#snippet switchCases(b: Branches, depth: number, prefix: string)}
+<!-- `pre`: the number of the case this block sits in ("1"), "" for a rule. -->
+{#snippet switchCases(b: Branches, depth: number, prefix: string, pre: string)}
   {@const list = cases(b)}
   {@const single = list.length === 1}
   <ul class="rails" style="--rail: var(--rail-{Math.min(depth, 3)}); --elbow: 0.95rem">
     {#each list as c, i}
       {@const path = prefix + i}
+      {@const num = single || c.kind === "else" ? null : pre ? `${pre}.${c.number}` : String(c.number)}
+      {@const own = single ? pre : pre ? `${pre}.${c.number}` : String(c.number)}
       <li>
-        {@render caseRow(c, single, depth, path)}
+        {@render caseRow(c, num, path)}
         {#each c.nested as n, j}
           {@const multi = cases(n).length > 1}
-          <!-- A check inside this case: a box of its own, one rail deeper. -->
+          {@const color = `var(--rail-${Math.min(depth + 1, 3)})`}
+          <!-- A check inside this case: a box of its own, one rail deeper, saying whose it is. -->
           <div
             class="my-1 ml-1 rounded-field border-l-2 py-1.5 pr-1.5 pl-2"
-            style="border-color: var(--rail-{Math.min(depth + 1, 3)}); background: color-mix(in oklab, var(--rail-{Math.min(depth + 1, 3)}) 6%, transparent)"
+            style="border-color: {color}; background: color-mix(in oklab, {color} 6%, transparent)"
           >
-            {#if multi}
-              <p class={["mb-1 pl-1 text-[0.875rem] text-base-content/70", applies(path) === false && "opacity-40"]}>
-                <span class="font-semibold" style="color: var(--rail-{Math.min(depth + 1, 3)})"
-                  >{single && depth === 0 ? t("route.nestedHeadingSingle") : t("route.nestedHeading", { n: c.number })}</span
-                >{t("route.firstMatchTail")}
-              </p>
-            {/if}
-            {@render switchCases(n, depth + 1, `${path}.${j}.`)}
+            <p class={["mb-1 pl-1 text-[0.875rem] text-base-content/70", applies(path) === false && "opacity-50"]}>
+              <span class="font-semibold" style="color: {color}">
+                {#if c.kind === "else"}{t("route.nestedInOtherwise")}{:else if own}{t("route.nestedIn", { n: own })}{:else}{t("route.nestedHeadingSingle")}{/if}</span
+              >{multi ? t("route.firstMatchTail") : ""}
+            </p>
+            {@render switchCases(n, depth + 1, `${path}.${j}.`, c.kind === "else" ? "" : own)}
           </div>
         {/each}
       </li>
@@ -141,7 +149,7 @@
         {#if rule.name}<span class="text-[0.875rem] font-medium text-base-content/70"><Mark text={rule.name} {words} /></span>{/if}
         <Conditions shape={conditionShape(rule.conditions, false, picked === "" ? Infinity : 3)} {words} />
       </span>
-      <Outcomes items={outcomes(rule.actions, keywords, delimiter)} stop={stops(rule.actions)} {singleFolder} {words} {hideParent} />
+      <Outcomes items={outcomes(rule.actions, keywords, delimiter)} stop={stops(rule.actions)} {singleFolder} {next} {words} {hideParent} {ontarget} />
     </span>
   </button>
 {:else}
@@ -152,6 +160,6 @@
     {/if}
   </button>
   <div class="mt-1">
-    {@render switchCases(rule, 0, "")}
+    {@render switchCases(rule, 0, "", "")}
   </div>
 {/if}

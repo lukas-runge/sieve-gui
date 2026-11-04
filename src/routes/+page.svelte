@@ -203,8 +203,19 @@
         </button>
         <div class="min-w-0 grow">
           <div class="flex min-w-0 items-center gap-3">
-            <h1 class="truncate text-[1.35rem] leading-tight font-semibold">{editor.name}</h1>
+            {#if accountView.active}
+              <!-- Results across scripts: the account is the subject; the script is where "back" leads. -->
+              <h1 class="flex min-w-0 items-baseline gap-2 truncate text-[1.35rem] leading-tight font-semibold">
+                <Icon name="server" size={18} class="self-center text-base-content/70" />{accountLabel}
+                <span class="truncate text-base font-normal text-base-content/75">
+                  {accountView.kind === "dest" ? t("scope.headerDest") : t("scope.headerSearch")}
+                </span>
+              </h1>
+            {:else}
+              <h1 class="truncate text-[1.35rem] leading-tight font-semibold">{editor.name}</h1>
+            {/if}
             <span
+              hidden={accountView.active}
               class={[
                 "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.8rem] font-medium",
                 active ? "bg-success/12 text-success" : "bg-base-200 text-base-content/60",

@@ -106,7 +106,7 @@
       <!-- Applies to the test message: the number stays, on green. -->
       <span
         class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full bg-success px-[0.3rem] text-[0.8125rem] font-bold text-success-content"
-        title={t("trial.applies")}>{#if num}{num}{:else}<Icon name="check" size={13} />{/if}</span
+        title={t("trial.applies")}><span class="flex items-center gap-0.5"><Icon name="check" size={12} />{#if num}{num}{/if}</span></span
       >
     {:else if num}
       <span class="grid h-[1.25rem] min-w-[1.25rem] shrink-0 place-items-center rounded-full border-2 px-[0.3rem] text-[0.8125rem] font-bold" style="border-color: var(--rail)"
@@ -178,11 +178,10 @@
     {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && c.nested.length}
       <!-- Nothing of its own: what happens is in the check below. -->
       <!-- Where its mail can go, muted, with what it depends on as a caption. -->
-      <span class="grid gap-0.5 rounded-field border border-dashed border-base-content/25 px-2 py-1">
-        <span class="flex items-start gap-1 text-[0.8125rem] font-medium text-base-content/80"
-          ><Icon name="chevronDown" size={13} class="mt-0.5 shrink-0" />{t("route.possibleMaybe")} {possibleHeading(c, num).replace(/:$/, "")}:</span
-        >
-        <Outcomes items={nestedOutcomes(c, keywords, delimiter)} {words} />
+      <!-- Expanded, the cases below show their own actions: just point there. -->
+      {@const inner = c.nested.length === 1 ? cases(c.nested[0]).length : 0}
+      <span class="flex items-start gap-1 text-[0.875rem] font-medium text-base-content/80">
+        <Icon name="chevronDown" size={14} class="mt-0.5 shrink-0" />{inner > 1 ? t("route.thenCases", { count: inner }) : t("route.thenCheck")}
       </span>
     {:else}
       <span class="grid gap-0.5">

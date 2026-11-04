@@ -275,11 +275,20 @@
                 onclick={() => mutate((r) => actionsIn(blockOf(r), step!.index).splice(i, 1))}><Icon name="trash" size={14} /></button
               >
             </div>
-            <ul class="rails grid grid-cols-1 gap-0.5" style="--rail: {inner}; --elbow: 1rem">
+            <!-- The route shows these cases in full: here, one button each to edit it. -->
+            <div class="flex flex-wrap gap-1.5 pl-1">
               {#each list as c, k}
-                <li>{@render caseLine(c, list, caseNumber(chain!), `${path}.${j}.${k}`, inner)}</li>
+                {@const n = label(c, list, caseNumber(chain!))}
+                <button
+                  class="inline-flex items-center gap-1 rounded-full border-2 px-2 py-0.5 text-[0.8125rem] font-semibold hover:bg-base-100"
+                  style="border-color: {inner}; color: {inner}"
+                  onclick={() => onfocus(`${path}.${j}.${k}`)}
+                >
+                  {n ?? (c.kind === "else" ? t("route.otherwise") : t("route.if"))}
+                  <span class="font-normal text-base-content/80">→ {outcomes(c.actions, keywords, delimiter).map((o) => (o.kind === "move" || o.kind === "copy" ? (o.path.at(-1) ?? o.text) : o.text)).join(", ") || "…"}</span>
+                </button>
               {/each}
-            </ul>
+            </div>
           </div>
         {:else}
           <ActionRow

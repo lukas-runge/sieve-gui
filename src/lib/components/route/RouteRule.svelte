@@ -116,6 +116,7 @@
   <button
     class={[
       "route-row case-row w-full rounded-field py-1 pr-1 text-left transition-opacity hover:bg-base-content/[0.04]",
+      bare && "pl-1.5",
       picked === path && "ring-2 ring-primary/70",
       hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
       dim && "opacity-70",

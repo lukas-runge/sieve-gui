@@ -40,7 +40,7 @@
     const actions: Action[] = d.folders.map((mailbox) => ({ type: "fileInto", mailbox, copy: false, create: false, flags: null }));
     if (d.inbox) actions.push({ type: "keep", flags: null });
     if (d.flags.length) actions.push({ type: "flags", op: "add", flags: d.flags });
-    return outcomes(actions, keywords, delimiter);
+    return outcomes(actions, keywords, delimiter).map((o) => (o.kind === "keep" ? { ...o, text: t("trial.inbox") } : o));
   });
 
   function deliveryOf(r: NonNullable<typeof result>): Outcome[] {
@@ -48,7 +48,7 @@
     const actions: Action[] = d.folders.map((mailbox) => ({ type: "fileInto", mailbox, copy: false, create: false, flags: null }));
     if (d.inbox) actions.push({ type: "keep", flags: null });
     if (d.flags.length) actions.push({ type: "flags", op: "add", flags: d.flags });
-    return outcomes(actions, keywords, delimiter);
+    return outcomes(actions, keywords, delimiter).map((o) => (o.kind === "keep" ? { ...o, text: t("trial.inbox") } : o));
   }
   /** Whether the unsaved edits change where the message ends up. */
   const changed = $derived.by(() => {

@@ -12,7 +12,7 @@
 <!-- Field, comparison and first value stay on one line (a long value is cut,
      in full as a tooltip); further values may wrap. -->
 <span class="inline-flex max-w-full min-w-0 flex-wrap items-baseline gap-x-1.5 gap-y-0.5" title={token.sentence}>
-  <span class="token-head inline-flex max-w-full min-w-0 items-baseline gap-x-1.5 whitespace-nowrap">
+  <span class="token-head inline-flex max-w-full min-w-0 flex-wrap items-baseline gap-x-1.5">
     <span
       class="shrink-0 rounded-md bg-base-content/[0.07] px-1.5 py-px text-[0.8125rem] font-medium text-base-content/85"
       title={token.fieldTitle}><Mark text={token.field} {words} /></span
@@ -31,35 +31,16 @@
 </span>
 
 {#snippet value(v: ConditionToken["values"][number], i: number)}
-  <span class={["token-value min-w-0 truncate text-base-content", token.pattern ? "pattern-value font-mono text-[0.875rem]" : "text-[0.94rem]"]}
-    >{#if v.before}<span class="text-base-content/65">{v.before}</span>{/if}<Mark text={v.text} {words} />{#if v.after}<span
+  <span class={["token-value min-w-0 text-base-content [overflow-wrap:anywhere]", token.pattern ? "pattern-value font-mono text-[0.875rem]" : "text-[0.94rem]"]}
+    >{#if v.before}<span class="text-base-content/65">{v.before}</span>{/if}<Mark text={v.text} {words} breaks={!token.pattern} />{#if v.after}<span
         class="font-normal text-base-content/70">{v.after}</span
       >{/if}{#if i < token.values.length - 1}<span class="font-normal text-base-content/70">{token.negated ? ", " : t("route.listOr")}</span>{/if}</span
   >
 {/snippet}
 
 <style>
-  /* A long pattern stays on one line (in full as a tooltip and once picked). */
+  /* Patterns break anywhere: they have no words to break at. */
   :global(.pattern-value) {
-    display: inline-block;
-    max-width: 36ch;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    vertical-align: bottom;
-  }
-  /* The picked case shows its values in full. */
-  :global([aria-current="true"] .token-head) {
-    flex-wrap: wrap;
-    white-space: normal;
-  }
-  :global([aria-current="true"] .token-value) {
-    white-space: normal;
-    overflow: visible;
-    overflow-wrap: anywhere;
-  }
-  :global([aria-current="true"] .pattern-value) {
-    max-width: none;
-    white-space: normal;
+    word-break: break-all;
   }
 </style>

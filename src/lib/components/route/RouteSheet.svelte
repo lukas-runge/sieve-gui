@@ -460,6 +460,14 @@
     <div class="grid gap-4 px-3 py-3">
       <!-- Account-wide: said as a heading, so the script's title above doesn't suggest otherwise. -->
       <div class="flex flex-wrap items-baseline gap-x-2 border-b border-base-300 px-1 pb-2">
+        <button
+          class="btn btn-ghost btn-sm -ml-2 gap-1 self-center"
+          onclick={() => {
+            target = null;
+            query = "";
+            view = "route";
+          }}><Icon name="arrowLeft" size={15} />{t("scope.back", { name: editor.name })}</button
+        >
         <h2 class="flex items-center gap-1.5 font-semibold"><Icon name="server" size={15} class="text-base-content/70" />{t("scope.account", { account: accountLabel })}</h2>
         <span class="text-[0.8125rem] text-base-content/75">
           {(target ? !withInactive : scope === "running") ? t("scope.runningShort") : t("scope.allShort")}
@@ -599,7 +607,7 @@
             <div class="flex items-center gap-2 px-2.5 text-[0.875rem]">
               <span class="text-[0.8125rem] text-base-content/70">{t("route.groupHead")}</span>
               <Icon name="folder" size={14} class="text-base-content/60" />
-              <span class="font-medium text-base-content/75">{groups.head[index]!.split(" / ").join(" › ")}</span>
+              <span class="font-semibold text-base-content/90">{groups.head[index]!.split(" / ").join(" › ")}</span>
               <span class="h-px grow bg-base-300"></span>
               <span class="pr-2 text-[0.8125rem] text-base-content/70">{t("route.groupCount", { count: groups.size[index] })}</span>
             </div>
@@ -658,6 +666,9 @@
             {/if}
           </div>
           <div class="flex shrink-0 items-center gap-1 pt-2 pr-1.5">
+            {#if tr && !tr.reached}
+              <span class="rounded-full bg-base-content/10 px-2 text-[0.75rem] leading-5 font-medium text-base-content/85">{t("trial.unreached")}</span>
+            {/if}
             {#if fresh === item.uid}
               <span class="rounded-full bg-primary/12 px-2 text-[0.8125rem] leading-5 font-medium text-primary">{t("route.fresh")}</span>
             {/if}

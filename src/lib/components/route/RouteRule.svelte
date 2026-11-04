@@ -56,6 +56,21 @@
     onpick: (path: CasePath) => void;
   } = $props();
 
+  /** A short name for screen readers: "Fall 1.2, sonst wenn: X enthält y → Hochschule". */
+  function caseName(c: Case, num: string | null): string {
+    const word = c.kind === "else" ? t("route.otherwise") : c.kind === "if" ? t("route.if") : t("route.elseIf");
+    const what = c.conditions ? shapeSentence(conditionShape(c.conditions, false, Infinity)) : t("route.allOthers");
+    const does = outcomes(c.actions, keywords, delimiter).map((o) => o.text).join(", ");
+    return `${num ? t("route.caseN", { n: num }) + ", " : ""}${word}: ${what}${does ? " → " + does : ""}`;
+  }
+  function shapeSentence(shape: ReturnType<typeof conditionShape>): string {
+    if (shape.kind === "always") return t("route.always");
+    if (shape.kind === "line") return shape.token.sentence;
+    const joiner = shape.mode === "any" || shape.mode === "none" ? t("route.or") : t("route.and");
+    return `${t(groupHeading[shape.mode])} ${shape.items.map((i) => (i.kind === "token" ? i.token.sentence : `(${shapeSentence(i.shape)})`)).join(` ${joiner} `)}`;
+  }
+  const groupHeading = { any: "route.groupAny", all: "route.groupAll", none: "route.groupNone", notAll: "route.groupNotAll" } as const;
+
   /** A case that neither the search nor the filter is about. */
   const unrelated = (c: Case) => (words.length > 0 && !caseMatches(c, words, keywords, delimiter)) || (filter !== null && !filter(c));
 
@@ -104,7 +119,7 @@
   {#if missed}
     <span class="justify-self-start rounded-full bg-base-content/10 px-2 text-[0.75rem] leading-5 font-medium text-base-content/85" title={t("trial.missed")}>{t("trial.missedShort")}</span>
   {:else if untried}
-    <span class="text-[0.75rem] text-base-content/75 italic" title={t("trial.notTriedHint")}>{t("trial.notTried")}</span>
+    <span class="text-[0.75rem] text-base-content/85 italic" title={t("trial.notTriedHint")}>{t("trial.notTried")}</span>
   {/if}
   </span>
 {/snippet}
@@ -124,6 +139,7 @@
     style="--row-indent: {bare ? '0px' : 'calc(7rem + 0.375rem)'}"
     title={trial && trial.reached && hit === false && !trial.misses.includes(path) ? t("trial.notTriedHint") : undefined}
     data-nav
+    aria-label={caseName(c, num)}
     aria-current={picked === path ? "true" : undefined}
     onclick={(e) => {
       e.stopPropagation();
@@ -193,7 +209,9 @@
               {/if}
               <span>
                 <span class="font-semibold" style="color: {color}">
-                  {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions)}{own
+                  {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && !multi}{t(
+                    "route.onlyIfAlso",
+                  )}{:else if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions)}{own
                     ? t("route.decidesIn", { n: own })
                     : t("route.decidesHere")}{:else if c.kind === "else"}{t("route.nestedInOtherwise")}{:else if own}{t("route.nestedIn", { n: own })}{:else}{t(
                     "route.nestedHeadingSingle",

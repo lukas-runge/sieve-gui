@@ -111,6 +111,10 @@
         <span class="size-2 rounded-full" style="background: oklch(0.62 0.13 {h})"></span>
         {#if o.kind === "unlabel"}{t("route.remove")}{/if}{#if o.kind === "setLabels"}{t("route.only")}{/if}<Mark text={o.text} {words} />
       </span>
+    {:else if o.kind === "keep"}
+      <span class="inline-flex items-center gap-1 text-[0.875rem] whitespace-nowrap text-base-content/85" title={t("route.keepTitle")}>
+        <Icon name="inbox" size={14} class="text-base-content/70" /><Mark text={o.text} {words} />
+      </span>
     {:else}
       <span class="inline-flex items-center gap-1 text-[0.875rem] whitespace-nowrap text-base-content/80">
         <Icon name={icon[o.kind]} size={14} class="text-base-content/70" /><Mark text={o.text} {words} />

@@ -156,6 +156,19 @@
     requestAnimationFrame(() => sheet?.querySelector<HTMLElement>('.route [aria-current="true"]')?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
   });
 
+  /** ↑/↓ move between cases and rules, Enter opens one. */
+  function navigate(e: KeyboardEvent) {
+    if ((e.key !== "ArrowDown" && e.key !== "ArrowUp") || e.altKey || !sheet) return;
+    const current = (e.target as HTMLElement).closest<HTMLElement>("[data-nav]");
+    if (!current) return;
+    const all = [...sheet.querySelectorAll<HTMLElement>("[data-nav]")].filter((el) => el.offsetParent !== null);
+    const next = all[all.indexOf(current) + (e.key === "ArrowDown" ? 1 : -1)];
+    if (!next) return;
+    e.preventDefault();
+    next.focus();
+    next.scrollIntoView({ block: "nearest" });
+  }
+
   // Another script opened: start over.
   let shownFor: string | null = null;
   $effect(() => {
@@ -283,7 +296,8 @@
   }
 </script>
 
-<section class="route-sheet rounded-box border border-base-300 bg-base-100" aria-label={t("route.heading")} bind:this={sheet}>
+<!-- svelte-ignore a11y_no_noninteractive_element_interactions: arrow keys move between the rule buttons inside -->
+<section class="route-sheet rounded-box border border-base-300 bg-base-100" aria-label={t("route.heading")} bind:this={sheet} onkeydown={navigate}>
   <!-- Search: sticks to the top while the list scrolls. -->
   <div class="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-t-box border-b border-base-300 bg-base-100 px-3 py-2">
     <div class="join" role="group" aria-label={t("dest.view")}>

@@ -387,6 +387,20 @@ export function cases(b: Branches): Case[] {
   return list;
 }
 
+/**
+ * Cases that can never apply because a case before them always matches
+ * first: one without conditions, or one testing exactly the same.
+ */
+export function unreachable(list: Case[]): Set<number> {
+  const out = new Set<number>();
+  const key = (c: Case) => (c.conditions ? JSON.stringify(c.conditions) : null);
+  for (let i = 1; i < list.length; i++) {
+    const own = key(list[i]);
+    if (list.slice(0, i).some((p) => p.conditions && (p.conditions.items.length === 0 || (own !== null && key(p) === own)))) out.add(i);
+  }
+  return out;
+}
+
 /** A rule that reads as one line: a single case without nested checks. */
 export function isSimple(b: Branches): boolean {
   return b.elsif.length === 0 && !b.otherwise && !b.actions.some((a) => a.type === "if");

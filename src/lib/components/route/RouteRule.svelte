@@ -7,7 +7,7 @@
   import type { Rule } from "#tauri/types";
   import { t } from "../../i18n.svelte";
   import type { Branches } from "../../rules/view";
-  import { caseMatches, cases, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
+  import { caseMatches, cases, unreachable, conditionShape, isSimple, outcomes, stops, type Case, type CasePath, type Outcome } from "../../rules/route";
   import Conditions from "./Conditions.svelte";
   import Icon from "../Icon.svelte";
   import Mark from "./Mark.svelte";
@@ -97,7 +97,7 @@
 {/snippet}
 
 <!-- What a case tests (left) and does (right, in the column shared by all rows). -->
-{#snippet caseRow(c: Case, num: string | null, path: CasePath)}
+{#snippet caseRow(c: Case, num: string | null, path: CasePath, dead = false)}
   {@const hit = applies(path)}
   {@const dim = (words.length > 0 && !caseMatches(c, words, keywords, delimiter)) || hit === false || (filter !== null && !filter(c))}
   <button
@@ -108,6 +108,7 @@
       dim && "opacity-60",
     ]}
     style="--row-indent: calc(7rem + 0.375rem)"
+    data-nav
     aria-current={picked === path ? "true" : undefined}
     onclick={(e) => {
       e.stopPropagation();
@@ -119,6 +120,11 @@
       <span class="min-w-0">
         {#if c.conditions}
           <Conditions shape={conditionShape(c.conditions, false, picked === path ? Infinity : 3)} {words} />
+          {#if dead}
+            <span class="mt-0.5 flex items-center gap-1 text-[0.8rem] font-medium text-base-content">
+              <span class="inline-flex items-center gap-1 rounded-full bg-warning/25 px-2"><Icon name="alert" size={13} />{t("route.unreachable")}</span>
+            </span>
+          {/if}
         {:else}
           <span class="text-[0.94rem] text-base-content/70">{t("route.allOthers")}</span>
         {/if}
@@ -137,6 +143,7 @@
 {#snippet switchCases(b: Branches, depth: number, prefix: string, pre: string)}
   {@const list = cases(b)}
   {@const single = list.length === 1}
+  {@const dead = unreachable(list)}
   <ul class="rails" style="--rail: var(--rail-{Math.min(depth, 3)}); --elbow: 0.95rem">
     {#each segments(list) as seg}
       {#if seg.kind === "folded"}
@@ -152,7 +159,7 @@
       {@const num = single || c.kind === "else" ? null : pre ? `${pre}.${c.number}` : String(c.number)}
       {@const own = single ? pre : pre ? `${pre}.${c.number}` : String(c.number)}
       <li>
-        {@render caseRow(c, num, path)}
+        {@render caseRow(c, num, path, dead.has(i))}
         {#each c.nested as n, j}
           {@const multi = cases(n).length > 1}
           {@const color = `var(--rail-${Math.min(depth + 1, 3)})`}
@@ -182,6 +189,7 @@
   <button
     class={["w-full rounded-field text-left transition-opacity", hit && "trial-hit-row", hit === false && "opacity-60"]}
     aria-current={picked === "" ? "true" : undefined}
+    data-nav
     onclick={() => onpick("")}
   >
     <span class="route-row">

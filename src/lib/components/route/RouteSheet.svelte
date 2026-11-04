@@ -35,7 +35,7 @@
   const words = $derived(queryWords(query));
   /** While searching, only matching items show and the order can't change. */
   const searching = $derived(words.length > 0);
-  const shown = $derived(editor.rules.items.map((item) => !searching || matches(item, words)));
+  const shown = $derived(editor.rules.items.map((item) => !searching || matches(item, words, keywords)));
   const shownCount = $derived(shown.filter(Boolean).length);
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
@@ -50,6 +50,7 @@
   }
 
   function duplicate(index: number) {
+    editor.focus = "";
     const copy = { ...$state.snapshot(editor.rules.items[index]), uid: uid() };
     if (copy.type === "rule") copy.name = copy.name ? t("rule.copyOf", { name: copy.name }) : "";
     editor.edit((rules) => {
@@ -74,6 +75,7 @@
   }
 
   export function addRule() {
+    editor.focus = "";
     const item = { type: "rule" as const, ...newRule(t("rule.new")), uid: uid() };
     editor.edit((rules) => {
       rules.items.push(item);
@@ -83,6 +85,7 @@
   }
 
   function addCode() {
+    editor.focus = "";
     const item = { type: "raw" as const, code: "", uid: uid() };
     editor.edit((rules) => {
       rules.items.push(item);
@@ -105,9 +108,14 @@
     dragFrom = dropAt = null;
   }
 
-  /** Opens the item in the inspector, or closes it if it is open already. */
-  function select(id: string) {
-    editor.selected = editor.selected === id ? null : id;
+  /** Opens a rule (at one of its cases) in the inspector; again closes it. */
+  function pick(id: string, path: string) {
+    if (editor.selected === id && editor.focus === path) {
+      editor.selected = null;
+      return;
+    }
+    editor.selected = id;
+    editor.focus = path;
   }
 </script>
 
@@ -187,25 +195,30 @@
         <span class="route-node grid place-items-center pt-[0.95rem]">
           <span class="route-mark route-mark-{shape}" class:selected></span>
         </span>
-        <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected && "bg-primary/[0.07] ring-1 ring-primary/30"]}>
-          <button
-            class="min-w-0 grow cursor-pointer rounded-field px-2.5 py-2 text-left hover:bg-base-200/60"
-            aria-expanded={selected}
-            aria-label={item.type === "rule" ? item.name || t("rule.untitled") : t("raw.heading")}
-            onclick={() => select(item.uid)}
-          >
+        <div class={["my-0.5 flex min-w-0 items-start gap-2 rounded-field", selected && "bg-primary/[0.05] ring-1 ring-primary/25"]}>
+          <div class="min-w-0 grow rounded-field px-2.5 py-2 hover:bg-base-200/50">
             {#if item.type === "rule"}
-              <RouteRule rule={item} {delimiter} {keywords} singleFolder={editor.rules.singleFolder} />
+              <RouteRule
+                rule={item}
+                {delimiter}
+                {keywords}
+                singleFolder={editor.rules.singleFolder}
+                {words}
+                picked={selected ? editor.focus : null}
+                onpick={(path) => pick(item.uid, path)}
+              />
             {:else}
-              <div class="flex items-baseline gap-2">
-                <span class="font-semibold">{t("raw.heading")}</span>
-                {#if editor.roundcubeRisks?.rawBlocks.includes(index)}
-                  <span class="badge badge-sm badge-soft badge-warning">{t("roundcube.badge")}</span>
-                {/if}
-              </div>
-              <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8rem] leading-snug text-base-content/60">{item.code.trim() || "…"}</pre>
+              <button class="w-full text-left" aria-current={selected ? "true" : undefined} onclick={() => pick(item.uid, "")}>
+                <span class="flex items-baseline gap-2">
+                  <span class="font-semibold">{t("raw.heading")}</span>
+                  {#if editor.roundcubeRisks?.rawBlocks.includes(index)}
+                    <span class="badge badge-sm badge-soft badge-warning">{t("roundcube.badge")}</span>
+                  {/if}
+                </span>
+                <pre class="mt-1 max-h-16 overflow-hidden font-mono text-[0.8rem] leading-snug text-base-content/65">{item.code.trim() || "…"}</pre>
+              </button>
             {/if}
-          </button>
+          </div>
           <div class="flex shrink-0 items-center gap-1 pt-2 pr-1.5">
             {#if item.type === "rule" && !item.enabled}
               <span class="rounded-full bg-base-200 px-2 text-[0.75rem] leading-5 font-medium text-base-content/60">{t("route.off")}</span>

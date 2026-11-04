@@ -230,6 +230,25 @@ const SYSTEM_FLAGS: Record<string, MessageKey> = {
   "\\draft": "route.flag.draft",
 };
 
+/** The IMAP system flags a rule can set, in the order they are offered. */
+export const SYSTEM_FLAG_LIST = ["\\Seen", "\\Flagged", "\\Answered", "\\Draft", "\\Deleted"];
+
+/**
+ * The flag a typed text stands for: a system flag or label by its name, a
+ * flag written as such (`\Seen`, `$label1`), else a new keyword (spaces
+ * aren't allowed in keywords, so they become underscores).
+ */
+export function flagFromText(text: string, keywords: Record<string, string>): string | null {
+  const typed = text.trim();
+  if (!typed) return null;
+  const lower = typed.toLocaleLowerCase();
+  const system = SYSTEM_FLAG_LIST.find((f) => f.toLowerCase() === lower || flagName(f, {}).toLocaleLowerCase() === lower);
+  if (system) return system;
+  const named = Object.entries(keywords).find(([, name]) => name.toLocaleLowerCase() === lower);
+  if (named) return named[0];
+  return typed.replace(/\s+/g, "_");
+}
+
 /** A flag by its name: system flags in words, keywords by the account's names. */
 export function flagName(flag: string, keywords: Record<string, string>): string {
   const key = SYSTEM_FLAGS[flag.toLowerCase()];
@@ -350,4 +369,73 @@ export function destinations(b: Branches, delimiter: string | null): string[] {
     ...c.nested.flatMap((n) => destinations(n, delimiter)),
   ]);
   return [...new Set(all)];
+}
+
+// ── Search and picking ───────────────────────────────────────────────────────
+
+/** `text` split into parts that match one of the search words and parts that don't. */
+export function marks(text: string, words: string[]): { text: string; hit: boolean }[] {
+  if (words.length === 0 || text === "") return [{ text, hit: false }];
+  const lower = text.toLocaleLowerCase();
+  const hits: boolean[] = new Array(text.length).fill(false);
+  for (const w of words) {
+    if (!w) continue;
+    for (let i = lower.indexOf(w); i >= 0; i = lower.indexOf(w, i + 1)) hits.fill(true, i, i + w.length);
+  }
+  const out: { text: string; hit: boolean }[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const last = out.at(-1);
+    if (last && last.hit === hits[i]) last.text += text[i];
+    else out.push({ text: text[i], hit: hits[i] });
+  }
+  return out;
+}
+
+function shapeText(shape: ConditionShape): string {
+  if (shape.kind === "always") return "";
+  if (shape.kind === "line") return tokenText(shape.token);
+  return shape.items.map((i) => (i.kind === "token" ? tokenText(i.token) : shapeText(i.shape))).join(" ");
+}
+
+function tokenText(token: ConditionToken): string {
+  return [token.field, token.fieldTitle ?? "", ...token.values.map((v) => v.text), ...token.more].join(" ");
+}
+
+/** Whether a case (with its nested checks) contains one of the search words. */
+export function caseMatches(c: Case, words: string[], keywords: Record<string, string>, delimiter: string | null): boolean {
+  if (words.length === 0) return true;
+  const text = [
+    c.conditions ? shapeText(conditionShape(c.conditions)) : "",
+    ...outcomes(c.actions, keywords, delimiter).map((o) => o.text),
+  ]
+    .join(" ")
+    .toLocaleLowerCase();
+  return words.some((w) => text.includes(w)) || c.nested.some((n) => cases(n).some((x) => caseMatches(x, words, keywords, delimiter)));
+}
+
+/**
+ * Where a case sits in a rule: top-level case indexes and, for checks inside
+ * a case, "case.check.case", e.g. "0.0.2" for the third case of the first
+ * check in the first case. "" is the rule itself.
+ */
+export type CasePath = string;
+
+/** Readable position of a case, e.g. "Case 1 › Check › Case 3". */
+export function casePathLabel(rule: Branches, path: CasePath): string {
+  if (path === "") return "";
+  const parts = path.split(".").map(Number);
+  const out: string[] = [];
+  let block: Branches = rule;
+  for (let i = 0; i < parts.length; i += 2) {
+    const list = cases(block);
+    const c = list[parts[i]];
+    if (!c) break;
+    out.push(c.kind === "else" ? t("route.otherwiseCase") : list.length === 1 ? t("route.checkCase") : t("route.caseN", { n: c.number }));
+    const next = parts[i + 1];
+    if (next === undefined) break;
+    const nested = c.nested[next];
+    if (!nested) break;
+    block = nested;
+  }
+  return out.join(" › ");
 }

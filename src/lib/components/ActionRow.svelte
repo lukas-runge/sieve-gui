@@ -8,6 +8,7 @@
   import { isKeyword } from "../keywords";
   import { session } from "../session.svelte";
   import Icon from "./Icon.svelte";
+  import { flagFromText, flagName, SYSTEM_FLAG_LIST } from "../rules/route";
 
   let {
     action,
@@ -15,6 +16,8 @@
     folders,
     singleFolder,
     depth = 1,
+    path = "",
+    focus = "",
     onchange,
     onremove,
   }: {
@@ -26,6 +29,10 @@
     singleFolder: boolean;
     /** Nesting level a check in this action would have. */
     depth?: number;
+    /** Case path prefix a check in this action has (see `CasePath`). */
+    path?: string;
+    /** The case the inspector shows first. */
+    focus?: string;
     onchange: (a: Action, merge: boolean) => void;
     onremove: () => void;
   } = $props();
@@ -46,12 +53,6 @@
     if (name !== null) await session.setKeywordName(accountId, keyword, name);
   }
 
-  function flagsText(flags: string[]) {
-    return flags.join(" ");
-  }
-  function parseFlags(text: string) {
-    return text.split(/\s+/).filter(Boolean);
-  }
 </script>
 
 <div class="flex flex-wrap items-start gap-2 rounded-field bg-base-200/70 p-2">
@@ -117,29 +118,55 @@
       oninput={(e) => onchange({ ...action, reason: e.currentTarget.value }, true)}
     ></textarea>
   {:else if action.type === "flags" && kind !== "markRead" && kind !== "flag"}
-    <div class="grow min-w-48">
-      <input
-        class="input input-sm w-full font-mono"
-        aria-label={t("action.flags")}
-        placeholder="\Seen \Flagged $Label1"
-        value={flagsText(action.flags)}
-        oninput={(e) => onchange({ ...action, flags: parseFlags(e.currentTarget.value) }, true)}
-      />
-      <p class="mt-1 text-xs text-base-content/60">{t("action.flagsHint")}</p>
-      {#if accountId && action.flags.some(isKeyword)}
-        <!-- Names for custom keywords, e.g. a webmail's labels. -->
-        <div class="mt-1 flex flex-wrap gap-1">
-          {#each action.flags.filter(isKeyword) as keyword}
+    {@const flags = action.flags}
+    <div class="grid grow min-w-48 gap-1.5">
+      <div class="flex flex-wrap items-center gap-1.5">
+        {#each flags as flag, i}
+          {@const unnamed = isKeyword(flag) && !keywordNames[flag]}
+          <span class="inline-flex items-center gap-0.5 rounded-full border border-base-300 bg-base-100 py-px pr-0.5 pl-2 text-sm">
+            {#if isKeyword(flag) && accountId}
+              <button
+                type="button"
+                class={["hover:underline", unnamed && "font-mono text-[0.8rem] text-base-content/70"]}
+                title={t("keywords.nameTitle", { keyword: flag })}
+                onclick={() => nameKeyword(flag)}>{flagName(flag, keywordNames)}</button
+              >
+            {:else}
+              <span>{flagName(flag, keywordNames)}</span>
+            {/if}
             <button
               type="button"
-              class={["badge badge-sm cursor-pointer", keywordNames[keyword] ? "badge-soft badge-primary" : "badge-ghost"]}
-              title={t("keywords.nameTitle", { keyword })}
-              onclick={() => nameKeyword(keyword)}
+              class="grid size-5 place-items-center rounded-full text-base-content/50 hover:bg-base-200 hover:text-base-content"
+              aria-label={t("action.flagRemove", { name: flagName(flag, keywordNames) })}
+              onclick={() => onchange({ ...action, flags: flags.filter((_, j) => j !== i) }, false)}><Icon name="x" size={12} /></button
             >
-              {keywordNames[keyword] ?? t("keywords.unnamed", { keyword })}
-            </button>
-          {/each}
-        </div>
+          </span>
+        {/each}
+        <input
+          class="input input-sm min-w-40 grow"
+          aria-label={t("action.flags")}
+          placeholder={t("action.flagAdd")}
+          list="{folderListId}-flags"
+          onkeydown={(e) => {
+            if (e.key !== "Enter" && e.key !== ",") return;
+            e.preventDefault();
+            const flag = flagFromText(e.currentTarget.value, keywordNames);
+            if (flag && !flags.includes(flag)) onchange({ ...action, flags: [...flags, flag] }, false);
+            e.currentTarget.value = "";
+          }}
+          onchange={(e) => {
+            const flag = flagFromText(e.currentTarget.value, keywordNames);
+            if (flag && !flags.includes(flag)) onchange({ ...action, flags: [...flags, flag] }, false);
+            e.currentTarget.value = "";
+          }}
+        />
+        <datalist id="{folderListId}-flags">
+          {#each SYSTEM_FLAG_LIST as f}<option value={flagName(f, {})}></option>{/each}
+          {#each Object.values(keywordNames) as name}<option value={name}></option>{/each}
+        </datalist>
+      </div>
+      {#if flags.some((f) => isKeyword(f) && !keywordNames[f])}
+        <p class="text-xs text-base-content/65">{t("action.flagNameHint")}</p>
       {/if}
     </div>
   {:else if action.type === "vacation"}
@@ -202,6 +229,8 @@
         {folders}
         {singleFolder}
         {depth}
+        {path}
+        {focus}
         mutate={(fn, merge) => {
           const copy = $state.snapshot(nested);
           fn(copy);

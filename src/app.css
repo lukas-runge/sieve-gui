@@ -162,7 +162,7 @@ body {
   column-gap: 1.25rem;
   align-items: start;
 }
-@container route (max-width: 38rem) {
+@container route (max-width: 46rem) {
   .route-row {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 0.25rem;

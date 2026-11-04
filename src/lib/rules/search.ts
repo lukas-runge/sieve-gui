@@ -7,7 +7,7 @@ import { mailboxLabel } from "./mailbox.ts";
 const TECHNICAL = new Set(["type", "matchType", "op", "unit", "part", "join", "comparator", "transform", "zone", "datePart"]);
 
 /** Every text a user may search for in an item, lowercased. */
-export function searchText(item: RuleItem): string {
+export function searchText(item: RuleItem, keywordNames: Record<string, string> = {}): string {
   if (item.type === "raw") return item.code.toLowerCase();
   const texts: string[] = [item.name];
   const walk = (value: unknown, key = "") => {
@@ -16,6 +16,8 @@ export function searchText(item: RuleItem): string {
       texts.push(value);
       // Folder names as people read them (modified UTF-7 decoded).
       if (key === "mailbox") texts.push(mailboxLabel(value));
+      // Labels by the names the account gave them.
+      if (key === "flags" && keywordNames[value]) texts.push(keywordNames[value]);
     } else if (typeof value === "number") {
       texts.push(String(value));
     } else if (Array.isArray(value)) {
@@ -37,8 +39,8 @@ export function queryWords(query: string): string[] {
   return query.toLowerCase().split(/\s+/).filter((w) => w !== "");
 }
 
-export function matches(item: RuleItem, words: string[]): boolean {
+export function matches(item: RuleItem, words: string[], keywordNames: Record<string, string> = {}): boolean {
   if (words.length === 0) return true;
-  const text = searchText(item);
+  const text = searchText(item, keywordNames);
   return words.every((w) => text.includes(w));
 }

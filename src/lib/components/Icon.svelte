@@ -41,6 +41,8 @@
     nested: `<path d="m15 10 5 5-5 5"/><path d="M4 4v7a4 4 0 0 0 4 4h12"/>`,
     circleCheck: `<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>`,
     branch: `<path d="M15 6a9 9 0 0 0-9 9V3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>`,
+    arrowLeft: `<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>`,
+    panelLeft: `<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>`,
   };
   export type IconName = keyof typeof icons;
 </script>

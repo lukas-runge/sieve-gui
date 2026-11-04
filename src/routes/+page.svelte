@@ -56,6 +56,24 @@
   /** The code or the picked rule beside the route. */
   const rightPanel = $derived(!!editor && (showCode || !!editor.selected));
 
+  // The sidebar can be folded away; both choices persist.
+  let sidebarOpen = $state(localStorage.getItem("sidebar") !== "0");
+  $effect(() => localStorage.setItem("sidebar", sidebarOpen ? "1" : "0"));
+  const clampWidth = (w: number) => Math.round(Math.min(Math.max(w, 340), Math.min(820, window.innerWidth * 0.6)));
+  let panelWidth = $state(clampWidth(Number(localStorage.getItem("panelWidth")) || 480));
+  $effect(() => localStorage.setItem("panelWidth", String(panelWidth)));
+
+  function startResize(e: PointerEvent) {
+    e.preventDefault();
+    const move = (ev: PointerEvent) => (panelWidth = clampWidth(window.innerWidth - ev.clientX));
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
   /** Code and inspector share the place on the right. */
   function toggleCode() {
     showCode = !showCode;
@@ -103,18 +121,25 @@
 <svelte:window {onkeydown} />
 
 <div
-  class={[
-    "grid h-screen",
-    rightPanel && wide.current ? "grid-cols-[16rem_minmax(0,1fr)_clamp(22rem,34vw,34rem)]" : "grid-cols-[16rem_minmax(0,1fr)]",
-  ]}
+  class="grid h-screen"
+  style:grid-template-columns="{sidebarOpen ? '16rem' : '0'} minmax(0, 1fr){rightPanel && wide.current ? ` ${panelWidth}px` : ''}"
 >
-  <aside class="min-h-0 border-r border-base-300 bg-base-200">
+  <aside class="min-h-0 overflow-hidden border-r border-base-300 bg-base-200" inert={!sidebarOpen}>
     <Sidebar onaccount={(account) => (accountDialog = { account })} />
   </aside>
 
   <main class="flex min-w-0 flex-col overflow-hidden bg-base-200">
     {#if editor}
       <header class="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-base-300 bg-base-100 px-6 py-3">
+        <button
+          class="btn btn-ghost btn-sm btn-square -ml-2 self-start text-base-content/60"
+          aria-pressed={!sidebarOpen}
+          aria-label={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
+          title={sidebarOpen ? t("sidebar.hide") : t("sidebar.show")}
+          onclick={() => (sidebarOpen = !sidebarOpen)}
+        >
+          <Icon name="panelLeft" size={17} />
+        </button>
         <div class="min-w-0 grow">
           <div class="flex min-w-0 items-center gap-3">
             <h1 class="truncate text-[1.35rem] leading-tight font-semibold">{editor.name}</h1>
@@ -162,7 +187,7 @@
           {#if showCode}
             <div class="flex min-h-0 grow flex-col gap-2 p-3">{@render codePanel(editor.code)}</div>
           {:else}
-            <Inspector {editor} extensions={session.extensions} serverFolders={serverFolders} />
+            <Inspector {editor} extensions={session.extensions} serverFolders={serverFolders} onback={() => (editor.selected = null)} />
           {/if}
         </section>
       {:else}
@@ -248,6 +273,18 @@
   </main>
 
   {#if rightPanel && wide.current}
+    <div class="relative flex min-h-0 min-w-0 flex-col">
+    <!-- Drag to make the panel wider or narrower. -->
+    <button
+      aria-label={t("panel.resize")}
+      title={t("panel.resize")}
+      class="absolute inset-y-0 -left-1 z-30 w-2 cursor-col-resize hover:bg-primary/25 focus-visible:bg-primary/40"
+      onpointerdown={startResize}
+      onkeydown={(e) => {
+        if (e.key === "ArrowLeft") panelWidth = clampWidth(panelWidth + 24);
+        if (e.key === "ArrowRight") panelWidth = clampWidth(panelWidth - 24);
+      }}
+    ></button>
     {#if showCode}
       <aside class="flex min-w-0 flex-col gap-2 overflow-hidden border-l border-base-300 bg-base-100 p-3" aria-label={t("code.heading")}>
         {@render codePanel(editor!.code)}
@@ -255,6 +292,7 @@
     {:else}
       <Inspector editor={editor!} extensions={session.extensions} serverFolders={serverFolders} />
     {/if}
+    </div>
   {/if}
 </div>
 

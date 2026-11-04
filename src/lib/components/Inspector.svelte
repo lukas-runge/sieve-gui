@@ -1,5 +1,6 @@
 <script lang="ts">
   // The rule picked on the route, to read and change beside it.
+  import { setContext, tick } from "svelte";
   import { importRules } from "#tauri/commands";
   import type { Folder, Rule } from "#tauri/types";
   import { describeError } from "../api";
@@ -7,8 +8,9 @@
   import { t } from "../i18n.svelte";
   import { closesMenu } from "../menu";
   import { scriptFolders, type ScriptFolders } from "../rules/mailbox";
-  import { isSimple } from "../rules/route";
-  import BranchesEditor from "./BranchesEditor.svelte";
+  import { casePathLabel, isSimple } from "../rules/route";
+  import { session } from "../session.svelte";
+  import BranchesEditor, { SUMMARY, type SummaryContext } from "./BranchesEditor.svelte";
   import CodeEditor from "./CodeEditor.svelte";
   import Icon from "./Icon.svelte";
 
@@ -16,7 +18,39 @@
     editor,
     extensions,
     serverFolders,
-  }: { editor: ScriptEditor; extensions: string[]; serverFolders: Folder[] | null } = $props();
+    onback,
+  }: {
+    editor: ScriptEditor;
+    extensions: string[];
+    serverFolders: Folder[] | null;
+    /** In narrow windows the inspector replaces the route: back to it. */
+    onback?: () => void;
+  } = $props();
+
+  // Case summaries read like the route.
+  const summary: SummaryContext = $state({ keywords: {}, delimiter: null });
+  $effect(() => {
+    summary.keywords = session.keywordNames(editor.accountId);
+    summary.delimiter = serverFolders?.find((f) => f.delimiter)?.delimiter ?? null;
+  });
+  setContext(SUMMARY, summary);
+
+  // The picked case comes into view and lights up briefly.
+  let body = $state<HTMLElement>();
+  $effect(() => {
+    const target = `${editor.selected}|${editor.focus}`;
+    void tick().then(() => {
+      if (!body || target !== `${editor.selected}|${editor.focus}`) return;
+      const el = editor.focus ? body.querySelector<HTMLElement>(`[data-case="${editor.focus}"]`) : null;
+      if (el) {
+        el.scrollIntoView({ block: "start", behavior: "smooth" });
+        el.animate([{ backgroundColor: "color-mix(in oklab, var(--color-primary) 14%, transparent)" }, { backgroundColor: "transparent" }], {
+          duration: 1200,
+          easing: "ease-out",
+        });
+      } else body.scrollTo({ top: 0 });
+    });
+  });
 
   const index = $derived(editor.rules.items.findIndex((i) => i.uid === editor.selected));
   const item = $derived(index >= 0 ? editor.rules.items[index] : null);
@@ -77,13 +111,21 @@
 {#if item}
   <aside class="flex h-full min-w-0 flex-col border-l border-base-300 bg-base-100" aria-label={t("inspector.label")}>
     <header class="flex items-start gap-2 border-b border-base-300 px-4 pt-3 pb-2.5">
+      {#if onback}
+        <button class="btn btn-ghost btn-sm btn-square -ml-1.5" aria-label={t("inspector.back")} title={t("inspector.back")} onclick={onback}>
+          <Icon name="arrowLeft" size={17} />
+        </button>
+      {/if}
       <div class="min-w-0 grow">
-        <p class="text-[0.78rem] text-base-content/55">
+        <p class="truncate text-[0.8rem] text-base-content/65">
           {#if item.type === "raw"}{t("raw.heading")}{:else if isSimple(item)}{t("inspector.rule")}{:else}{t("inspector.switch")}{/if}
+          {#if item.type === "rule" && editor.focus}
+            <span class="text-base-content/45">›</span> <span class="font-medium text-base-content/80">{casePathLabel(item, editor.focus)}</span>
+          {/if}
         </p>
         {#if item.type === "rule"}
           <input
-            class="w-full rounded-field bg-transparent text-lg font-semibold outline-none placeholder:font-normal placeholder:text-base-content/40 focus:bg-base-200 focus:px-1.5 -mx-0 transition-[padding]"
+            class="w-full rounded-field bg-transparent text-lg font-semibold outline-none placeholder:font-normal placeholder:text-base-content/45 focus:bg-base-200 focus:px-1.5"
             aria-label={t("rule.name")}
             placeholder={t("inspector.namePlaceholder")}
             value={item.name}
@@ -103,7 +145,7 @@
       </button>
     </header>
 
-    <div class="min-h-0 grow overflow-y-auto px-4 py-4">
+    <div class="min-h-0 grow overflow-y-auto px-4 py-4" bind:this={body}>
       {#if item.type === "rule"}
         <label class="mb-4 flex items-center gap-2.5 text-sm">
           <input type="checkbox" class="toggle toggle-sm toggle-primary" checked={item.enabled} onchange={(e) => change((r) => (r.enabled = e.currentTarget.checked))} />
@@ -113,6 +155,7 @@
           block={item}
           {extensions}
           {folders}
+          focus={editor.focus}
           singleFolder={editor.rules.singleFolder}
           mutate={(fn, merge) => change((r) => fn(r), merge)}
         />

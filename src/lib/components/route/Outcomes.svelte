@@ -4,8 +4,14 @@
   import type { Outcome } from "../../rules/route";
   import { t } from "../../i18n.svelte";
   import Icon, { type IconName } from "../Icon.svelte";
+  import Mark from "./Mark.svelte";
 
-  let { items, stop = false, singleFolder = false }: { items: Outcome[]; stop?: boolean; singleFolder?: boolean } = $props();
+  let {
+    items,
+    stop = false,
+    singleFolder = false,
+    words = [],
+  }: { items: Outcome[]; stop?: boolean; singleFolder?: boolean; words?: string[] } = $props();
 
   const icon: Record<Outcome["kind"], IconName> = {
     move: "folder",
@@ -40,11 +46,11 @@
         <span class="flex min-w-0 items-baseline">
           <!-- The direct parent says enough; the full path is in the tooltip. -->
           {#if o.path.length > 1}
-            <span class="min-w-0 truncate text-[0.82rem] text-base-content/50"
-              >{o.path.length > 2 ? "… / " : ""}{o.path.at(-2)}&nbsp;/&nbsp;</span
+            <span class="min-w-0 truncate text-[0.84rem] text-base-content/65"
+              >{o.path.length > 2 ? "… / " : ""}<Mark text={o.path.at(-2) ?? ""} {words} />&nbsp;/&nbsp;</span
             >
           {/if}
-          <span class="shrink-0 font-semibold">{o.path.at(-1) ?? o.text}</span>
+          <span class="shrink-0 font-semibold"><Mark text={o.path.at(-1) ?? o.text} {words} /></span>
         </span>
       </span>
     {:else if o.kind === "label" || o.kind === "unlabel" || o.kind === "setLabels"}
@@ -55,20 +61,20 @@
         title={o.kind === "setLabels" ? t("route.setLabelsTitle") : undefined}
       >
         <span class="size-1.5 rounded-full" style="background: oklch(0.62 0.13 {h})"></span>
-        {#if o.kind === "unlabel"}{t("route.remove")}{/if}{#if o.kind === "setLabels"}{t("route.only")}{/if}{o.text}
+        {#if o.kind === "unlabel"}{t("route.remove")}{/if}{#if o.kind === "setLabels"}{t("route.only")}{/if}<Mark text={o.text} {words} />
       </span>
     {:else}
       <span class="inline-flex items-center gap-1 text-[0.88rem] whitespace-nowrap text-base-content/80">
-        <Icon name={icon[o.kind]} size={14} class="text-base-content/55" />{o.text}
+        <Icon name={icon[o.kind]} size={14} class="text-base-content/60" /><Mark text={o.text} {words} />
       </span>
     {/if}
   {/each}
   {#if stop}
     <span
-      class="inline-flex items-center gap-1 text-[0.8rem] whitespace-nowrap text-base-content/50"
+      class="inline-flex items-center gap-1 text-[0.82rem] whitespace-nowrap text-base-content/65"
       title={singleFolder ? t("route.stopScriptHint") : t("route.stopHint")}
     >
-      <Icon name="stop" size={14} />{t("route.stop")}
+      <Icon name="stop" size={14} />{singleFolder ? t("route.stopScriptRules") : t("route.stopRules")}
     </span>
   {/if}
 </div>

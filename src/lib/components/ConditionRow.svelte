@@ -36,7 +36,13 @@
   const view = $derived(viewCondition(condition));
   const size = $derived(view?.field === "size" ? splitSize(Number(view.values[0])) : null);
   // "exists" asks for the header, not a part of its addresses.
-  const parts = $derived(view && hasValues(view.operator) ? partsFor(view.field, extensions, view.part) : []);
+  // For a header typed in by hand, the address part is an expert detail: only
+  // shown once one is chosen.
+  const parts = $derived(
+    view && hasValues(view.operator) && (view.field !== "header" || view.part !== "header")
+      ? partsFor(view.field, extensions, view.part)
+      : [],
+  );
 
   const regex = $derived(view?.operator === "regex" || view?.operator === "notRegex");
   // The current operator stays selectable, e.g. a regex on a server without `regex`.

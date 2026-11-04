@@ -20,6 +20,7 @@
   import { addresses } from "../../rules/simulate";
   import { templateRule, type TemplateKind } from "../../rules/templates";
   import Icon from "../Icon.svelte";
+  import Destinations from "./Destinations.svelte";
   import RouteRule from "./RouteRule.svelte";
 
   let {
@@ -96,6 +97,15 @@
   let dragFrom = $state<number | null>(null);
   let dropAt = $state<number | null>(null);
 
+  /** The route, or where mail goes ("destinations"). */
+  let view = $state<"route" | "dest">("route");
+  /** The running scripts with their rules, the open one with its edits. */
+  const runningScripts = $derived(
+    order.length
+      ? order.map((name) => ({ name, items: name === editor.name ? editor.rules.items : (others?.find((o) => o.name === name)?.rules.items ?? []) }))
+      : [{ name: editor.name, items: editor.rules.items }],
+  );
+
   /** Search this script, or every script of the account. */
   let scope = $state<"script" | "all">("script");
   /** A folder or label clicked on the route: everything that goes there, in every script. */
@@ -109,7 +119,7 @@
     return others.filter((o) => !session.runs(editor.accountId, o.name) && o.rules.items.some((item) => goesTo(item, t))).length;
   });
   $effect(() => {
-    if (!searching && !target) return;
+    if (!searching && !target && view !== "dest") return;
     const id = editor.accountId;
     void session.allRules(id).then((list) => {
       if (editor.accountId === id) others = list;
@@ -159,6 +169,7 @@
   });
 
   function showTarget(o: Outcome) {
+    view = "route";
     if (!o.target) return;
     withInactive = false;
     target = { ...o.target, text: o.kind === "move" || o.kind === "copy" ? o.path.join(" / ") : o.text, folder: o.target.kind === "folder" };
@@ -275,6 +286,23 @@
 <section class="route-sheet rounded-box border border-base-300 bg-base-100" aria-label={t("route.heading")} bind:this={sheet}>
   <!-- Search: sticks to the top while the list scrolls. -->
   <div class="sticky top-0 z-20 flex flex-wrap items-center gap-2 rounded-t-box border-b border-base-300 bg-base-100 px-3 py-2">
+    <div class="join" role="group" aria-label={t("dest.view")}>
+      <button class={["btn btn-sm join-item gap-1.5", view === "route" ? "btn-active" : "btn-ghost"]} aria-pressed={view === "route"} onclick={() => (view = "route")}>
+        <Icon name="route" size={15} />{t("dest.route")}
+      </button>
+      <button
+        class={["btn btn-sm join-item gap-1.5", view === "dest" ? "btn-active" : "btn-ghost"]}
+        aria-pressed={view === "dest"}
+        title={t("dest.title")}
+        onclick={() => {
+          view = "dest";
+          target = null;
+          query = "";
+        }}
+      >
+        <Icon name="folder" size={15} />{t("dest.button")}
+      </button>
+    </div>
     {#if target}
       <div class="flex min-w-0 grow items-center gap-2 px-1.5 py-1 text-sm">
         <span class="whitespace-nowrap text-base-content/70">{t("target.heading")}</span>
@@ -314,7 +342,8 @@
       {/if}
     </label>
     {/if}
-    <div class={["join", target && "hidden"]} role="group" aria-label={t("search.scope")}>
+    <!-- Where to search: only while searching. -->
+    <div class={["join", (target || !searching) && "hidden"]} role="group" aria-label={t("search.scope")}>
       <button class={["btn btn-xs join-item", scope === "script" ? "btn-active" : "btn-ghost"]} aria-pressed={scope === "script"} onclick={() => (scope = "script")}>
         {t("search.thisScript")}
       </button>
@@ -367,7 +396,12 @@
     </div>
   {/if}
 
-  {#if listing}
+  {#if view === "dest" && !target}
+    <Destinations scripts={runningScripts} {delimiter} {keywords} onpick={(tg) => {
+      withInactive = false;
+      target = tg;
+    }} />
+  {:else if listing}
     <!-- Matches in every script of the account, in the order the scripts run. -->
     <div class="grid gap-4 px-3 py-3">
       {#each results as r (r.name)}

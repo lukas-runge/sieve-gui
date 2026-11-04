@@ -582,6 +582,15 @@ const en = {
   "template.senderName": "From a sender",
   "template.recipientName": "To an address",
   "template.subjectName": "By subject",
+  "dest.view": "View",
+  "dest.route": "Route",
+  "dest.button": "Destinations",
+  "dest.title": "Every folder and label mail goes to, and which rules send it there",
+  "dest.intro": "Where the {count} running script(s) send mail. Pick a folder or label to see the rules.",
+  "dest.folders": "Folders",
+  "dest.labels": "Labels",
+  "dest.below": "{count} below",
+  "dest.inbox": "Inbox: everything no rule moves",
   "language": "Language",
 } as const;
 
@@ -1168,6 +1177,15 @@ const de: Record<MessageKey, string> = {
   "template.senderName": "Von einem Absender",
   "template.recipientName": "An eine Adresse",
   "template.subjectName": "Nach Betreff",
+  "dest.view": "Ansicht",
+  "dest.route": "Strecke",
+  "dest.button": "Ziele",
+  "dest.title": "Alle Ordner und Labels, in die Mails gehen, und welche Regeln sie dorthin schicken",
+  "dest.intro": "Wohin die laufenden Skripte ({count}) Mails schicken. Wähle einen Ordner oder ein Label, um die Regeln zu sehen.",
+  "dest.folders": "Ordner",
+  "dest.labels": "Labels",
+  "dest.below": "{count} darunter",
+  "dest.inbox": "Posteingang: alles, was keine Regel verschiebt",
   "language": "Sprache",
 };
 

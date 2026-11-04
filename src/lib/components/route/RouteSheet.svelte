@@ -13,7 +13,7 @@
   import { closesMenu } from "../../menu";
   import { isSimple, outcomes } from "../../rules/route";
   import { goesTo, matches, queryWords, type Target } from "../../rules/search";
-  import { caseGoesTo, cases, type Outcome } from "../../rules/route";
+  import { caseGoesTo, caseMatches, cases, type Outcome } from "../../rules/route";
   import type { ScriptRun } from "../../rules/simulate";
   import { trial as sample } from "../../trial.svelte";
   import { accountView } from "../../scope.svelte";
@@ -162,6 +162,20 @@
   const listing = $derived(!!target || (scope !== "script" && searching));
   const results = $derived(listing ? allResults : []);
   const resultCount = $derived(results.reduce((n, r) => n + r.hits.length, 0));
+  /** Matching cases in those rules (a rule with several cases may match in several). */
+  const caseCount = $derived(
+    results.reduce(
+      (n, r) =>
+        n +
+        r.hits.reduce((m, h) => {
+          if (h.item.type !== "rule") return m + 1;
+          const list = cases(h.item);
+          const hit = list.filter((c) => (target ? caseGoesTo(c, target) : caseMatches(c, words, keywords, delimiter))).length;
+          return m + Math.max(1, hit);
+        }, 0),
+      0,
+    ),
+  );
   /** While searching this script: matches in the others, to point at them. */
   const elsewhere = $derived(searching && scope === "script" ? allResults.filter((r) => r.name !== editor.name) : []);
   const caseFilter = $derived(target ? (c: Parameters<typeof caseGoesTo>[0]) => caseGoesTo(c, target!) : null);
@@ -388,7 +402,8 @@
       {#if searching}
         <span class="text-[0.8125rem] whitespace-nowrap text-base-content/70" role="status">
           {scope !== "script"
-            ? resultCount === 1 ? t("search.hitOne") : t("search.countAll", { count: resultCount })
+            ? (resultCount === 1 ? t("search.hitOne") : t("search.countAll", { count: resultCount })) +
+              (caseCount > resultCount ? " · " + t("search.cases", { count: caseCount }) : "")
             : t("search.count", { shown: shownCount, total: editor.rules.items.length })}
         </span>
       {/if}
@@ -653,10 +668,15 @@
                 onpick={(path) => pick(item.uid, path)}
               />
             {:else}
-              <button class="w-full text-left" aria-current={selected ? "true" : undefined} onclick={() => pick(item.uid, "")}>
-                <span class="flex items-baseline gap-2">
-                  <span class="font-semibold">{t("raw.heading")}</span>
-                  <span class="text-[0.8125rem] text-base-content/70">{t("route.codeNote")}</span>
+              <!-- Own code: set apart, since its effect isn't summarised. -->
+              <button
+                class="w-full rounded-field border border-dashed border-base-content/30 bg-base-200/60 px-2.5 py-1.5 text-left"
+                aria-current={selected ? "true" : undefined}
+                onclick={() => pick(item.uid, "")}
+              >
+                <span class="flex flex-wrap items-baseline gap-x-2">
+                  <span class="flex items-center gap-1.5 font-semibold"><Icon name="code" size={14} />{t("raw.heading")}</span>
+                  <span class="text-[0.8125rem] text-base-content/75">{t("route.codeNote")}</span>
                   {#if editor.roundcubeRisks?.rawBlocks.includes(index)}
                     <span class="badge badge-sm badge-soft badge-warning">{t("roundcube.badge")}</span>
                   {/if}

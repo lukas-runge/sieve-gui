@@ -132,6 +132,7 @@
     class={[
       "route-row case-row w-full rounded-field py-1 pr-1 text-left transition-opacity hover:bg-base-content/[0.04]",
       bare && "pl-1.5",
+      depth > 0 && "case-deep",
       picked === path && "ring-2 ring-primary/70",
       hit && picked !== path && "bg-success/10 ring-1 ring-success/35",
       dim && "opacity-70",
@@ -189,10 +190,17 @@
           {@const color = `var(--rail-${Math.min(depth + 1, 3)})`}
           {@const fold = id ? `${id}|${path}.${j}` : ""}
           {@const folded = !!fold && folds.has(fold)}
-          <!-- Hangs off its case's number by an elbow, indented: a child, not a sibling. -->
+          <!-- Two kinds of nesting look different before reading: a case that
+               decides further (no actions of its own) continues its rail,
+               without a box; a check that adds to what a case does is an
+               attached section with a "+". -->
+          {@const decides = outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions)}
           <div
-            class="nested-box relative mx-1 mt-0.5 mb-1 ml-[1.6rem] rounded-field border-l-2 py-1.5 pr-1.5 pl-2"
-            style="--box: {color}; border-color: {color}; background: color-mix(in oklab, {color} var(--nest-tint), transparent)"
+            class={[
+              "relative mt-0.5 mb-1 ml-[1.6rem] py-1 pr-1.5",
+              decides ? "pl-1" : "nested-box mx-1 rounded-field border-l-2 border-dashed pl-2",
+            ]}
+            style="--box: {color}; border-color: {color}; {decides ? '' : `background: color-mix(in oklab, ${color} var(--nest-tint), transparent)`}"
           >
             <p class={["flex items-start gap-1 pl-0.5 text-[0.875rem] text-base-content/75", !folded && "mb-1", applies(path) === false && "opacity-70"]}>
               {#if fold}
@@ -208,6 +216,7 @@
                 >
               {/if}
               <span>
+                {#if !decides}<span class="mr-1 inline-grid size-4 place-items-center rounded-full text-[0.75rem] font-bold text-base-100" style="background: {color}" aria-hidden="true">+</span>{/if}
                 <span class="font-semibold" style="color: {color}">
                   {#if outcomes(c.actions, keywords, delimiter).length === 0 && !stops(c.actions) && !multi}{t(
                     "route.onlyIfAlso",

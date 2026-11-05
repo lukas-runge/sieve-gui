@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { Action } from "#tauri/types";
+  import type { Action, SetModifier } from "#tauri/types";
   import { t, type MessageKey } from "../i18n.svelte";
-  import { ACTION_KINDS, actionExtension, actionKind, buildAction, type ActionKind } from "../rules/view";
+  import { ACTION_KINDS, actionExtension, actionKind, buildAction, FOLDER_VARIABLE, SET_MODIFIERS, type ActionKind } from "../rules/view";
   import { folderExists, mailboxLabel, mailboxRaw, type ScriptFolders } from "../rules/mailbox";
   import BranchesEditor from "./BranchesEditor.svelte";
   import { askText } from "../dialogs.svelte";
@@ -169,6 +169,49 @@
       </datalist>
       {#if flags.some((f) => isKeyword(f) && !keywordNames[f])}
         <p class="text-[0.8rem] text-base-content/70">{t("action.flagNameHint")}</p>
+      {/if}
+    </div>
+  {:else if action.type === "set"}
+    {@const modifier = action.modifiers.length <= 1 ? (action.modifiers[0] ?? "") : null}
+    <div class="flex grow min-w-48 flex-wrap items-start gap-2">
+      <input
+        class="input input-sm w-40 font-mono"
+        aria-label={t("field.variableName")}
+        placeholder={t("field.variableName")}
+        title={t("field.variableHint")}
+        spellcheck="false"
+        autocapitalize="off"
+        value={action.name}
+        oninput={(e) => onchange({ ...action, name: e.currentTarget.value.replace(/[^A-Za-z0-9_]/g, "") }, true)}
+      />
+      <span class="py-1 text-sm text-base-content/70">{t("action.setTo")}</span>
+      <input
+        class="input input-sm min-w-40 grow"
+        aria-label={t("action.setValue")}
+        placeholder={t("action.setValue")}
+        value={action.value}
+        oninput={(e) => onchange({ ...action, value: e.currentTarget.value }, true)}
+      />
+      {#if modifier !== null}
+        <!-- One change of the value; several (written by hand) stay as they are. -->
+        <select
+          class="select select-sm w-auto"
+          aria-label={t("action.setModifier")}
+          value={modifier}
+          onchange={(e) => onchange({ ...action, modifiers: e.currentTarget.value ? [e.currentTarget.value as SetModifier] : [] }, false)}
+        >
+          <option value="">{t("action.setModifier.none")}</option>
+          {#each SET_MODIFIERS.filter((m) => m === modifier || m !== "quoteRegex" || extensions.includes("regex")) as m}
+            <option value={m}>{t(`action.setModifier.${m}` as MessageKey)}</option>
+          {/each}
+        </select>
+      {:else}
+        <span class="py-1 font-mono text-[0.8rem] text-base-content/70">{action.modifiers.map((m) => `:${m.toLowerCase()}`).join(" ")}</span>
+      {/if}
+      {#if singleFolder && action.name.toLowerCase() === FOLDER_VARIABLE}
+        <p class="basis-full text-[0.8rem] text-base-content/70">{t("action.setFolderVariable")}</p>
+      {:else}
+        <p class="basis-full text-[0.8rem] text-base-content/70">{t("action.setHint", { name: action.name || "name" })}</p>
       {/if}
     </div>
   {:else if action.type === "vacation"}

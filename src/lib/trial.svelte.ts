@@ -32,7 +32,7 @@ class TrialState {
     const scripts: TrialScript[] = [];
     for (const name of this.order) {
       const rules = name === editor.name ? editor.rules : saved.find((s) => s.name === name)?.rules;
-      if (rules) scripts.push({ name, items: rules.items, singleFolder: rules.singleFolder });
+      if (rules) scripts.push({ name, items: rules.items, singleFolder: rules.singleFolder, requires: rules.requires });
     }
     const root = session.roots[editor.accountId];
     return runTrial(scripts, this.mail, !!root?.lastMoveWins);
@@ -48,7 +48,7 @@ class TrialState {
     const scripts: TrialScript[] = [];
     for (const name of this.order) {
       const rules = this.saved.scripts.find((s) => s.name === name)?.rules;
-      if (rules) scripts.push({ name, items: rules.items, singleFolder: rules.singleFolder });
+      if (rules) scripts.push({ name, items: rules.items, singleFolder: rules.singleFolder, requires: rules.requires });
     }
     const root = session.roots[editor.accountId];
     return runTrial(scripts, this.mail, !!root?.lastMoveWins);

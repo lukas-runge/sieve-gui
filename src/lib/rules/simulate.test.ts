@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { Action, Condition, RuleItem } from "#tauri/types";
-import { addresses, EMPTY_MAIL, parseMail, runTrial } from "./simulate.ts";
+import { addresses, EMPTY_MAIL, expand, modify, newScope, parseMail, runTrial } from "./simulate.ts";
 
 const m = (type: string) => ({ matchType: { type }, comparator: null }) as never;
 const from = (key: string, type = "is", part = "domain"): Condition =>
@@ -75,4 +75,60 @@ test("makes up a message for a case", async () => {
     true,
   );
   assert.deepEqual(trial.delivery.folders, ["R"]);
+});
+
+const compare = (headers: string[], other: string[], differs: boolean, part: string | null = "all"): Condition =>
+  ({ negate: false, test: { type: "compare", headers, part, other, differs } }) as Condition;
+const str = (source: string, key: string, type = "is"): Condition =>
+  ({ negate: false, test: { type: "string", sources: [source], matcher: m(type), keys: [key] } }) as Condition;
+const set = (name: string, value: string, modifiers: string[] = []): Action => ({ type: "set", name, value, modifiers }) as Action;
+const addflag = (flag: string): Action => ({ type: "flags", op: "add", flags: [flag] });
+
+test("comparisons of two fields", () => {
+  const items = [rule([compare(["reply-to"], ["from"], true)], [move("Junk")])];
+  const run = (headers: string) => runTrial([{ name: "s", items, singleFolder: false }], { ...EMPTY_MAIL, from: "A <a@x.example>", headers }, false);
+  assert.deepEqual(run("Reply-To: b@y.example").delivery.folders, ["Junk"]);
+  // Addresses compare without case; without Reply-To nothing differs.
+  assert.deepEqual(run("Reply-To: A@X.example").delivery.folders, []);
+  assert.deepEqual(run("").delivery.folders, []);
+  assert.equal(run("").uncertain, false);
+});
+
+test("the folder chosen so far, across scripts", () => {
+  const spam = rule([subject("viagra")], [move("Junk")]);
+  const mark = rule([str("${move_to_folder}", "junk")], [addflag("$Junk")]);
+  const mail = { ...EMPTY_MAIL, subject: "Viagra!" };
+  const scripts = [
+    { name: "spam", items: [spam], singleFolder: true },
+    { name: "mark", items: [mark], singleFolder: true },
+  ];
+  assert.deepEqual(runTrial(scripts, mail, true).delivery.flags, ["$Junk"]);
+  assert.deepEqual(runTrial(scripts, { ...mail, subject: "Hi" }, true).delivery.flags, []);
+});
+
+test("set, match variables and modifiers", () => {
+  const items = [
+    rule([{ negate: false, test: { type: "header", headers: ["subject"], matcher: m("matches"), keys: ["[*] *"] } } as Condition], [
+      set("tag", "${1}", ["upperFirst", "lower"]),
+    ]),
+    rule([str("${tag}", "Spam")], [move("${tag}-${2}"), addflag("${tag}")]),
+  ];
+  const trial = runTrial([{ name: "s", items, singleFolder: false, requires: ["variables"] }], { ...EMPTY_MAIL, subject: "[SPAM] buy now" }, false);
+  // `${2}` still holds the last match: `:is` doesn't capture.
+  assert.deepEqual(trial.delivery.folders, ["Spam-buy now"]);
+  assert.deepEqual(trial.delivery.flags, ["Spam"]);
+  // Without `variables`, "${…}" is plain text.
+  const plain = runTrial([{ name: "s", items: [rule([subject("${x}")], [move("A")])], singleFolder: false }], { ...EMPTY_MAIL, subject: "a ${x} b" }, false);
+  assert.deepEqual(plain.delivery.folders, ["A"]);
+});
+
+test("expanding variables", () => {
+  const scope = newScope();
+  scope.vars.set("a", "1");
+  scope.match = ["whole", "first"];
+  assert.equal(expand("${A}-${1}-${2}-${b}-${a-b}", scope), "1-first--" + "-${a-b}");
+  assert.equal(expand("${env.x}", scope), null);
+  assert.equal(modify("hELLO", ["upperFirst", "lower"]), "Hello");
+  assert.equal(modify("abc", ["length", "upper"]), "3");
+  assert.equal(modify("a*b?", ["quoteWildcard"]), "a\\*b\\?");
 });

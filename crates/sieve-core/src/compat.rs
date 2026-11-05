@@ -10,7 +10,7 @@ use serde::Serialize;
 
 use crate::ast::{Command, Comment, CommentKind};
 use crate::metadata::parse_rule_name;
-use crate::model::{Action, ConditionTest, Rule, RuleItem, RuleSet};
+use crate::model::{Action, ConditionTest, Join, Rule, RuleItem, RuleSet};
 
 /// Tests Roundcube's filter form can represent, as seen in its output.
 const ROUNDCUBE_TESTS: &[&str] = &[
@@ -73,8 +73,15 @@ pub fn roundcube_risks(set: &RuleSet) -> RoundcubeRisks {
 }
 
 fn has_groups(rule: &Rule) -> bool {
-    rule.conditions.items.iter().any(|c| matches!(c.test, ConditionTest::Group { .. }))
-        || rule.has_branches()
+    let items = &rule.conditions.items;
+    // A comparison is written as `allof (…)`: a group unless it is the
+    // rule's only (not negated) condition, written bare.
+    let alone = |c: &crate::model::Condition| items.len() == 1 && rule.conditions.join == Join::Any && !c.negate;
+    items.iter().any(|c| match c.test {
+        ConditionTest::Group { .. } => true,
+        ConditionTest::Compare { .. } => !alone(c),
+        _ => false,
+    }) || rule.has_branches()
         || rule.actions.iter().any(|a| matches!(a, Action::If(_)))
 }
 
@@ -193,6 +200,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(roundcube_risks(&set).rules, vec![1]);
+    }
+
+    #[test]
+    fn comparisons_are_groups_unless_alone() {
+        let compare = "allof (address :matches \"reply-to\" \"*\", not address :is \"from\" \"${1}\")";
+        let set = crate::import(&format!(
+            "require \"variables\";\nif {compare} {{ keep; }}\nif anyof (exists \"a\", {compare}) {{ keep; }}\nif not {compare} {{ keep; }}\n"
+        ))
+        .unwrap();
+        assert!(set.items.iter().all(|i| matches!(i, RuleItem::Rule(_))));
+        assert_eq!(roundcube_risks(&set).rules, vec![1, 2]);
     }
 
     #[test]

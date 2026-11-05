@@ -989,6 +989,45 @@
           "name": "Big attachments",
           "otherwise": null,
           "type": "rule"
+        },
+        {
+          "actions": [
+            {
+              "flags": [
+                "$Junk"
+              ],
+              "op": "add",
+              "type": "flags"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "keys": [
+                    "Junk"
+                  ],
+                  "matcher": {
+                    "comparator": null,
+                    "matchType": {
+                      "type": "is"
+                    }
+                  },
+                  "sources": [
+                    "${move_to_folder}"
+                  ],
+                  "type": "string"
+                }
+              }
+            ],
+            "join": "any"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Mark spam as junk",
+          "otherwise": null,
+          "type": "rule"
         }
       ],
       "preamble": null,
@@ -999,7 +1038,7 @@
       ],
       "singleFolder": true
     },
-    "source": "require [\"imap4flags\",\"include\",\"variables\"];\r\nglobal \"move_to_folder\";\r\n\r\n# rule:[Bank]\r\nif address :domain :is \"from\" \"bank.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Finance/Bank\";\r\n}\r\n\r\nif address :domain :is \"from\" \"card.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Finance/Credit card\";\r\n}\r\n\r\nif address :domain :is \"from\" [\r\n\t\"broker.example\",\r\n\t\"savings.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Finance/Investments\";\r\n}\r\n\r\n# rule:[Travel]\r\nif address :domain :is \"from\" [\r\n\t\"rail.example\",\r\n\t\"transit.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Travel/Trains\";\r\n}\r\n\r\nif address :domain :is \"from\" \"airline.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Travel/Flights\";\r\n}\r\n\r\nif address :domain :is \"from\" [\r\n\t\"hotels.example\",\r\n\t\"rentals.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Travel/Stays\";\r\n}\r\n\r\n# rule:[Services]\r\nif address :domain :is \"from\" \"cloud.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Services/Cloud\";\r\n}\r\n\r\nif address :domain :is \"from\" [\r\n\t\"music.example\",\r\n\t\"video.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Services/Streaming\";\r\n}\r\n\r\nif address :domain :is \"from\" \"code-host.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Services/Code\";\r\n}\r\n\r\n# rule:[Clubs]\r\nif address :domain :is \"from\" \"sports-club.example\" {\r\n\tset \"move_to_folder\" \"Clubs/Sports\";\r\n}\r\n\r\nif address :domain :is \"from\" \"choir.example\" {\r\n\tset \"move_to_folder\" \"Clubs/Choir\";\r\n}\r\n\r\n# rule:[Big attachments]\r\nif size :over 20M {\r\n\taddflag \"$label6\";\r\n}\r\n"
+    "source": "require [\"imap4flags\",\"include\",\"variables\"];\r\nglobal \"move_to_folder\";\r\n\r\n# rule:[Bank]\r\nif address :domain :is \"from\" \"bank.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Finance/Bank\";\r\n}\r\n\r\nif address :domain :is \"from\" \"card.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Finance/Credit card\";\r\n}\r\n\r\nif address :domain :is \"from\" [\r\n\t\"broker.example\",\r\n\t\"savings.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Finance/Investments\";\r\n}\r\n\r\n# rule:[Travel]\r\nif address :domain :is \"from\" [\r\n\t\"rail.example\",\r\n\t\"transit.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Travel/Trains\";\r\n}\r\n\r\nif address :domain :is \"from\" \"airline.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Travel/Flights\";\r\n}\r\n\r\nif address :domain :is \"from\" [\r\n\t\"hotels.example\",\r\n\t\"rentals.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Travel/Stays\";\r\n}\r\n\r\n# rule:[Services]\r\nif address :domain :is \"from\" \"cloud.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Services/Cloud\";\r\n}\r\n\r\nif address :domain :is \"from\" [\r\n\t\"music.example\",\r\n\t\"video.example\"\r\n] {\r\n\tset \"move_to_folder\" \"Accounts/Services/Streaming\";\r\n}\r\n\r\nif address :domain :is \"from\" \"code-host.example\" {\r\n\tset \"move_to_folder\" \"Accounts/Services/Code\";\r\n}\r\n\r\n# rule:[Clubs]\r\nif address :domain :is \"from\" \"sports-club.example\" {\r\n\tset \"move_to_folder\" \"Clubs/Sports\";\r\n}\r\n\r\nif address :domain :is \"from\" \"choir.example\" {\r\n\tset \"move_to_folder\" \"Clubs/Choir\";\r\n}\r\n\r\n# rule:[Big attachments]\r\nif size :over 20M {\r\n\taddflag \"$label6\";\r\n}\r\n\n# rule:[Mark spam as junk]\nif string :is \"${move_to_folder}\" \"Junk\" {\n\taddflag \"$Junk\";\n}\n"
   },
   "Spam": {
     "rules": {
@@ -1255,6 +1294,50 @@
           "type": "rule"
         },
         {
+          "actions": [
+            {
+              "flags": [
+                "$label5"
+              ],
+              "op": "add",
+              "type": "flags"
+            }
+          ],
+          "conditions": {
+            "items": [
+              {
+                "negate": false,
+                "test": {
+                  "headers": [
+                    "list-id"
+                  ],
+                  "type": "exists"
+                }
+              },
+              {
+                "negate": false,
+                "test": {
+                  "differs": true,
+                  "headers": [
+                    "reply-to"
+                  ],
+                  "other": [
+                    "from"
+                  ],
+                  "part": "domain",
+                  "type": "compare"
+                }
+              }
+            ],
+            "join": "all"
+          },
+          "elsif": [],
+          "enabled": true,
+          "name": "Reply goes elsewhere",
+          "otherwise": null,
+          "type": "rule"
+        },
+        {
           "code": "# A rule sieve-gui shows as code: it doesn't summarise editheader.\nif header :contains \"subject\" \"[SPAM]\"\n{\n\tdeleteheader \"X-Spam-Score\";\n}",
           "type": "raw"
         }
@@ -1270,6 +1353,6 @@
       ],
       "singleFolder": true
     },
-    "source": "require [\"body\",\"fileinto\",\"imap4flags\",\"include\",\"regex\",\"variables\"];\r\nglobal \"move_to_folder\";\r\n\r\n# rule:[Known pests]\r\nif anyof (\r\n\theader :contains \"from\" \"offers@ads.example\",\r\n\theader :contains \"from\" \"prize@lottery.example\",\r\n\theader :contains \"from\" \"news@spam-shop.example\"\r\n) {\r\n\tsetflag \"\\\\Seen\";\r\n\tset \"move_to_folder\" \"Junk\";\r\n\treturn;\r\n}\r\n\r\n# rule:[Flagged as spam by the server]\r\nif anyof (\r\n\theader :contains \"x-spam-flag\" \"yes\",\r\n\tallof (\r\n\t\theader :regex \"X-DSPAM-Result\" \"^(Spam|Virus|Bl[ao]cklisted)$\",\r\n\t\tnot header :contains \"X-DSPAM-Reclassified\" \"Innocent\"\r\n\t),\r\n\tallof (\r\n\t\tnot header :regex \"subject\" \"[[:graph:]]\",\r\n\t\tbody :text :regex \"^[[:space:]]*http://[[:graph:]]+[[:space:]]*$\"\r\n\t)\r\n) {\r\n\tif not address :domain :matches \"from\" [\r\n\t\t\"*work.example\",\r\n\t\t\"*family.example\",\r\n\t\t\"*friends.example\"\r\n\t] {\r\n\t\tset \"move_to_folder\" \"Junk\";\r\n\t\treturn;\r\n\t}\r\n}\r\n\r\n# A rule sieve-gui shows as code: it doesn't summarise editheader.\nif header :contains \"subject\" \"[SPAM]\"\n{\n\tdeleteheader \"X-Spam-Score\";\n}\r\n"
+    "source": "require [\"body\",\"fileinto\",\"imap4flags\",\"include\",\"regex\",\"variables\"];\r\nglobal \"move_to_folder\";\r\n\r\n# rule:[Known pests]\r\nif anyof (\r\n\theader :contains \"from\" \"offers@ads.example\",\r\n\theader :contains \"from\" \"prize@lottery.example\",\r\n\theader :contains \"from\" \"news@spam-shop.example\"\r\n) {\r\n\tsetflag \"\\\\Seen\";\r\n\tset \"move_to_folder\" \"Junk\";\r\n\treturn;\r\n}\r\n\r\n# rule:[Flagged as spam by the server]\r\nif anyof (\r\n\theader :contains \"x-spam-flag\" \"yes\",\r\n\tallof (\r\n\t\theader :regex \"X-DSPAM-Result\" \"^(Spam|Virus|Bl[ao]cklisted)$\",\r\n\t\tnot header :contains \"X-DSPAM-Reclassified\" \"Innocent\"\r\n\t),\r\n\tallof (\r\n\t\tnot header :regex \"subject\" \"[[:graph:]]\",\r\n\t\tbody :text :regex \"^[[:space:]]*http://[[:graph:]]+[[:space:]]*$\"\r\n\t)\r\n) {\r\n\tif not address :domain :matches \"from\" [\r\n\t\t\"*work.example\",\r\n\t\t\"*family.example\",\r\n\t\t\"*friends.example\"\r\n\t] {\r\n\t\tset \"move_to_folder\" \"Junk\";\r\n\t\treturn;\r\n\t}\r\n}\r\n\r\n# rule:[Reply goes elsewhere]\nif allof (\n\texists \"list-id\",\n\tallof (address :domain :matches \"reply-to\" \"*\", not address :domain :is \"from\" \"${1}\")\n) {\n\taddflag \"$label5\";\n}\n\n# A rule sieve-gui shows as code: it doesn't summarise editheader.\nif header :contains \"subject\" \"[SPAM]\"\n{\n\tdeleteheader \"X-Spam-Score\";\n}\r\n"
   }
 }

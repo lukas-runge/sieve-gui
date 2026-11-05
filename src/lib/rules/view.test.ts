@@ -10,6 +10,7 @@ import {
   actionKind,
   buildAction,
   buildCondition,
+  fieldsFor,
   headerNames,
   newRule,
   operatorsFor,
@@ -270,4 +271,61 @@ test("new rules and nested checks have branches", () => {
   assert.equal(actionKind(check), "check");
   // Switching back to "check" keeps the nested branches.
   assert.equal(buildAction("check", check), check);
+});
+
+test("comparing two fields: a compare test, offered with variables", () => {
+  const scam: ConditionView = { field: "header", header: "Reply-To", part: "all", operator: "differsFrom", values: [], other: { field: "from", header: "" } };
+  const c = buildCondition(scam);
+  assert.deepEqual(c, { negate: false, test: { type: "compare", headers: ["Reply-To"], part: "all", other: ["from"], differs: true } });
+  assert.deepEqual(viewCondition(c), scam);
+  // Whole headers; several headers on the other side.
+  const whole = buildCondition({ ...from, operator: "sameAs", other: { field: "toOrCc", header: "" } });
+  assert.deepEqual(whole.test, { type: "compare", headers: ["from"], part: null, other: ["to", "cc"], differs: false });
+  assert.equal(viewCondition(whole)?.operator, "sameAs");
+  // A new comparison of From starts with Reply-To.
+  const fresh = buildCondition({ ...from, operator: "sameAs" });
+  assert.deepEqual(fresh.test.type === "compare" && fresh.test.other, ["reply-to"]);
+
+  assert.ok(operatorsFor("from", "all", ["variables"]).includes("differsFrom"));
+  assert.ok(!operatorsFor("from", "all", []).includes("differsFrom"));
+  assert.ok(!operatorsFor("body", "header", ["variables"]).includes("sameAs"));
+  // "Not (same as)" isn't "differs": it also matches without the header.
+  assert.equal(viewCondition({ ...c, negate: true }), null);
+  assert.ok(offersPart(scam));
+});
+
+test("comparisons keep fitting when field or part change", () => {
+  const v: ConditionView = { field: "subject", header: "", part: "header", operator: "sameAs", values: [], other: { field: "subject", header: "" } };
+  // An address part needs addresses on the other side too.
+  assert.deepEqual(withPart({ ...v, field: "to" }, "domain").other, { field: "from", header: "" });
+  // Comparing From with itself tests nothing.
+  assert.deepEqual(withField({ ...v, other: { field: "from", header: "" } }, "from").other, { field: "header", header: "reply-to" });
+  // Fields without comparisons fall back to "contains".
+  assert.equal(withField(v, "body").operator, "contains");
+});
+
+test("variables and the folder so far are string tests", () => {
+  const junk: ConditionView = { field: "folder", header: "", part: "header", operator: "is", values: ["Junk"] };
+  const c = buildCondition(junk);
+  assert.deepEqual(c.test, { type: "string", sources: ["${move_to_folder}"], matcher: { matchType: { type: "is" }, comparator: null }, keys: ["Junk"] });
+  assert.deepEqual(viewCondition(c), junk);
+  const variable = buildCondition({ field: "variable", header: "tag", part: "header", operator: "startsWith", values: ["a"] });
+  assert.deepEqual(viewCondition(variable), { field: "variable", header: "tag", part: "header", operator: "startsWith", values: ["a"] });
+  // Typing a name starts from an empty one.
+  assert.equal(viewCondition(buildCondition({ field: "variable", header: "", part: "header", operator: "is", values: ["x"] }))?.header, "");
+  // Other sources stay code.
+  const mixed = { negate: false, test: { type: "string", sources: ["${a}${b}"], matcher: { matchType: { type: "is" }, comparator: null }, keys: [""] } } as Condition;
+  assert.equal(viewCondition(mixed), null);
+
+  assert.ok(fieldsFor(["variables"], true).includes("folder"));
+  assert.ok(!fieldsFor(["variables"], false).includes("folder"));
+  assert.ok(!fieldsFor([]).includes("variable"));
+  assert.ok(!operatorsFor("variable", "header", ["variables"]).includes("exists"));
+  assert.equal(withField(from, "folder").operator, "is");
+});
+
+test("set a variable", () => {
+  const set = buildAction("setVariable");
+  assert.deepEqual(set, { type: "set", name: "", value: "", modifiers: [] });
+  assert.equal(actionKind(set), "setVariable");
 });

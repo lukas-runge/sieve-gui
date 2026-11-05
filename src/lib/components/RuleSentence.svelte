@@ -2,7 +2,7 @@
   // A rule read as a sentence: "If Sender contains @tax… then move to Taxes".
   import type { Action, Condition, Join, Rule } from "#tauri/types";
   import { i18n, t, type MessageKey } from "../i18n.svelte";
-  import { actionKind, hasValues, headerNames, viewCondition, type Branches } from "../rules/view";
+  import { actionKind, hasValues, headerNames, viewCondition, type Branches, type Field } from "../rules/view";
   import { formatDate, formatSize } from "../rules/format";
   import { mailboxLabel } from "../rules/mailbox";
   import { flagLabel } from "../keywords";
@@ -12,6 +12,12 @@
     singleFolder,
     keywords = {},
   }: { rule: Rule; singleFolder: boolean; keywords?: Record<string, string> } = $props();
+
+  function fieldName(v: { field: Field; header: string }): string {
+    if (v.field === "header") return headerNames(v.header).join(` ${t("sentence.or")} `);
+    if (v.field === "variable") return t("route.field.variable", { name: v.header || "…" });
+    return t(`field.${v.field}` as MessageKey);
+  }
 
   function actionParam(a: Action): string | null {
     switch (a.type) {
@@ -23,6 +29,8 @@
         return a.reason;
       case "vacation":
         return a.subject ?? a.reason.split("\n")[0];
+      case "set":
+        return `${a.name || "…"} = ${a.value}`;
       case "flags": {
         const kind = actionKind(a);
         return kind === "markRead" || kind === "flag" ? null : a.flags.map((f) => flagLabel(f, keywords)).join(" ");
@@ -48,13 +56,13 @@
 {#snippet single(condition: Condition)}
   {@const view = viewCondition(condition)}
   {#if view}<span class="slot"
-      >{view.field === "header"
-        ? headerNames(view.header).join(` ${t("sentence.or")} `)
-        : t(`field.${view.field}` as MessageKey)}{#if view.part !== "header"}{" "}({t(
+      >{fieldName(view)}{#if view.part !== "header"}{" "}({t(
           `part.${view.part}` as MessageKey,
         )}){/if}</span
     >{" "}<span>{t(`op.${view.operator}` as MessageKey)}</span>
-    {#if hasValues(view.operator)}
+    {#if view.other}
+      {" "}<span class="slot">{fieldName(view.other)}</span>
+    {:else if hasValues(view.operator)}
       {#each view.values as value, j}
         {#if j > 0}{" "}<span class="text-base-content/60">{t("sentence.or")}</span>{/if}
         {" "}<span class="slot slot-code"
@@ -62,7 +70,9 @@
             ? formatSize(Number(value))
             : view.field === "date"
               ? formatDate(value, i18n.locale)
-              : value || "…"}</span
+              : view.field === "folder"
+                ? mailboxLabel(value) || "…"
+                : value || "…"}</span
         >
       {/each}
     {/if}

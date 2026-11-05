@@ -6,11 +6,14 @@
     buildCondition,
     fieldsFor,
     hasValues,
+    isCompare,
     offersPart,
     operatorsFor,
+    otherFieldsFor,
     partsFor,
     viewCondition,
     withField,
+    withOther,
     withPart,
     type ConditionView,
     type Field,
@@ -23,16 +26,23 @@
   import { conditionToken } from "../rules/route";
   import Icon from "./Icon.svelte";
   import { checkRegex, regexMatches, type RegexProblem } from "../rules/regex";
+  import { mailboxLabel, mailboxRaw, type ScriptFolders } from "../rules/mailbox";
+  import FolderPicker from "./FolderPicker.svelte";
 
   let {
     condition,
     extensions,
+    folders,
+    singleFolder,
     compact = false,
     onchange,
     onremove,
   }: {
     condition: Condition;
     extensions: string[];
+    folders: ScriptFolders;
+    /** Single-folder mode: the folder chosen so far can be tested. */
+    singleFolder: boolean;
     /** One of several: shows as a line to read until it's opened for editing. */
     compact?: boolean;
     onchange: (c: Condition, merge: boolean) => void;
@@ -47,6 +57,8 @@
   const open = $derived(!compact || editing || !view || (hasValues(view.operator) && view.values.every((v) => v === "")));
   const size = $derived(view?.field === "size" ? splitSize(Number(view.values[0])) : null);
   const parts = $derived(view && offersPart(view) ? partsFor(view.field, extensions, view.part) : []);
+  // The current field stays selectable, e.g. a variable on a server without `variables`.
+  const fields = $derived(view ? [...new Set([...fieldsFor(extensions, singleFolder), view.field])] : []);
 
   const regex = $derived(view?.operator === "regex" || view?.operator === "notRegex");
   // The current operator stays selectable, e.g. a regex on a server without `regex`.
@@ -109,10 +121,22 @@
       value={view.field}
       onchange={(e) => view && onchange(buildCondition(withField(view, e.currentTarget.value as Field)), false)}
     >
-      {#each fieldsFor(extensions) as field}
+      {#each fields as field}
         <option value={field}>{t(`field.${field}` as MessageKey)}</option>
       {/each}
     </select>
+    {#if view.field === "variable"}
+      <input
+        class="input input-sm w-40 font-mono"
+        aria-label={t("field.variableName")}
+        placeholder={t("field.variableName")}
+        title={t("field.variableHint")}
+        spellcheck="false"
+        autocapitalize="off"
+        value={view.header}
+        oninput={(e) => update({ header: e.currentTarget.value.replace(/[^A-Za-z0-9_]/g, "") }, true)}
+      />
+    {/if}
     {#if view.field === "header"}
       <input
         class="input input-sm w-56"
@@ -150,7 +174,36 @@
         <option value={op}>{t(`op.${op}` as MessageKey)}</option>
       {/each}
     </select>
-    {#if view.field === "size" && size}
+    {#if isCompare(view.operator)}
+      {@const other = view.other ?? { field: "from", header: "" }}
+      <!-- The field compared with; the address part applies to both. -->
+      <select
+        class="select select-sm w-auto"
+        aria-label={t("field.compareWith")}
+        value={other.field}
+        onchange={(e) => view && onchange(buildCondition(withOther(view, { field: e.currentTarget.value as Field, header: "" })), false)}
+      >
+        {#each otherFieldsFor(view) as field}
+          <option value={field}>{t(`field.${field}` as MessageKey)}</option>
+        {/each}
+      </select>
+      {#if other.field === "header"}
+        <input
+          class="input input-sm w-56"
+          aria-label={t("field.headerName")}
+          placeholder={t("field.headerName")}
+          title={t("field.headerNameHint")}
+          value={other.header}
+          oninput={(e) => update({ other: { field: "header", header: e.currentTarget.value } }, true)}
+        />
+      {/if}
+      <p class="basis-full text-[0.8rem] text-base-content/70">{t(view.operator === "sameAs" ? "op.sameAsHint" : "op.differsFromHint")}</p>
+    {:else if view.field === "folder" && view.values.length <= 1}
+      <div class="grow min-w-48">
+        <FolderPicker value={mailboxLabel(view.values[0] ?? "")} {folders} onpick={(name) => update({ values: [mailboxRaw(name, folders.encoding)] })} />
+        <p class="mt-1 text-[0.8rem] text-base-content/70">{t("field.folderHint")}</p>
+      </div>
+    {:else if view.field === "size" && size}
       <div class="join">
         <input
           type="number"

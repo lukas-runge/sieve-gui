@@ -61,6 +61,7 @@
     reject: "ban",
     delete: "trash",
     keep: "inbox",
+    variable: "code",
   };
 
 </script>

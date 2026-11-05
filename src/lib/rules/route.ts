@@ -12,7 +12,7 @@ import { i18n, t, type MessageKey } from "../i18n.svelte";
 import { formatDate, formatSize } from "./format";
 import { mailboxLabel } from "./mailbox";
 import { actionsGoTo, type Target } from "./search";
-import { actionKind, hasValues, headerNames, viewCondition, type Branches, type ConditionView } from "./view";
+import { actionKind, hasValues, headerNames, isCompare, viewCondition, type Branches, type ConditionView, type OtherField } from "./view";
 
 // ── Conditions ────────────────────────────────────────────────────────────────
 
@@ -64,11 +64,10 @@ export function headerChip(names: string[]): { label: string; title: string | nu
   return { label, title: label === names.join(", ") ? null : names.join(", ") };
 }
 
-function fieldChip(v: ConditionView): { label: string; title: string | null } {
-  let chip: { label: string; title: string | null };
-  if (v.field === "header") chip = headerChip(headerNames(v.header));
-  else chip = { label: t(`route.field.${v.field}` as MessageKey), title: null };
-  return chip;
+function fieldChip(v: ConditionView | OtherField): { label: string; title: string | null } {
+  if (v.field === "header") return headerChip(headerNames(v.header));
+  if (v.field === "variable") return { label: t("route.field.variable", { name: v.header || "…" }), title: null };
+  return { label: t(`route.field.${v.field}` as MessageKey), title: null };
 }
 
 const NEGATED: Record<string, string> = {
@@ -128,7 +127,13 @@ function valueToken(op: string, part: string, value: string): ValueToken {
 }
 
 function sentence(v: ConditionView, chip: string): string {
-  const values = v.values.map((x) => `„${x}“`).join(` ${t("sentence.or")} `);
+  if (v.other) {
+    const other = fieldChip(v.other);
+    const part = v.part !== "header" && v.part !== "all" ? ` (${t(`part.${v.part}` as MessageKey)})` : "";
+    return `${chip}${part} ${t(`op.${v.operator}` as MessageKey)} ${other.title ?? other.label}`;
+  }
+  const shown = v.field === "folder" ? v.values.map(mailboxLabel) : v.values;
+  const values = shown.map((x) => `„${x}“`).join(` ${t("sentence.or")} `);
   const part = v.part !== "header" && v.part !== "all" ? ` (${t(`part.${v.part}` as MessageKey)})` : "";
   return `${chip}${part} ${t(`op.${v.operator}` as MessageKey)}${hasValues(v.operator) ? " " + values : ""}`;
 }
@@ -161,6 +166,15 @@ export function conditionToken(c: Condition, max = MAX_VALUES): ConditionToken {
     values = v.values.map((x) => ({ before: "", text: formatDate(x, i18n.locale), after: "" }));
   } else if (op === "hasType") {
     values = v.values.map((x) => ({ before: "", text: x, after: "" }));
+  } else if (isCompare(v.operator)) {
+    // "Reply-To differs from From": the other field as the value.
+    word = t(`route.op.${v.operator}` as MessageKey);
+    const other = fieldChip(v.other ?? { field: "from", header: "" });
+    const part = v.part !== "header" && v.part !== "all" ? ` (${t(`part.${v.part}` as MessageKey)})` : "";
+    values = [{ before: "", text: other.label, after: part }];
+  } else if (v.field === "folder") {
+    word = compareWord(op, "header");
+    values = v.values.map((x) => valueToken(op, "header", mailboxLabel(x)));
   } else {
     word = compareWord(op, v.part);
     values = v.values.map((x) => valueToken(op, v.part, x));
@@ -245,7 +259,8 @@ export type OutcomeKind =
   | "reply"
   | "reject"
   | "delete"
-  | "keep";
+  | "keep"
+  | "variable";
 
 export interface Outcome {
   kind: OutcomeKind;
@@ -355,6 +370,9 @@ export function outcomes(actions: Action[], keywords: Record<string, string>, de
         break;
       case "keep":
         out.push({ kind: "keep", path: [], text: t("route.keep") });
+        break;
+      case "set":
+        out.push({ kind: "variable", path: [], text: t("route.set", { name: a.name || "…", value: a.value }) });
         break;
       case "stop":
       case "if":

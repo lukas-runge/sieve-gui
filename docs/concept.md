@@ -1,6 +1,6 @@
 # sieve-gui — Concept
 
-> Status: draft · last updated 2026-11-04
+> Status: draft · last updated 2026-11-05
 
 ## 1. Vision
 
@@ -89,6 +89,22 @@ Some servers lose filter scripts on their own, e.g. Synology MailPlus when it up
 - The first connect of an account (no copy yet) takes over the server state without asking.
 - The copy does not cover the server's own configuration (e.g. whether ManageSieve is enabled at all).
 
+### Variables
+
+Rules can use variables (RFC 5229) where the server lists `variables`:
+
+- **Comparing two fields:** "Reply-To differs from From" (typical of advance-fee scams), "Delivered-To is the same as To or Cc", optionally on an address part (domain, local part …) that applies to both sides. Sieve can't compare two headers, so the condition (`ConditionTest::Compare`) is written as a capture plus a test of the captured value, and read back from exactly that shape:
+
+  ```sieve
+  allof (address :domain :matches "reply-to" "*", not address :domain :is "from" "${1}")
+  ```
+
+  It compares the first value of the field with every value of the other one, without case. If the field is missing, the capture fails and the condition doesn't hold, "differs" included: a message without Reply-To doesn't count as "Reply-To differs from From". `not` around it ("not the same as") is a different condition that does hold then; it is shown as code. Inside a rule with other conditions it is a nested `allof` group, which Roundcube's form can't take (§3 *Known foreign scripts*).
+- **Variable** conditions: `string :is "${name}" "…"` with the usual text comparisons. **Folder so far** is the same test on the folder variable of "last move wins" (`string :is "${move_to_folder}" "Junk"`), with a folder picker: the folder the rules so far chose, which the root files the message into, across scripts. It is offered only in single-folder mode; with "last move wins" off, the variable is no longer global and the condition no longer sees other scripts' moves. A use: "if the folder so far is Junk, add the label `$Junk`" at the end of the last script, so that mail clients that read the junk keyword (Thunderbird) mark messages a rule moved to Junk.
+- **Set variable** (`set [modifiers] name value`), with one modifier to choose (lower/upper case, first letter, escaping for patterns or regexes, length); several modifiers written elsewhere are kept and shown. `set` of the folder variable without modifiers stays "move to folder" in single-folder mode.
+- Other `string` tests (several sources, text around a variable) and `${…}` in other values stay as written and show as code or as typed.
+- The dry run follows variables: `set` with its modifiers in the order of their precedence, `${0}`…`${9}` from the last successful `:matches`/`:regex` (each `*` matching as little as the rest of the pattern allows, as Pigeonhole does), unset variables empty, variables local to a script except the folder so far. Variables in a namespace (`${env.…}`) make the result uncertain.
+
 ### Capability-aware UI
 
 The server's `CAPABILITY` response (`SIEVE` extensions, limits) drives the UI: only conditions and actions the server supports are offered (e.g. `regex`, `editheader`, `vacation-seconds`).
@@ -176,6 +192,7 @@ Unlike filter providers, tag providers need the network beyond ManageSieve and I
 - Vacation / out-of-office editor (dates, subject, body, interval)
 - Raw-code cards with the fallback editor
 - Branches (`elsif`/`else`), nested conditions, search in the rule list (§3)
+- Variables: comparing two fields, conditions on variables and on the folder chosen so far, "set variable" (§3, D21)
 - Tags: names and colors for custom keywords (e.g. MailPlus labels), per account; taken over from Synology MailPlus (§3 *Tag providers*, D20)
 - Existing setups: ask before the root script takes over, include scripts unchanged, show which scripts include which (§3)
 - Live code preview (optional side panel)
@@ -213,10 +230,6 @@ Unlike filter providers, tag providers need the network beyond ManageSieve and I
   - check the result against real scripts with many branches and nested checks
 - Test a rule against a pasted/selected sample message
 - "Create rule from this message"
-- **Variables (RFC 5229) in rules:** conditions that compare one part of a message with another, e.g. "Reply-To is a different address than From" (typical of advance-fee scams) or "Delivered-To is not in To/Cc". Sieve can't compare two headers directly. A test captures a value with `:matches`/`:regex` into `${0}`…`${9}` (or `set`), and a nested test checks against `"${…}"`. The rule model has no variables yet, so such rules only show as code cards. Needed:
-  - a condition "same as / differs from <other field and part>" that is written as capture plus nested test and read back from that shape
-  - capability check: only offered if the server lists `variables`
-  - showing variables a rule sets with `set` (other than the generated `move_to_folder`) instead of turning the rule into code
 - Rule templates (newsletters, invoices, mailing lists)
 - Own Lezer grammar for the code editor (folding, context-aware completion)
 - Headings to group long rule lists, with a marker of their own (not derived from existing comments)
@@ -371,3 +384,4 @@ The project is **MIT-licensed**. To keep it that way:
 | D18 | Tests | Sample messages with expected folders and flags are part of the app (v0.2): set up and run in it, checked before saving, stored with the local copy. Tests in a separate repository can only report after a change is live | 2026-11-03 |
 | D19 | Filter providers | Systems that write Sieve from their own filter settings (first: Synology MailPlus) can be taken over, not run side by side: they rewrite their scripts and re-activate their own on every save (tested on MailPlus). A provider module in `sieve_core::providers` detects the setup by content, imports its filters into rules (fixture-tested) and describes its behavior. The take-over creates a sieve-gui script, stops running the provider's root without deleting it, asks the user to delete the filters in the provider's UI, and turns on "sieve-gui manages the filters alone", which re-activates the root on connect and, while the app is open, within 30 seconds (5 seconds right after the take-over), and offers to take over filters added there later (§3) | 2026-11-05 |
 | D20 | Tag providers | Names and colors of a provider's labels are taken over into the account's tags instead of typed in (first: Synology MailPlus, through DSM's web API with the account's credentials). Its keywords are told from messages carrying the labels, read over IMAP, since the API doesn't name them. Tags stay per account for now; app-wide tags are open (§4 Later) | 2026-11-05 |
+| D21 | Variables | Comparing two fields is one condition, written as a `:matches "*"` capture plus an `:is "${1}"` test in an `allof`, and recognized only in exactly that shape (anything else stays as written). Conditions on a variable are `string` tests on a single `${name}`; the folder chosen so far is that test on the folder variable of "last move wins", offered in single-folder mode. All are offered only if the server lists `variables` (§3 *Variables*) | 2026-11-05 |

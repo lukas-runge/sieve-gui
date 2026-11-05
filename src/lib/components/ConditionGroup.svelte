@@ -19,12 +19,15 @@
   import Icon from "./Icon.svelte";
   import RouteConditions from "./route/Conditions.svelte";
   import { conditionShape } from "../rules/route";
+  import type { ScriptFolders } from "../rules/mailbox";
 
   let {
     group,
     holder = null,
     heading,
     extensions,
+    folders,
+    singleFolder,
     mutate,
     onremove,
   }: {
@@ -34,6 +37,9 @@
     /** Heading of the top-level conditions ("When" by default). */
     heading?: string;
     extensions: string[];
+    folders: ScriptFolders;
+    /** Single-folder mode: conditions can test the folder chosen so far. */
+    singleFolder: boolean;
     /** Applies an edit (with an undo step) to this group and its holder. */
     mutate: (fn: (group: ConditionGroup, holder: Condition | null) => void, merge?: boolean) => void;
     /** Removes a nested group. */
@@ -99,11 +105,13 @@
 {#snippet body()}
   {#each group.items as condition, i}
     {#if condition.test.type === "group"}
-      <Self group={condition.test} holder={condition} {extensions} mutate={child(i)} onremove={() => remove(i)} />
+      <Self group={condition.test} holder={condition} {extensions} {folders} {singleFolder} mutate={child(i)} onremove={() => remove(i)} />
     {:else}
       <ConditionRow
         {condition}
         {extensions}
+        {folders}
+        {singleFolder}
         onchange={(c, merge) => mutate((g) => (g.items[i] = c), merge)}
         onremove={() => remove(i)}
       />

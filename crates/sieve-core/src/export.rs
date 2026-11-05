@@ -5,6 +5,10 @@ use crate::metadata::format_rule_name;
 use crate::model::*;
 use crate::printer::{print_command, print_commands, print_test, PrintOptions};
 use crate::root::FOLDER_VARIABLE;
+
+/// What [`ConditionTest::Compare`] captures with and compares against.
+pub(crate) const COMPARE_PATTERN: &str = "*";
+pub(crate) const COMPARE_KEY: &str = "${1}";
 use crate::span::Span;
 
 /// What Roundcube writes for a script without rules.
@@ -147,6 +151,13 @@ fn basic_test(t: &ConditionTest) -> Test {
     let mut args = Vec::new();
     let name = match t {
         ConditionTest::Group { join, items } => return group_test(*join, items),
+        ConditionTest::Compare { headers, part, other, differs } => return compare_test(headers, *part, other, *differs),
+        ConditionTest::String { sources, matcher, keys } => {
+            push_matcher(&mut args, matcher);
+            args.push(string_or_list(sources.clone()));
+            args.push(string_or_list(keys.clone()));
+            "string"
+        }
         ConditionTest::Header { headers, matcher, keys } => {
             push_matcher(&mut args, matcher);
             args.push(string_or_list(headers.clone()));
@@ -216,6 +227,27 @@ fn basic_test(t: &ConditionTest) -> Test {
         }
     };
     test(name, args, None)
+}
+
+/// The capture of the first value of `headers` and the test of `other`
+/// against it, see [`ConditionTest::Compare`].
+fn compare_test(headers: &[String], part: Option<AddressPart>, other: &[String], differs: bool) -> Test {
+    let side = |fields: &[String], match_type: MatchType, key: &str| {
+        let mut args = Vec::new();
+        if let Some(part) = part {
+            push_address_part(&mut args, part);
+        }
+        push_matcher(&mut args, &Matcher::new(match_type));
+        args.push(string_or_list(fields.to_vec()));
+        args.push(string(key));
+        test(if part.is_some() { "address" } else { "header" }, args, None)
+    };
+    let capture = side(headers, MatchType::Matches, COMPARE_PATTERN);
+    let mut compare = side(other, MatchType::Is, COMPARE_KEY);
+    if differs {
+        compare = test("not", Vec::new(), Some(Tests::Single(Box::new(compare))));
+    }
+    test("allof", Vec::new(), Some(Tests::List(TestList { tests: vec![capture, compare], span: Span::default() })))
 }
 
 /// Match type first, then comparator (`:value "gt" :comparator "…"`).
@@ -356,6 +388,12 @@ fn action_command(action: &Action, single_folder: bool) -> Command {
         Action::Flags { op, flags } => {
             args.push(string_or_list(flags.clone()));
             op.command()
+        }
+        Action::Set { name, value, modifiers } => {
+            args.extend(modifiers.iter().map(|m| tag(m.tag())));
+            args.push(string(name));
+            args.push(text(value));
+            "set"
         }
         Action::Vacation(v) => {
             match v.period {

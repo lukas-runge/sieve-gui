@@ -151,6 +151,22 @@ pub enum ConditionTest {
     /// A nested `allof (…)` / `anyof (…)`. An empty group is written as
     /// `true` (all of nothing) or `false` (any of nothing).
     Group { join: Join, items: Vec<Condition> },
+    /// `string [match] [comparator] <sources> <keys>` (RFC 5229 §5): text
+    /// with variables in it, such as `"${name}"`, compared with the keys.
+    String { sources: Vec<String>, matcher: Matcher, keys: Vec<String> },
+    /// Whether the first value of `headers` is (`differs`: is not) one of
+    /// the values of `other`, e.g. "Reply-To differs from From". Sieve can't
+    /// compare two headers, so it is written as a capture and a test of the
+    /// captured value (RFC 5229 match variables):
+    ///
+    /// ```sieve
+    /// allof (address :matches "reply-to" "*", not address :is "from" "${1}")
+    /// ```
+    ///
+    /// `part: None` compares whole headers (`header`), `Some` the addresses
+    /// in them (`address`). Without a value in `headers` it doesn't match,
+    /// whether `differs` or not.
+    Compare { headers: Vec<String>, part: Option<AddressPart>, other: Vec<String>, differs: bool },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -270,8 +286,50 @@ pub enum Action {
     /// `addflag` / `setflag` / `removeflag` (RFC 5232)
     Flags { op: FlagOp, flags: Vec<String> },
     Vacation(Vacation),
+    /// `set [modifiers] <name> <value>` (RFC 5229 §4)
+    Set { name: String, value: String, modifiers: Vec<SetModifier> },
     /// A nested `if` ("also check").
     If(NestedIf),
+}
+
+/// How `set` changes the value before storing it (RFC 5229 §4.1), applied
+/// in the order of their precedence, not as written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SetModifier {
+    Lower,
+    Upper,
+    LowerFirst,
+    UpperFirst,
+    QuoteWildcard,
+    /// draft-ietf-sieve-regex, needs `regex`
+    QuoteRegex,
+    Length,
+}
+
+impl SetModifier {
+    pub const ALL: [SetModifier; 7] = [
+        SetModifier::Lower,
+        SetModifier::Upper,
+        SetModifier::LowerFirst,
+        SetModifier::UpperFirst,
+        SetModifier::QuoteWildcard,
+        SetModifier::QuoteRegex,
+        SetModifier::Length,
+    ];
+
+    /// The tag without its colon.
+    pub fn tag(self) -> &'static str {
+        match self {
+            SetModifier::Lower => "lower",
+            SetModifier::Upper => "upper",
+            SetModifier::LowerFirst => "lowerfirst",
+            SetModifier::UpperFirst => "upperfirst",
+            SetModifier::QuoteWildcard => "quotewildcard",
+            SetModifier::QuoteRegex => "quoteregex",
+            SetModifier::Length => "length",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -389,6 +447,14 @@ impl ConditionTest {
                 items.iter().for_each(|c| c.test.collect_extensions(out));
                 (None, None)
             }
+            ConditionTest::String { matcher, .. } => {
+                out.push("variables");
+                (Some(matcher), None)
+            }
+            ConditionTest::Compare { part, .. } => {
+                out.push("variables");
+                (None, part.as_ref())
+            }
             ConditionTest::Body { matcher, .. } => {
                 out.push("body");
                 (Some(matcher), None)
@@ -450,6 +516,12 @@ impl Action {
                 }
             }
             Action::Flags { .. } => out.push("imap4flags"),
+            Action::Set { modifiers, .. } => {
+                out.push("variables");
+                if modifiers.contains(&SetModifier::QuoteRegex) {
+                    out.push("regex");
+                }
+            }
             Action::Vacation(v) => {
                 out.push("vacation");
                 if matches!(v.period, Some(VacationPeriod::Seconds(_))) {

@@ -425,6 +425,15 @@
             </button>
           </div>
         {/if}
+        {@const cleanup = session.cleanup[account.id]}
+        {#if cleanup}
+          <div role="status" class="mx-1 grid gap-2 rounded-field bg-primary/8 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("info", t(cleanup.done ? "provider.cleanupDone" : "provider.cleanup", { provider: providerName(cleanup.provider) }))}
+            <button class="btn btn-xs justify-self-start" onclick={() => delete session.cleanup[account.id]}>
+              {t(cleanup.done ? "provider.dismiss" : "provider.hide")}
+            </button>
+          </div>
+        {/if}
         {@const reclaimed = session.reclaimed[account.id]}
         {#if reclaimed}
           <div role="status" class="mx-1 grid gap-2 rounded-field bg-primary/8 px-2.5 py-2 text-[0.8rem]">

@@ -8,7 +8,6 @@
   import { conditionToken } from "../rules/route";
   import { mailboxLabel } from "../rules/mailbox";
   import { session } from "../session.svelte";
-  import { tell } from "../dialogs.svelte";
   import Token from "./route/Token.svelte";
 
   let {
@@ -64,7 +63,6 @@
     if (ok) {
       dialog.close();
       void session.openScript(accountId, name.trim());
-      void tell(t("provider.done", { provider }));
     } else {
       error = session.error;
     }

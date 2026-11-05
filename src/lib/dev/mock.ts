@@ -189,7 +189,19 @@ const folders = (
 
 const sieve = ["fileinto", "include", "reject", "envelope", "vacation", "subaddress", "relational", "regex", "imap4flags", "copy", "body", "variables", "mailbox", "date"];
 
+/**
+ * What saving in MailPlus' web UI does, for checking the watcher in preview
+ * mode: rewrites its scripts (here: without filters) and makes `synomc`
+ * active again. Call `__mailplusSave()` from the console or a test.
+ */
+function mailplusSave() {
+  const nasServer = servers.nas;
+  for (const name of ["filter", "spam_rule"]) nasServer.saved.set(name, (mailplusFixtures as Record<string, Fixture>)[name].source);
+  nasServer.active = "synomc";
+}
+
 export function installMock() {
+  Object.assign(window, { __mailplusSave: mailplusSave });
   mockIPC(async (cmd, args) => {
     const a = (args ?? {}) as Record<string, any>;
     const server = servers[a.id] ?? servers.preview;

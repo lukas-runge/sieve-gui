@@ -61,6 +61,13 @@ export interface ServerState {
  */
 export const ROOT_SCRIPT = "sieve-gui";
 
+/** How often accounts whose filters sieve-gui manages alone are checked (ms). */
+const WATCH_SLOW = 30_000;
+/** How often while waiting for the filters to be deleted in the provider's UI. */
+const WATCH_FAST = 5_000;
+/** How long to wait that fast after a take-over. */
+const CLEANUP_TIME = 15 * 60_000;
+
 /** The account settings that need a root script, as far as the server supports them. */
 export interface RootSettings {
   multipleScripts: boolean;
@@ -110,8 +117,18 @@ class Session {
    * connect ("sieve-gui manages the filters alone").
    */
   reclaimed = $state<Record<string, string>>({});
+  /**
+   * Per account: after a take-over, the user deletes the filters in the
+   * provider's UI, which makes the provider take the active script back.
+   * Until `until`, the account is checked every few seconds; `done` once
+   * the filters are gone there.
+   */
+  cleanup = $state<Record<string, { provider: string; until: number; done: boolean }>>({});
   /** Per account: the scripts read for detecting providers. */
   #providerScripts: Record<string, ProviderScript[]> = {};
+  /** Per account: when it was last checked by `watchProviders`. */
+  #watched: Record<string, number> = {};
+  #watching = new Set<string>();
   /** Per account: differences between the server and the local copy, until resolved. */
   copies = $state<Record<string, CopyStatus>>({});
   /** The account whose copy differences are shown. */
@@ -617,9 +634,12 @@ class Session {
       const alone = this.#filtersAlone(id);
       // Offered while the provider's root runs, or once filters were added
       // there after a take-over.
+      // Not while they're being deleted there after a take-over.
+      const pending = this.cleanup[id];
       const found = (await detectProviders(scripts)).filter(
         (d) =>
           d.filters + d.listEntries > 0 &&
+          !(pending && !pending.done && pending.provider === d.provider) &&
           (this.isActive(id, d.root) || (alone?.provider === d.provider && alone.fingerprint !== d.fingerprint)),
       );
       if (found.length) this.providers[id] = found;
@@ -677,6 +697,8 @@ class Session {
         const value = { provider, root, scripts, fingerprint };
         await setFiltersAlone(id, value);
         await this.loadAccounts();
+        // Deleting the filters there takes the active script back; watch closely.
+        this.cleanup[id] = { provider, until: Date.now() + CLEANUP_TIME, done: false };
       }
       delete this.providers[id];
     } catch (e) {
@@ -686,6 +708,58 @@ class Session {
     }
     await this.refreshScripts(id);
     return true;
+  }
+
+  /**
+   * While the app is open, checks the accounts whose filters sieve-gui
+   * manages alone (every 30 s, every 5 s for a while after a take-over): if
+   * the provider made its own script active again, the root is activated
+   * right away. Returns a function that stops checking.
+   */
+  watchProviders(): () => void {
+    const timer = setInterval(() => {
+      for (const account of this.accounts) void this.#watch(account.id);
+    }, WATCH_FAST);
+    return () => clearInterval(timer);
+  }
+
+  async #watch(id: string) {
+    const alone = this.#filtersAlone(id);
+    if (!alone || this.servers[id]?.status !== "ready" || this.#watching.has(id)) return;
+    const pending = this.cleanup[id];
+    const fast = !!pending && !pending.done && pending.until > Date.now();
+    if (!fast && Date.now() - (this.#watched[id] ?? 0) < WATCH_SLOW) return;
+    this.#watching.add(id);
+    this.#watched[id] = Date.now();
+    try {
+      const scripts = await listScripts(id);
+      const active = scripts.find((s) => s.active)?.name ?? null;
+      if (active === alone.root && scripts.some((s) => s.name === ROOT_SCRIPT)) {
+        await activateScript(id, ROOT_SCRIPT);
+        // Expected while the filters are being deleted there: no notice then.
+        if (!pending || pending.done) this.reclaimed[id] = alone.provider;
+        await this.refreshScripts(id);
+        await this.#checkCopy(id);
+      }
+      if (pending && !pending.done) {
+        const names = [alone.root, ...alone.scripts];
+        const sources: ProviderScript[] = [];
+        for (const name of names.filter((n) => scripts.some((s) => s.name === n))) {
+          sources.push({ name, source: await getScript(id, name) });
+        }
+        const found = (await detectProviders(sources)).find((d) => d.provider === alone.provider);
+        if (!found || found.filters + found.listEntries === 0) {
+          this.cleanup[id] = { ...pending, done: true };
+          // Filters added there from now on are new.
+          if (found) await setFiltersAlone(id, { ...alone, fingerprint: found.fingerprint });
+          await this.loadAccounts();
+        }
+      }
+    } catch {
+      // Not reachable right now; the next check tries again.
+    } finally {
+      this.#watching.delete(id);
+    }
   }
 
   /** Makes the root script active again after something else replaced it. */

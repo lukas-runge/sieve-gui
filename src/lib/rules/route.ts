@@ -188,7 +188,7 @@ export type ConditionShape =
 export type ConditionItem = { kind: "token"; token: ConditionToken } | { kind: "group"; shape: ConditionShape };
 
 function sameComparison(items: Condition[]): boolean {
-  const views = items.map(viewCondition);
+  const views = items.map((c) => viewCondition(c));
   if (views.some((v) => !v || !hasValues(v.operator))) return false;
   const key = (v: ConditionView) => `${v.field}|${v.header.toLowerCase()}|${v.part}|${v.operator}`;
   return new Set(views.map((v) => key(v!))).size === 1;

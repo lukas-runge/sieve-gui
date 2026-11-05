@@ -39,7 +39,9 @@
     onremove: () => void;
   } = $props();
 
-  const view = $derived(viewCondition(condition));
+  /** The operator chosen here last: an empty "starts with" is written as `*` and would read back as a pattern. */
+  let picked = $state<Operator | undefined>(undefined);
+  const view = $derived(viewCondition(condition, picked));
   /** Editing this condition (a compact one opens on click; empty ones start open). */
   let editing = $state(false);
   const open = $derived(!compact || editing || !view || (hasValues(view.operator) && view.values.every((v) => v === "")));
@@ -139,7 +141,10 @@
       class="select select-sm w-auto"
       aria-label="Operator"
       value={view.operator}
-      onchange={(e) => update({ operator: e.currentTarget.value as Operator })}
+      onchange={(e) => {
+        picked = e.currentTarget.value as Operator;
+        update({ operator: picked });
+      }}
     >
       {#each operators as op}
         <option value={op}>{t(`op.${op}` as MessageKey)}</option>

@@ -70,6 +70,25 @@ test("subdomain pairs are recognized in any order, and only as pairs", () => {
   assert.equal(view(["a.org", "*.a.org"], "all")?.operator, "matches");
 });
 
+test("an empty starts/ends with keeps the operator picked for it", () => {
+  // Both are written as `:matches "*"`, like the pattern `*`.
+  const empty = buildCondition({ ...from, operator: "startsWith", values: [""] });
+  assert.equal(viewCondition(empty)?.operator, "matches");
+  assert.deepEqual(viewCondition(empty, "startsWith"), { ...from, operator: "startsWith", values: [""] });
+  assert.deepEqual(viewCondition(empty, "endsWith"), { ...from, operator: "endsWith", values: [""] });
+  // A second value still being typed.
+  const second = buildCondition({ ...from, operator: "endsWith", values: ["@a.org", ""] });
+  assert.deepEqual(viewCondition(second, "endsWith")?.values, ["@a.org", ""]);
+  const negated = buildCondition({ ...from, operator: "notStartsWith", values: [""] });
+  assert.equal(viewCondition(negated, "notStartsWith")?.operator, "notStartsWith");
+  // A picked pattern stays a pattern.
+  const pattern = buildCondition({ ...from, operator: "matches", values: ["a*"] });
+  assert.equal(viewCondition(pattern)?.operator, "startsWith");
+  assert.deepEqual(viewCondition(pattern, "matches"), { ...from, operator: "matches", values: ["a*"] });
+  // Only where the keys read that way.
+  assert.equal(viewCondition(buildCondition({ ...from, operator: "startsWith", values: ["a"] }), "endsWith")?.operator, "startsWith");
+});
+
 test("address tests on other headers", () => {
   const c = { ...address("localPart", "is", ["me"]), test: { ...address("localPart", "is", ["me"]).test, headers: ["Reply-To"] } };
   assert.deepEqual(viewCondition(c as Condition), { field: "header", header: "Reply-To", part: "localPart", operator: "is", values: ["me"] });

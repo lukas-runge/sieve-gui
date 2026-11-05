@@ -137,9 +137,12 @@
     document.documentElement.lang = i18n.locale;
   });
 
-  onMount(async () => {
-    await session.loadAccounts();
-    for (const account of session.accounts) void session.connect(account.id);
+  onMount(() => {
+    void (async () => {
+      await session.loadAccounts();
+      for (const account of session.accounts) void session.connect(account.id);
+    })();
+    return session.watchProviders();
   });
 
   function onkeydown(e: KeyboardEvent) {

@@ -1,11 +1,12 @@
 <script lang="ts">
   import { flip } from "svelte/animate";
   import { SvelteSet } from "svelte/reactivity";
-  import type { Account } from "#tauri/types";
+  import type { Account, Detection } from "#tauri/types";
   import type { ScriptNode } from "../session.svelte";
-  import { t } from "../i18n.svelte";
+  import { t, type MessageKey } from "../i18n.svelte";
   import CertificateDialog from "./CertificateDialog.svelte";
   import CopyDialog from "./CopyDialog.svelte";
+  import ProviderDialog from "./ProviderDialog.svelte";
   import { ask, askText, tell } from "../dialogs.svelte";
   import { closesMenu } from "../menu";
   import { ROOT_SCRIPT, session } from "../session.svelte";
@@ -21,6 +22,10 @@
     /** Hides the sidebar (its toggle sits in its header). */
     ontoggle?: () => void;
   } = $props();
+
+  /** The filter provider whose take-over dialog is open. */
+  let providerPrompt = $state<{ accountId: string; detection: Detection } | null>(null);
+  const providerName = (id: string) => t(`provider.${id}` as MessageKey);
 
 
   async function open(id: string, name: string) {
@@ -420,6 +425,32 @@
             </button>
           </div>
         {/if}
+        {@const cleanup = session.cleanup[account.id]}
+        {#if cleanup}
+          <div role="status" class="mx-1 grid gap-2 rounded-field bg-primary/8 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("info", t(cleanup.done ? "provider.cleanupDone" : "provider.cleanup", { provider: providerName(cleanup.provider) }))}
+            <button class="btn btn-xs justify-self-start" onclick={() => delete session.cleanup[account.id]}>
+              {t(cleanup.done ? "provider.dismiss" : "provider.hide")}
+            </button>
+          </div>
+        {/if}
+        {@const reclaimed = session.reclaimed[account.id]}
+        {#if reclaimed}
+          <div role="status" class="mx-1 grid gap-2 rounded-field bg-primary/8 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("info", t("provider.reclaimed", { provider: providerName(reclaimed) }))}
+            <button class="btn btn-xs justify-self-start" onclick={() => delete session.reclaimed[account.id]}>{t("provider.dismiss")}</button>
+          </div>
+        {/if}
+        {#each session.providers[account.id] ?? [] as detection (detection.provider)}
+          {@const later = account.filtersAlone?.provider === detection.provider}
+          {@const counts = { provider: providerName(detection.provider), filters: detection.filters, entries: detection.listEntries }}
+          <div role="alert" class="mx-1 grid gap-2 rounded-field bg-warning/10 px-2.5 py-2 text-[0.8rem]">
+            {@render callout("warning", t(later ? "provider.foundLater" : "provider.found", counts))}
+            <button class="btn btn-xs btn-primary justify-self-start" onclick={() => (providerPrompt = { accountId: account.id, detection })}>
+              {t("provider.takeOver")}
+            </button>
+          </div>
+        {/each}
         {@const adoption = session.adoption[account.id]}
         {#if adoption}
           <div role="alert" class="mx-1 grid gap-2 rounded-field bg-primary/8 px-2.5 py-2 text-[0.8rem]">
@@ -531,6 +562,9 @@
 
 </nav>
 
+{#if providerPrompt}
+  <ProviderDialog accountId={providerPrompt.accountId} detection={providerPrompt.detection} onclose={() => (providerPrompt = null)} />
+{/if}
 {#if session.copyPrompt && session.copies[session.copyPrompt]}
   {@const id = session.copyPrompt}
   {#key id}

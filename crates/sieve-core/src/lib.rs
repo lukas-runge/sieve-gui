@@ -17,6 +17,7 @@ pub mod metadata;
 pub mod model;
 mod parser;
 pub mod printer;
+pub mod providers;
 pub mod root;
 pub mod span;
 

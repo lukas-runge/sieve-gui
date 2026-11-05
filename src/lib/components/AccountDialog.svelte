@@ -33,6 +33,9 @@
   let lastMoveWins = $state(initial?.lastMoveWins ?? true);
   let multipleScripts = $state(initial?.multipleScripts ?? true);
   let roundcube = $state(initial?.roundcube ?? false);
+  // Turned on by taking over a filter provider's filters; can only be turned off here.
+  const filtersAlone = initial?.filtersAlone ?? null;
+  let filtersAloneOn = $state(!!filtersAlone);
   let keywordText = $state(formatKeywordNames(initial?.keywordNames ?? {}));
   let copyDir = $state(initial?.copyDir ?? "");
   // The icon: its own text, colour or picture; empty means "from the name".
@@ -82,6 +85,7 @@
         multipleScripts,
         lastMoveWins,
         roundcube,
+        filtersAlone: filtersAloneOn ? filtersAlone : null,
         keywordNames: parseKeywordNames(keywordText),
         copyDir: copyDir.trim() || null,
         icon: iconDraft.text || iconDraft.hue !== null || iconDraft.image ? iconDraft : null,
@@ -282,6 +286,16 @@
         </label>
         <p class="label whitespace-normal">{t("account.roundcubeHint")}</p>
       </div>
+      {#if filtersAlone}
+        {@const provider = t(`provider.${filtersAlone.provider}` as MessageKey)}
+        <div>
+          <label class="label text-base-content whitespace-normal">
+            <input type="checkbox" class="toggle toggle-sm" bind:checked={filtersAloneOn} />
+            {t("account.filtersAlone", { provider })}
+          </label>
+          <p class="label whitespace-normal">{t("account.filtersAloneHint", { provider })}</p>
+        </div>
+      {/if}
     </fieldset>
 
     <fieldset class="fieldset">

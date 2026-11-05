@@ -31,7 +31,7 @@ fn synomc_is_not_a_sieve_gui_root() {
 
 #[test]
 fn scripts_import() {
-    for name in ["synomc.sieve", "filter.sieve", "spam_rule.sieve"] {
+    for name in ["synomc.sieve", "filter.sieve", "filter-one-rule.sieve", "spam_rule.sieve"] {
         import(&fixture(name)).unwrap_or_else(|e| panic!("{name}: {e}"));
     }
 }

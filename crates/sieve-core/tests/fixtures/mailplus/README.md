@@ -10,6 +10,16 @@ lists in the MailPlus web UI:
   they recorded in global variables.
 - `filter.sieve`: filters from the MailPlus web UI (none here).
 - `spam_rule.sieve`: personal block and allow lists (none here).
+- `filter-one-rule.sieve`: `filter` after adding one filter in the web UI
+  (subject contains `sieve-filter-test` → Junk), captured 2026-11-05. Each
+  filter is an `if` that only records its folder in `filter_mailbox`,
+  under a `# id: <n>` comment.
+
+Saving filters in the web UI rewrites `synomc` and `filter` completely and
+makes `synomc` the active script again (tested 2026-11-05: a comment added
+to `synomc` was gone afterwards).
+`synomc.sieve` is the version MailPlus wrote then (tab indentation; the
+first capture had spaces instead).
 
 They stand for any setup sieve-gui finds on a server and didn't create:
 sieve-gui must include such a root unchanged and never rewrite it.

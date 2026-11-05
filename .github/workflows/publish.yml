@@ -1,0 +1,95 @@
+name: Publish
+
+# Once a release is published (release.yml leaves it a draft): update the
+# Homebrew cask in lukas-runge/homebrew-tap and the Scoop manifest in
+# lukas-runge/scoop-bucket. RELEASE_TOKEN is a fine-grained token with
+# Contents: read and write on just those two repositories.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, e.g. v0.1.0
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  homebrew:
+    name: Homebrew cask
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Hash the disk images
+        run: |
+          version="${TAG#v}"
+          gh release download "$TAG" --dir dl \
+            --pattern "sieve-gui_${version}_aarch64.dmg" \
+            --pattern "sieve-gui_${version}_x64.dmg"
+          {
+            echo "VERSION=$version"
+            echo "SHA_ARM=$(sha256sum "dl/sieve-gui_${version}_aarch64.dmg" | cut -d' ' -f1)"
+            echo "SHA_INTEL=$(sha256sum "dl/sieve-gui_${version}_x64.dmg" | cut -d' ' -f1)"
+          } >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v7
+        with:
+          repository: lukas-runge/homebrew-tap
+          token: ${{ secrets.RELEASE_TOKEN }}
+          path: tap
+
+      - name: Update the cask
+        run: |
+          scripts/release/cask.sh "$VERSION" "$SHA_ARM" "$SHA_INTEL" > tap/Casks/sieve-gui.rb
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/sieve-gui.rb
+          if git diff --cached --quiet; then echo "Unchanged."; exit 0; fi
+          git commit -m "sieve-gui $VERSION"
+          git push
+
+  scoop:
+    name: Scoop manifest
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Hash the portable zips
+        run: |
+          version="${TAG#v}"
+          gh release download "$TAG" --dir dl \
+            --pattern "sieve-gui_${version}_x64_portable.zip" \
+            --pattern "sieve-gui_${version}_arm64_portable.zip"
+          {
+            echo "VERSION=$version"
+            echo "SHA_X64=$(sha256sum "dl/sieve-gui_${version}_x64_portable.zip" | cut -d' ' -f1)"
+            echo "SHA_ARM64=$(sha256sum "dl/sieve-gui_${version}_arm64_portable.zip" | cut -d' ' -f1)"
+          } >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v7
+        with:
+          repository: lukas-runge/scoop-bucket
+          token: ${{ secrets.RELEASE_TOKEN }}
+          path: bucket
+
+      - name: Update the manifest
+        run: |
+          scripts/release/scoop.sh "$VERSION" "$SHA_X64" "$SHA_ARM64" > bucket/bucket/sieve-gui.json
+          cd bucket
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bucket/sieve-gui.json
+          if git diff --cached --quiet; then echo "Unchanged."; exit 0; fi
+          git commit -m "sieve-gui $VERSION"
+          git push

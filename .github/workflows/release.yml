@@ -84,3 +84,33 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
+
+      # Scoop installs the bare executable (the frontend is built into it;
+      # Windows 10 and 11 ship WebView2), so no installer has to be unpacked.
+      - name: Portable zip (Windows, for Scoop)
+        if: startsWith(matrix.runner, 'windows')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $arch = if ("${{ matrix.target }}".StartsWith("aarch64")) { "arm64" } else { "x64" }
+          $zip = "sieve-gui_${version}_${arch}_portable.zip"
+          Compress-Archive -Path "target/${{ matrix.target }}/release/sieve-gui.exe" -DestinationPath "target/$zip"
+          if ("${{ github.ref }}".StartsWith("refs/tags/")) { gh release upload "${{ github.ref_name }}" "target/$zip" --clobber }
+
+      # Without a tag nothing is released: keep the bundles to look at.
+      - name: Keep bundles (manual runs)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundles-${{ matrix.label }}
+          path: |
+            target/${{ matrix.target }}/release/bundle/**/*.deb
+            target/${{ matrix.target }}/release/bundle/**/*.rpm
+            target/${{ matrix.target }}/release/bundle/**/*.AppImage
+            target/${{ matrix.target }}/release/bundle/**/*.dmg
+            target/${{ matrix.target }}/release/bundle/**/*.msi
+            target/${{ matrix.target }}/release/bundle/**/*.exe
+            target/*_portable.zip
+          if-no-files-found: warn

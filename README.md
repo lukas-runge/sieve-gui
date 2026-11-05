@@ -34,9 +34,22 @@ The script takes the latest [release](https://github.com/lukas-runge/sieve-gui/r
 
 **Updates:** when a new version is out, sieve-gui says so in the sidebar. "Update" closes the app, installs the new version (asking for the admin password for `.deb` and `.rpm`) and starts it again. Running the script again does the same.
 
-### macOS and Windows
+### macOS (Homebrew)
 
-Download the installer from the [latest release](https://github.com/lukas-runge/sieve-gui/releases/latest).
+```sh
+brew install lukas-runge/tap/sieve-gui
+```
+
+Updates: `brew upgrade sieve-gui`. The app isn't notarized yet; the cask removes the quarantine attribute after installing, so it opens without the Gatekeeper prompt.
+
+### Windows (Scoop)
+
+```powershell
+scoop bucket add lukas https://github.com/lukas-runge/scoop-bucket
+scoop install sieve-gui
+```
+
+Updates: `scoop update sieve-gui`. Needs WebView2, which Windows 10 and 11 include.
 
 ---
 
@@ -181,7 +194,11 @@ Pushing a `v*` tag builds draft releases for:
 | Windows | x86-64, ARM64 |
 | macOS | x86-64 (Intel), ARM64 (Apple Silicon) |
 
-> **Note:** Builds are not code-signed. macOS builds are ad-hoc signed so Apple Silicon runs them, but Gatekeeper will still warn on first launch; Windows shows a SmartScreen prompt.
+Windows releases also get a portable zip with just `sieve-gui.exe`, for Scoop.
+
+Publishing the draft (`publish.yml`) updates the cask in [`lukas-runge/homebrew-tap`](https://github.com/lukas-runge/homebrew-tap) and the manifest in [`lukas-runge/scoop-bucket`](https://github.com/lukas-runge/scoop-bucket), with the `RELEASE_TOKEN` secret: a fine-grained token with Contents read and write on those two repositories.
+
+> **Note:** Builds are not code-signed. macOS builds are ad-hoc signed so Apple Silicon runs them; downloaded directly instead of through Homebrew, Gatekeeper asks once (System Settings → Privacy & Security → Open Anyway). The installers downloaded directly on Windows get a SmartScreen prompt (More info → Run anyway).
 
 ---
 

@@ -148,7 +148,7 @@ Recognizing a provider is an explicit, extensible list, not an exception to the 
 
 ### Tag providers
 
-Some systems keep names and colors for keywords of their own: a webmail's labels. A tag provider reads them, so they don't have to be typed in. In the account dialog, "Take over from <provider>" merges them into the account's tags: a tag of the same keyword gets the provider's name and color, other tags stay. Nothing is stored until the account is saved, and nothing changes on the server.
+Some systems keep names and colors for keywords of their own: a webmail's labels. A tag provider reads them, so they don't have to be typed in. In the account dialog, "Take over from <provider>" merges them into the account's tags. It is offered only for an account that runs on the provider: its setup is found in the account's scripts (by the filter provider's detection, with or without filters), its filters were taken over, or its tags were taken over before. On taking over, a tag of the same keyword gets the provider's name and color, other tags stay. Nothing is stored until the account is saved, and nothing changes on the server.
 
 Unlike filter providers, tag providers need the network beyond ManageSieve and IMAP, so they live in their own crates (first: `crates/mailplus`), not in `sieve-core`.
 

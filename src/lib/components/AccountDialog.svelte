@@ -326,6 +326,7 @@
 
     <TagsEditor
       accountId={initial?.id ?? null}
+      provider={initial ? session.tagProvider(initial.id) : null}
       host={initial?.host ?? host}
       bind:tags
       bind:mailplus

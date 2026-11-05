@@ -13,13 +13,16 @@
 
   let {
     accountId,
+    provider,
     host,
     tags = $bindable(),
     mailplus = $bindable(),
     oncertificate,
   }: {
-    /** `null` for an account not saved yet: it has no stored password to log in with. */
+    /** `null` for an account not saved yet. */
     accountId: string | null;
+    /** The tag provider the account runs on (see `session.tagProvider`); `null` hides taking tags over. */
+    provider: "mailplus" | null;
     /** The account's server, where DSM runs too. */
     host: string;
     tags: Tag[];
@@ -39,12 +42,12 @@
   }
 
   async function takeOver(otp: string | null = null): Promise<void> {
-    if (!accountId) return;
+    if (!accountId || !provider) return;
     loading = true;
     error = null;
     result = null;
     try {
-      const provided = await providerTags(accountId, "mailplus", port, otp);
+      const provided = await providerTags(accountId, provider, port, otp);
       const merged = mergeTags(tags, provided);
       tags = merged.tags;
       result = merged;
@@ -138,27 +141,29 @@
     <Icon name="plus" size={14} />{t("tags.add")}
   </button>
 
-  <!-- Tag provider: MailPlus' labels through DSM. -->
-  <div class="grid gap-2 rounded-box border border-base-300 p-3">
-    <div class="flex flex-wrap items-center gap-2">
-      <button type="button" class="btn btn-sm gap-1.5" disabled={!accountId || loading} onclick={() => takeOver()}>
-        {#if loading}<span class="loading loading-spinner loading-xs"></span>{:else}<Icon name="tag" size={14} />{/if}
-        {t("tags.fromProvider", { provider: t("provider.mailplus") })}
-      </button>
-      <label class="flex items-center gap-1.5 text-sm text-base-content/80">
-        {t("tags.port")}
-        <input type="number" min="1" max="65535" class="input input-sm w-20" bind:value={port} />
-      </label>
-    </div>
-    <p class="label whitespace-normal">
-      {accountId ? t("tags.mailplusHint", { host }) : t("tags.saveFirst")}
-    </p>
-    {#if result}
-      <p role="status" class="text-sm">
-        {result.added || result.changed ? t("tags.merged", { added: result.added, changed: result.changed }) : t("tags.mergedNone")}
-        {#if result.unmatched.length}<br /><span class="text-base-content/70">{t("tags.unmatched", { names: result.unmatched.join(", ") })}</span>{/if}
+  <!-- Tag provider: MailPlus' labels through DSM, only for accounts on MailPlus. -->
+  {#if provider === "mailplus"}
+    <div class="grid gap-2 rounded-box border border-base-300 p-3">
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" class="btn btn-sm gap-1.5" disabled={loading} onclick={() => takeOver()}>
+          {#if loading}<span class="loading loading-spinner loading-xs"></span>{:else}<Icon name="tag" size={14} />{/if}
+          {t("tags.fromProvider", { provider: t("provider.mailplus") })}
+        </button>
+        <label class="flex items-center gap-1.5 text-sm text-base-content/80">
+          {t("tags.port")}
+          <input type="number" min="1" max="65535" class="input input-sm w-20" bind:value={port} />
+        </label>
+      </div>
+      <p class="label whitespace-normal">
+        {t("tags.mailplusHint", { host })}
       </p>
-    {/if}
-    {#if error}<p role="alert" class="text-sm text-error">{error}</p>{/if}
-  </div>
+      {#if result}
+        <p role="status" class="text-sm">
+          {result.added || result.changed ? t("tags.merged", { added: result.added, changed: result.changed }) : t("tags.mergedNone")}
+          {#if result.unmatched.length}<br /><span class="text-base-content/70">{t("tags.unmatched", { names: result.unmatched.join(", ") })}</span>{/if}
+        </p>
+      {/if}
+      {#if error}<p role="alert" class="text-sm text-error">{error}</p>{/if}
+    </div>
+  {/if}
 </fieldset>

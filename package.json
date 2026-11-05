@@ -1,6 +1,6 @@
 {
   "name": "sieve-gui",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A desktop editor for server-side Sieve mail filters via ManageSieve.",
   "type": "module",
   "imports": {

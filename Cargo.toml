@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/sieve-core", "crates/managesieve", "crates/mailstore", "crates/mailplus", "src-tauri"]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Lukas Runge"]
 license = "MIT"
 repository = "https://github.com/lukas-runge/sieve-gui"

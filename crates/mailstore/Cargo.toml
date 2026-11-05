@@ -11,7 +11,7 @@ publish = false
 [dependencies]
 async-imap = { version = "0.12.0", default-features = false, features = ["runtime-tokio"] }
 futures-util = "0.3.34"
-managesieve = { version = "0.1.0", path = "../managesieve" }
+managesieve = { version = "0.2.0", path = "../managesieve" }
 rustls-pki-types = "1.15.1"
 serde = { version = "1.0.229", features = ["derive"] }
 thiserror = "2.0.21"

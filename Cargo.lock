@@ -2091,7 +2091,7 @@ checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "mailplus"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "managesieve",
  "reqwest",
@@ -2102,7 +2102,7 @@ dependencies = [
 
 [[package]]
 name = "mailstore"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-imap",
  "futures-util",
@@ -2116,7 +2116,7 @@ dependencies = [
 
 [[package]]
 name = "managesieve"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64 0.23.1",
  "rcgen",
@@ -3501,7 +3501,7 @@ checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
 
 [[package]]
 name = "sieve-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3509,7 +3509,7 @@ dependencies = [
 
 [[package]]
 name = "sieve-gui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "apple-native-keyring-store",
  "dbus-secret-service-keyring-store",

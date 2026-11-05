@@ -5,6 +5,7 @@ mod folders;
 mod passwords;
 mod rules;
 mod server;
+mod tags;
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -117,6 +118,7 @@ pub fn run() {
             server::copy_status,
             server::resolve_copy,
             folders::list_folders,
+            tags::provider_tags,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

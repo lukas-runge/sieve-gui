@@ -45,6 +45,14 @@ pub struct Account {
     /// `$synolabel_…`), shown instead of the keyword.
     #[serde(default)]
     pub keyword_names: HashMap<String, String>,
+    /// Colours for custom keywords, as `#rrggbb`. A keyword without one
+    /// gets a colour derived from its name.
+    #[serde(default)]
+    pub keyword_colors: HashMap<String, String>,
+    /// Where Synology MailPlus' web API is, for taking its labels over as
+    /// keyword names and colours (`tags`). `None`: not used yet.
+    #[serde(default)]
+    pub mailplus: Option<MailPlusSettings>,
     /// Folder for the local copy of the scripts; `None` uses the app's data
     /// folder (see `copy`).
     #[serde(default)]
@@ -74,6 +82,17 @@ pub struct FiltersAlone {
     /// (`Detection::fingerprint`): only filters added since are offered.
     #[serde(default)]
     pub fingerprint: String,
+}
+
+/// DSM's web API on the account's host (see the `mailplus` crate).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailPlusSettings {
+    /// DSM's HTTPS port, 5001 unless changed in DSM.
+    pub port: u16,
+    /// Like [`Account::certificate`], for DSM.
+    #[serde(default)]
+    pub certificate: Option<String>,
 }
 
 /// An account's icon: a picture, or a short text on a colour.
@@ -129,6 +148,8 @@ pub struct ImapSettings {
 pub enum Service {
     ManageSieve,
     Imap,
+    /// DSM's web API, for MailPlus' labels.
+    MailPlus,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -169,6 +190,10 @@ pub struct AccountInput {
     pub last_move_wins: bool,
     pub roundcube: bool,
     pub keyword_names: HashMap<String, String>,
+    #[serde(default)]
+    pub keyword_colors: HashMap<String, String>,
+    #[serde(default)]
+    pub mailplus: Option<MailPlusSettings>,
     pub copy_dir: Option<String>,
     #[serde(default)]
     pub icon: Option<AccountIcon>,
@@ -260,6 +285,8 @@ pub async fn save_account(
         last_move_wins: input.last_move_wins,
         roundcube: input.roundcube,
         keyword_names: input.keyword_names,
+        keyword_colors: checked_colors(input.keyword_colors),
+        mailplus: input.mailplus,
         copy_dir: input.copy_dir.map(|d| d.trim().to_owned()).filter(|d| !d.is_empty()),
         icon: match input.icon {
             Some(icon) => icon.checked()?,
@@ -278,6 +305,15 @@ pub async fn save_account(
     // Settings may have changed; connect again on next use.
     sessions.disconnect(&account.id).await;
     Ok(account)
+}
+
+/// Keeps colours written as `#rrggbb` (in lowercase), drops the others.
+fn checked_colors(colors: HashMap<String, String>) -> HashMap<String, String> {
+    colors
+        .into_iter()
+        .map(|(k, v)| (k.trim().to_owned(), v.trim().to_ascii_lowercase()))
+        .filter(|(k, v)| !k.is_empty() && v.len() == 7 && v.starts_with('#') && v[1..].bytes().all(|b| b.is_ascii_hexdigit()))
+        .collect()
 }
 
 /// Sets the names of the account's custom keywords and returns the account.
@@ -343,12 +379,21 @@ pub async fn trust_certificate(
             match service {
                 Service::ManageSieve => account.certificate = Some(sha256),
                 Service::Imap => account.imap.as_mut()?.certificate = Some(sha256),
+                Service::MailPlus => {
+                    account
+                        .mailplus
+                        .get_or_insert(MailPlusSettings { port: mailplus::DSM_PORT, certificate: None })
+                        .certificate = Some(sha256)
+                }
             }
             Some(account.clone())
         })?
         .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("no {service:?} server for account {id}")))?;
     store.save(&app)?;
-    sessions.disconnect(&account.id).await;
+    // DSM isn't part of the connection.
+    if service != Service::MailPlus {
+        sessions.disconnect(&account.id).await;
+    }
     Ok(account)
 }
 
@@ -363,4 +408,20 @@ pub async fn delete_account(
     store.with(&app, |accounts| accounts.retain(|a| a.id != id))?;
     store.save(&app)?;
     crate::passwords::remove(&id)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn colours_are_checked() {
+        let colors = checked_colors(HashMap::from([
+            ("$a".to_owned(), " #CC3D9C ".to_owned()),
+            ("$b".to_owned(), "red".to_owned()),
+            ("$c".to_owned(), "#12345".to_owned()),
+            (" ".to_owned(), "#123456".to_owned()),
+        ]));
+        assert_eq!(colors, HashMap::from([("$a".to_owned(), "#cc3d9c".to_owned())]));
+    }
 }

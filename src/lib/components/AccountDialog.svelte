@@ -1,14 +1,17 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import type { Account, AccountSecurity } from "#tauri/types";
+  import type { Account, AccountSecurity, MailPlusSettings, UntrustedCertificate } from "#tauri/types";
+  import { trustCertificate } from "#tauri/commands";
   import { describeError } from "../api";
   import { t, type MessageKey } from "../i18n.svelte";
   import { ROOT_SCRIPT, session } from "../session.svelte";
   import Fingerprint from "./Fingerprint.svelte";
-  import { formatKeywordNames, parseKeywordNames } from "../keywords";
+  import { tagList, tagMaps, type Tag } from "../keywords";
   import { ICON_HUES, iconImage, initials, shortText } from "../accountIcon";
   import { labelHue } from "../rules/route";
   import AccountIconView from "./AccountIcon.svelte";
+  import CertificateDialog from "./CertificateDialog.svelte";
+  import TagsEditor from "./TagsEditor.svelte";
   import Icon from "./Icon.svelte";
 
   let { account, onclose }: { account: Account | null; onclose: () => void } = $props();
@@ -36,7 +39,22 @@
   // Turned on by taking over a filter provider's filters; can only be turned off here.
   const filtersAlone = initial?.filtersAlone ?? null;
   let filtersAloneOn = $state(!!filtersAlone);
-  let keywordText = $state(formatKeywordNames(initial?.keywordNames ?? {}));
+  let tags = $state<Tag[]>(tagList(initial?.keywordNames ?? {}, initial?.keywordColors ?? {}));
+  let mailplus = $state<MailPlusSettings | null>(initial?.mailplus ?? null);
+  // DSM's certificate, while the user decides whether to trust it.
+  let dsmCertificate = $state<{ untrusted: UntrustedCertificate; address: string; retry: () => void } | null>(null);
+  async function trustDsm() {
+    const pending = dsmCertificate;
+    if (!pending || !initial) return;
+    try {
+      await trustCertificate(initial.id, "mailPlus", pending.untrusted.certificate.sha256);
+      mailplus = { port: mailplus?.port ?? 5001, certificate: pending.untrusted.certificate.sha256 };
+      await session.loadAccounts();
+      pending.retry();
+    } catch (err) {
+      error = describeError(err);
+    }
+  }
   let copyDir = $state(initial?.copyDir ?? "");
   // The icon: its own text, colour or picture; empty means "from the name".
   let iconTextValue = $state(initial?.icon?.text ?? "");
@@ -86,7 +104,9 @@
         lastMoveWins,
         roundcube,
         filtersAlone: filtersAloneOn ? filtersAlone : null,
-        keywordNames: parseKeywordNames(keywordText),
+        keywordNames: tagMaps(tags).names,
+        keywordColors: tagMaps(tags).colors,
+        mailplus,
         copyDir: copyDir.trim() || null,
         icon: iconDraft.text || iconDraft.hue !== null || iconDraft.image ? iconDraft : null,
         password: password || (initial ? null : ""),
@@ -304,18 +324,14 @@
       <p class="label whitespace-normal">{t("copy.dirHint")}</p>
     </fieldset>
 
-    <fieldset class="fieldset">
-      <label class="fieldset-legend" for="acc-keywords">{t("keywords.heading")}</label>
-      <textarea
-        id="acc-keywords"
-        class="textarea w-full font-mono text-sm"
-        rows={Math.min(8, Math.max(2, keywordText.split("\n").length))}
-        placeholder="$label1 = Wichtig"
-        bind:value={keywordText}
-        spellcheck="false"
-      ></textarea>
-      <p class="label whitespace-normal">{t("keywords.hint")}</p>
-    </fieldset>
+    <TagsEditor
+      accountId={initial?.id ?? null}
+      provider={initial ? session.tagProvider(initial.id) : null}
+      host={initial?.host ?? host}
+      bind:tags
+      bind:mailplus
+      oncertificate={(untrusted, address, retry) => (dsmCertificate = { untrusted, address, retry })}
+    />
 
     {#if error}<p role="alert" class="text-error">{error}</p>{/if}
 
@@ -327,4 +343,13 @@
       </button>
     </div>
   </form>
+  <!-- Outside the form: the certificate dialog has its own. -->
+  {#if dsmCertificate}
+    <CertificateDialog
+      untrusted={dsmCertificate.untrusted}
+      host={dsmCertificate.address}
+      ontrust={trustDsm}
+      onclose={() => (dsmCertificate = null)}
+    />
+  {/if}
 </dialog>

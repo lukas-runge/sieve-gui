@@ -17,6 +17,10 @@ pub enum ErrorKind {
     UntrustedCertificate,
     /// The server rejected the credentials.
     Auth,
+    /// DSM asks for a 2-step verification code: try again with one.
+    SecondFactorRequired,
+    /// DSM rejected the 2-step verification code.
+    SecondFactorFailed,
     /// The server rejected a command (`NO`), e.g. a script with errors.
     Server,
     /// The script on the server changed since it was loaded.
@@ -114,6 +118,25 @@ impl From<mailstore::Error> for AppError {
             E::Auth(_) => ErrorKind::Auth,
             E::Io(_) | E::Timeout => ErrorKind::Connection,
             E::Imap(_) => ErrorKind::Server,
+        };
+        Self::new(kind, err.to_string())
+    }
+}
+
+impl From<mailplus::Error> for AppError {
+    fn from(err: mailplus::Error) -> Self {
+        use mailplus::Error as E;
+        let kind = match err {
+            E::UntrustedCertificate { certificate, reason } => {
+                return Self::untrusted(Service::MailPlus, *certificate, reason);
+            }
+            E::Http(_) => ErrorKind::Connection,
+            E::Tls(_) => ErrorKind::Tls,
+            E::NotMailPlus => ErrorKind::NotFound,
+            E::Auth(_) => ErrorKind::Auth,
+            E::SecondFactorRequired => ErrorKind::SecondFactorRequired,
+            E::SecondFactorFailed => ErrorKind::SecondFactorFailed,
+            E::Api { .. } | E::Response { .. } => ErrorKind::Server,
         };
         Self::new(kind, err.to_string())
     }

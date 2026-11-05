@@ -112,6 +112,11 @@ class Session {
    */
   providers = $state<Record<string, Detection[]>>({});
   /**
+   * Per account: every provider whose setup is on the server, with or
+   * without filters (e.g. "mailplus"). Tells which tag providers apply.
+   */
+  detectedProviders = $state<Record<string, string[]>>({});
+  /**
    * Per account: the provider that had made its own script active again,
    * until the notice is dismissed. sieve-gui re-activated its root on
    * connect ("sieve-gui manages the filters alone").
@@ -252,6 +257,11 @@ class Session {
     return this.accounts.find((a) => a.id === id)?.keywordNames ?? {};
   }
 
+  /** Colours (`#rrggbb`) of the account's custom keywords. */
+  keywordColors(id: string): Record<string, string> {
+    return this.accounts.find((a) => a.id === id)?.keywordColors ?? {};
+  }
+
   /** Names a keyword of the account (`null` removes the name). */
   async setKeywordName(id: string, keyword: string, name: string | null) {
     const names = { ...this.keywordNames(id) };
@@ -307,7 +317,7 @@ class Session {
       return;
     }
     if (untrusted.service === "manageSieve") await this.connect(id);
-    else await this.loadFolders(id);
+    else if (untrusted.service === "imap") await this.loadFolders(id);
   }
 
   async refreshScripts(id: string) {
@@ -636,7 +646,9 @@ class Session {
       // there after a take-over.
       // Not while they're being deleted there after a take-over.
       const pending = this.cleanup[id];
-      const found = (await detectProviders(scripts)).filter(
+      const detections = await detectProviders(scripts);
+      this.detectedProviders[id] = detections.map((d) => d.provider);
+      const found = detections.filter(
         (d) =>
           d.filters + d.listEntries > 0 &&
           !(pending && !pending.done && pending.provider === d.provider) &&
@@ -647,6 +659,18 @@ class Session {
     } catch {
       delete this.providers[id];
     }
+  }
+
+  /**
+   * The tag provider for the account (concept §3 "Tag providers"), if any:
+   * the system its scripts show it runs on, the one whose filters were taken
+   * over, or the one already used for its tags.
+   */
+  tagProvider(id: string): "mailplus" | null {
+    const account = this.accounts.find((a) => a.id === id);
+    const mailplus =
+      this.detectedProviders[id]?.includes("mailplus") || account?.filtersAlone?.provider === "mailplus" || !!account?.mailplus;
+    return mailplus ? "mailplus" : null;
   }
 
   /** A provider's filters as rules, for the preview before taking them over. */

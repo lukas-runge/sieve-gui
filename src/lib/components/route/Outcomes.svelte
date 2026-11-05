@@ -1,7 +1,8 @@
 <script lang="ts">
   // Where a message goes and what happens to it: the folder like a sorting
   // compartment (path quiet, last folder strong), labels as tags.
-  import { labelHue as hue, type Outcome } from "../../rules/route";
+  import { labelStyle, type Outcome } from "../../rules/route";
+  import { session } from "../../session.svelte";
   import { t } from "../../i18n.svelte";
   import Icon, { type IconName } from "../Icon.svelte";
   import Mark from "./Mark.svelte";
@@ -31,6 +32,8 @@
     /** Clicking a folder or label shows everything that goes there. */
     ontarget?: (o: Outcome) => void;
   } = $props();
+  // Tag colours of the open script's account.
+  const colors = $derived(session.editor ? session.keywordColors(session.editor.accountId) : {});
 
   /** Folders and labels lead to everything else that goes there. */
   function target(o: Outcome) {
@@ -97,11 +100,11 @@
         </span>
       </span>
     {:else if o.kind === "label" || o.kind === "unlabel" || o.kind === "setLabels"}
-      {@const h = hue(o.text)}
+      {@const style = labelStyle(o.text, o.keyword ? colors[o.keyword] : null)}
       <!-- svelte-ignore a11y_no_noninteractive_tabindex: a link when `ontarget` is set -->
       <span
         class={["inline-flex items-center gap-1 rounded-full border px-2 py-px text-[0.875rem] font-medium whitespace-nowrap", ontarget && o.target && "target"]}
-        style="border-color: oklch(0.65 0.11 {h} / 0.6); background: oklch(0.7 0.1 {h} / 0.1)"
+        style={style.chip}
         title={o.text.startsWith("$")
           ? t("route.unnamedLabel", { name: o.text })
           : ontarget && o.target
@@ -114,7 +117,7 @@
         onclick={target(o)}
         onkeydown={target(o)}
       >
-        <span class="size-2 rounded-full" style="background: oklch(0.62 0.13 {h})"></span>
+        <span class="size-2 rounded-full" style={style.dot}></span>
         {#if o.kind === "unlabel"}{t("route.remove")}{/if}{#if o.kind === "setLabels"}{t("route.only")}{/if}<Mark text={o.text} {words} />
       </span>
     {:else if o.kind === "keep"}

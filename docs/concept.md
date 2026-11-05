@@ -61,7 +61,7 @@ Sieve text  ⇄  parser / generator  ⇄  rule model  ⇄  UI
 
 Rule names and enabled state are stored as structured comments in the **format of the Roundcube *managesieve* plugin** (e.g. `# rule:[Name]`), so scripts can be edited alternately in Roundcube and sieve-gui without losing names. Disabled rules are kept in the script in a non-executing form instead of being removed. Before implementing the parser, the exact encoding (names, disabled rules) is captured from real Roundcube-generated scripts and turned into test fixtures.
 
-**Keyword names:** custom flags such as Synology MailPlus labels (`$synolabel_tu0exccz`) or Roundcube's `$label1` carry no name. Each account keeps a name per keyword, shown instead of the keyword. Names are entered by the user: no mail protocol exposes them. IMAP keywords carry no display name, neither IANA's IMAP METADATA entries nor its keyword registry define one (`$MailFlagBit0`–`2`, RFC 9979, only encode a flag color), and MailPlus keeps its label names out of IMAP (its Dovecot runs without `imap_metadata`). Its web API does list them, with colors (§4 Later, "Tags"). Storing names on the server under a METADATA vendor entry would need a registered vendor token (RFC 5464 §3.2.1) and is off by default in Dovecot, so it isn't planned.
+**Tags:** custom flags such as Synology MailPlus labels (`$synolabel_tu0exccz`) or Roundcube's `$label1` carry no name. Each account keeps a name and a color (`#rrggbb`) per keyword, shown as a chip instead of the keyword; a keyword without its own color gets a hue derived from its name. Names come from the user or from a tag provider (*Tag providers* below): no mail protocol exposes them. IMAP keywords carry no display name, neither IANA's IMAP METADATA entries nor its keyword registry define one (`$MailFlagBit0`–`2`, RFC 9979, only encode a flag color), and MailPlus keeps its label names out of IMAP (its Dovecot runs without `imap_metadata`). Storing names on the server under a METADATA vendor entry would need a registered vendor token (RFC 5464 §3.2.1) and is off by default in Dovecot, so it isn't planned.
 
 ### Several active scripts, one folder per message
 
@@ -146,6 +146,21 @@ Recognizing a provider is an explicit, extensible list, not an exception to the 
 - Lost and not replaced: removing the spam marker from the subject for allowed senders, and the header `X-Synology-Personal-Spam-Rule` that MailPlus adds on list matches.
 - Value of the MailPlus UI next to sieve-gui: none that outweighs the cost. Its filters and lists are a subset of sieve-gui's rules; what remains is convenience (blocking a sender while reading mail, editing filters from any browser), and using it switches sieve-gui off. The allow list doesn't override the server-side spam filter either: `move_spam` only looks at `X-Synology-Spam-Flag`.
 
+### Tag providers
+
+Some systems keep names and colors for keywords of their own: a webmail's labels. A tag provider reads them, so they don't have to be typed in. In the account dialog, "Take over from <provider>" merges them into the account's tags. It is offered only for an account that runs on the provider: its setup is found in the account's scripts (by the filter provider's detection, with or without filters), its filters were taken over, or its tags were taken over before. On taking over, a tag of the same keyword gets the provider's name and color, other tags stay. Nothing is stored until the account is saved, and nothing changes on the server.
+
+Unlike filter providers, tag providers need the network beyond ManageSieve and IMAP, so they live in their own crates (first: `crates/mailplus`), not in `sieve-core`.
+
+**Synology MailPlus.** Tested against MailPlus 4.1.1 on 2026-11-05.
+
+- MailPlus' web client reads its labels from DSM's web API, an undocumented API that may change with MailPlus updates. DSM runs on the account's host, by default on port 5001 (editable next to the button). The app logs in with the account's user name and password: MailPlus accounts are DSM accounts. `SYNO.API.Auth` needs `session=webui` (`session=MailPlus` fails with error 402). If DSM asks for 2-step verification (error 403), the app asks for the code and logs in again.
+- Before logging in, `query.cgi` (`SYNO.API.Info`) tells whether the server has MailPlus' APIs at all.
+- `SYNO.MailClient.Label` (`method=list`) returns each label's numeric `id`, `name`, `full_name` (with its parents, e.g. `xis/Newsletter`), `background_color` and `text_color`. The tag gets the `full_name` and one color: the background if it is strong, otherwise the text color (MailPlus pairs pale backgrounds with a dark text).
+- The API doesn't name a label's keyword, and the web client never sees it either: the server translates. So the keyword is told from messages. `SYNO.MailClient.Thread` (`method=list`, condition `[{"name":"label","value":"<id>"}]`, `conversation_view=false`) lists up to five messages per label with their folder, `Message-ID` and all their labels. Over IMAP (read-only, `EXAMINE`, one `SEARCH` per folder), the same messages' keywords are read. A label and a keyword belong together the more of the label's messages have the keyword and the more of the keyword's messages have the label; the second part tells a child label's keyword from its parent's. Pairs are taken best first, ties stay open (`mailplus::match_keywords`). On the real account, 15 of 16 labels were matched, all correctly; one message the web API listed with a label lacked its keyword over IMAP, which this scoring tolerates.
+- A label no message carries can't be matched; the dialog lists it.
+- DSM's certificate is pinned like the servers' (`MailPlusSettings::certificate`): reached by IP address, DSM often shows a certificate for its host name, or a self-signed one.
+
 ## 4. Features and milestones
 
 ### v0.1 — visual editing (MVP)
@@ -161,7 +176,7 @@ Recognizing a provider is an explicit, extensible list, not an exception to the 
 - Vacation / out-of-office editor (dates, subject, body, interval)
 - Raw-code cards with the fallback editor
 - Branches (`elsif`/`else`), nested conditions, search in the rule list (§3)
-- Names for custom keywords (e.g. MailPlus labels), per account (§3)
+- Tags: names and colors for custom keywords (e.g. MailPlus labels), per account; taken over from Synology MailPlus (§3 *Tag providers*, D20)
 - Existing setups: ask before the root script takes over, include scripts unchanged, show which scripts include which (§3)
 - Live code preview (optional side panel)
 - Deploy flow: diff against server version → `CHECKSCRIPT` → `PUTSCRIPT`
@@ -205,12 +220,7 @@ Recognizing a provider is an explicit, extensible list, not an exception to the 
 - Rule templates (newsletters, invoices, mailing lists)
 - Own Lezer grammar for the code editor (folding, context-aware completion)
 - Headings to group long rule lists, with a marker of their own (not derived from existing comments)
-- **Tags:** keywords with a name and a color, shown as a colored chip in rule cards and pickers instead of the bare name. Today an account keeps only a name per keyword (§3).
-  - **Per account or app-wide (open):** keywords belong to a mailbox (MailPlus generates a random `$synolabel_…` per label), but a "Rechnung" tag may well exist in several accounts. App-wide tags, each mapped to a keyword per account, would move tag management out of the account dialog into its own place in the app. Decide this before colors are stored, so the data model doesn't change twice.
-  - **Tag providers:** like filter providers, a provider can deliver tags: in the account settings, "Take over tags from MailPlus" fetches names and colors, using the account's stored credentials.
-  - **MailPlus:** DSM's web API (`entry.cgi`, port 5001 by default) answers `SYNO.MailClient.Label` (`method=list`, versions 1–3) with `id`, `name`, `full_name` (hierarchy with `/`, e.g. `xis/Newsletter`), `background_color` and `text_color` (hex without `#`). Login via `SYNO.API.Auth` with `session=webui` (`session=MailPlus` fails with error 402); the DSM account is usually the mail account. Detection needs no login: `query.cgi` (`SYNO.API.Info`) lists `SYNO.MailClient.Label`. Tested on 2026-11-05.
-  - **Unsolved: label → keyword.** The API returns the label's numeric `id`, not its `$synolabel_…` keyword. Candidates: find a message carrying the label through the web API and read its keywords over IMAP (only covers labels in use; `SYNO.MailClient.Thread` returned no messages for the conditions tried), or a web UI filter whose "add label" action ends up as `addflag` in `filter.sieve`. First step: record the web UI's requests while labeling a message. Without a reliable mapping, MailPlus stays manual.
-  - **Costs:** an undocumented API that may change with MailPlus updates, a second endpoint besides IMAP and ManageSieve, self-signed certificates and DSM 2-step verification (`SYNO.API.Auth` error 403 asks for a code).
+- **App-wide tags (open):** keywords belong to a mailbox (MailPlus generates a random `$synolabel_…` per label), but a tag like "Rechnung" may well exist in several accounts. App-wide tags, each mapped to a keyword per account, would move tag management out of the account dialog into its own place in the app.
 - Optional git history for the local copy: each change on the server becomes a commit (e.g. via `gix`, no installed git needed); pushing to a remote later still
 
 ## 5. UX principles
@@ -230,7 +240,8 @@ sieve-gui/
 ├── crates/
 │   ├── sieve-core/      # lexer, parser, AST, rule model, generator, evaluator   (MIT)
 │   ├── managesieve/     # async ManageSieve client                               (MIT)
-│   └── mailstore/       # read-only IMAP access: folder list, later messages     (MIT)
+│   ├── mailstore/       # read-only IMAP access: folder list, keywords, later messages (MIT)
+│   └── mailplus/        # Synology MailPlus labels through DSM's web API          (MIT)
 ├── src-tauri/           # Tauri app: commands, keychain, state
 └── src/                 # SvelteKit frontend (SPA), Svelte 5, Tailwind + daisyUI
 ```
@@ -359,3 +370,4 @@ The project is **MIT-licensed**. To keep it that way:
 | D17 | Control structures | `if`/`elsif`/`else` as branches of one card, nested `if` as indented "also check" within actions (any depth), everything else (e.g. `include` inside a script) stays a code card | 2026-11-03 |
 | D18 | Tests | Sample messages with expected folders and flags are part of the app (v0.2): set up and run in it, checked before saving, stored with the local copy. Tests in a separate repository can only report after a change is live | 2026-11-03 |
 | D19 | Filter providers | Systems that write Sieve from their own filter settings (first: Synology MailPlus) can be taken over, not run side by side: they rewrite their scripts and re-activate their own on every save (tested on MailPlus). A provider module in `sieve_core::providers` detects the setup by content, imports its filters into rules (fixture-tested) and describes its behavior. The take-over creates a sieve-gui script, stops running the provider's root without deleting it, asks the user to delete the filters in the provider's UI, and turns on "sieve-gui manages the filters alone", which re-activates the root on connect and, while the app is open, within 30 seconds (5 seconds right after the take-over), and offers to take over filters added there later (§3) | 2026-11-05 |
+| D20 | Tag providers | Names and colors of a provider's labels are taken over into the account's tags instead of typed in (first: Synology MailPlus, through DSM's web API with the account's credentials). Its keywords are told from messages carrying the labels, read over IMAP, since the API doesn't name them. Tags stay per account for now; app-wide tags are open (§4 Later) | 2026-11-05 |

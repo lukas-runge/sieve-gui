@@ -41,5 +41,7 @@ ignore = [
     { id = "RUSTSEC-2024-0370", reason = "transitive via Tauri's gtk-rs 0.18 on Linux" },
     # pin-utils is unmaintained (archived 2026-10-01). It comes in through
     # async-imap 0.12.0, the latest release; nothing in our code uses it.
+    # Temporary: remove this entry and update async-imap once a release
+    # includes https://github.com/chatmail/async-imap/pull/153.
     { id = "RUSTSEC-2026-0441", reason = "transitive via async-imap 0.12.0 (mailstore), no release without it yet" },
 ]

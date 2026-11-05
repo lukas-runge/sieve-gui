@@ -149,12 +149,16 @@ function subdomainValues(keys: string[]): string[] | null {
   return domains.every((d) => wildcards.has(d)) ? domains : null;
 }
 
-/** "starts with" / "ends with" values, if every key has that shape. */
-function affixValues(keys: string[], kind: "start" | "end"): string[] | null {
+/**
+ * "starts with" / "ends with" values, if every key has that shape. An empty
+ * value is the key `*`, which also reads as the other kind or as a pattern,
+ * so it counts only if that operator was picked (`allowEmpty`).
+ */
+function affixValues(keys: string[], kind: "start" | "end", allowEmpty = false): string[] | null {
   const out: string[] = [];
   for (const key of keys) {
     const ok = kind === "start" ? key.endsWith("*") && !key.endsWith("\\*") : key.startsWith("*");
-    if (!ok || key.length < 2) return null;
+    if (!ok || key.length < (allowEmpty ? 1 : 2)) return null;
     const literal = unescapePattern(kind === "start" ? key.slice(0, -1) : key.slice(1));
     if (literal === null) return null;
     out.push(literal);
@@ -166,20 +170,26 @@ function negated(op: string, negate: boolean): Operator {
   return (negate ? "not" + op[0].toUpperCase() + op.slice(1) : op) as Operator;
 }
 
-/** The editor view of a condition, or null if it can't be edited. */
-export function viewCondition(c: Condition): ConditionView | null {
+/**
+ * The editor view of a condition, or null if it can't be edited.
+ *
+ * `picked` is the operator last chosen in the editor. Where the keys read
+ * both ways (`:matches "a*"` is "starts with a" and the pattern `a*`; an empty
+ * "starts with" is `*`), the view keeps that operator instead of the default.
+ */
+export function viewCondition(c: Condition, picked?: Operator): ConditionView | null {
   const test = c.test;
   switch (test.type) {
     case "header": {
       const f = fieldOf(test.headers);
       if (!f) return null;
-      const m = textOperator(test.matcher, test.keys, c.negate, "header");
+      const m = textOperator(test.matcher, test.keys, c.negate, "header", picked);
       return m && { ...f, part: "header", ...m };
     }
     case "address": {
       const f = fieldOf(test.headers);
       if (!f || !ADDRESS_FIELDS.includes(f.field)) return null;
-      const m = textOperator(test.matcher, test.keys, c.negate, test.part);
+      const m = textOperator(test.matcher, test.keys, c.negate, test.part, picked);
       return m && { ...f, part: test.part, ...m };
     }
     case "exists": {
@@ -195,7 +205,7 @@ export function viewCondition(c: Condition): ConditionView | null {
         return { field: "parts", header: "", part: "header", operator, values: test.transform.value };
       }
       if (test.transform.type !== "text") return null;
-      const m = textOperator(test.matcher, test.keys, c.negate, "header");
+      const m = textOperator(test.matcher, test.keys, c.negate, "header", picked);
       return m && { field: "body", header: "", part: "header", ...m };
     }
     case "size":
@@ -243,6 +253,7 @@ function textOperator(
   keys: string[],
   negate: boolean,
   part: Part,
+  picked?: Operator,
 ): { operator: Operator; values: string[] } | null {
   if (matcher.comparator !== null) return null;
   switch (matcher.matchType.type) {
@@ -251,12 +262,16 @@ function textOperator(
     case "regex":
       return { operator: negated(matcher.matchType.type, negate), values: keys };
     case "matches": {
+      const want = picked?.startsWith("not") ? picked[3].toLowerCase() + picked.slice(4) : picked;
+      if (want === "matches") return { operator: negated("matches", negate), values: keys };
       const domains = part === "domain" ? subdomainValues(keys) : null;
       if (domains) return { operator: negated("isWithSubdomains", negate), values: domains };
-      const start = affixValues(keys, "start");
-      if (start) return { operator: negated("startsWith", negate), values: start };
-      const end = affixValues(keys, "end");
-      if (end) return { operator: negated("endsWith", negate), values: end };
+      const kinds = want === "endsWith" ? (["end", "start"] as const) : (["start", "end"] as const);
+      for (const kind of kinds) {
+        const op = kind === "start" ? "startsWith" : "endsWith";
+        const values = affixValues(keys, kind, want === op);
+        if (values) return { operator: negated(op, negate), values };
+      }
       return { operator: negated("matches", negate), values: keys };
     }
     default:

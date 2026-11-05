@@ -206,8 +206,9 @@ const en = {
   "op.subdomainHint": "example.com also matches mail.example.com, but not myexample.com.",
 
   "part.label": "Address part",
-  "part.more": "Compare only part of the address (e.g. the domain) …",
-  "part.header": "anywhere in the header",
+  "part.hint": "What is compared: \"name and address\" is the whole line, e.g. Jane Doe <jane@example.org>; the other choices only that part of the address.",
+  "part.header": "name and address",
+  "part.wholeHeader": "whole header",
   "part.all": "address",
   "part.domain": "domain",
   "part.localPart": "name before @",
@@ -950,8 +951,9 @@ const de: Record<MessageKey, string> = {
   "op.subdomainHint": "example.com trifft auch mail.example.com, aber nicht meinexample.com.",
 
   "part.label": "Adressteil",
-  "part.more": "Nur einen Teil der Adresse prüfen (z. B. Domain) …",
-  "part.header": "irgendwo in der Kopfzeile",
+  "part.hint": "Was verglichen wird: „Name und Adresse“ ist die ganze Zeile, z. B. Max Muster <max@example.org>; die anderen nur diesen Teil der Adresse.",
+  "part.header": "Name und Adresse",
+  "part.wholeHeader": "ganze Kopfzeile",
   "part.all": "Adresse",
   "part.domain": "Domain",
   "part.localPart": "Name vor dem @",

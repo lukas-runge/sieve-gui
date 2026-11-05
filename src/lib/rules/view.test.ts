@@ -13,6 +13,7 @@ import {
   headerNames,
   newRule,
   operatorsFor,
+  offersPart,
   partsFor,
   removeCondition,
   viewCondition,
@@ -90,6 +91,18 @@ test("subaddress parts need the extension, unless already used", () => {
   assert.deepEqual(partsFor("subject", ["subaddress"], "header"), []);
 });
 
+test("an address part is offered where there are addresses", () => {
+  assert.ok(offersPart(from));
+  assert.ok(!offersPart({ ...from, operator: "exists", values: [] }));
+  assert.ok(!offersPart({ ...from, field: "subject" }));
+  const header: ConditionView = { ...from, field: "header", header: "X-Spam-Flag" };
+  assert.ok(!offersPart(header));
+  assert.ok(offersPart({ ...header, header: "Reply-To" }));
+  assert.ok(offersPart({ ...header, header: "sender, Resent-From" }));
+  // A part chosen already stays visible.
+  assert.ok(offersPart({ ...header, part: "domain" }));
+});
+
 test("switching part or field keeps what still fits", () => {
   const subdomains: ConditionView = { ...from, part: "domain", operator: "notIsWithSubdomains", values: ["a.org"] };
   assert.deepEqual(withPart(subdomains, "all"), { ...subdomains, part: "all", operator: "notIs" });
@@ -101,6 +114,18 @@ test("switching part or field keeps what still fits", () => {
   });
   assert.deepEqual(withField(subdomains, "to"), { ...subdomains, field: "to" });
   assert.deepEqual(withField(subdomains, "subject"), { ...subdomains, field: "subject", part: "header", operator: "notIs" });
+});
+
+test("a typed address is cut down to the part now compared", () => {
+  const typed: ConditionView = { ...from, values: ["max+news@example.org", "@example.com", "plain"] };
+  assert.deepEqual(withPart(typed, "domain").values, ["example.org", "example.com", "plain"]);
+  assert.deepEqual(withPart(typed, "localPart").values, ["max+news", "", "plain"]);
+  assert.deepEqual(withPart(typed, "user").values, ["max", "", "plain"]);
+  assert.deepEqual(withPart(typed, "detail").values, ["news", "", "plain"]);
+  assert.deepEqual(withPart(typed, "all").values, typed.values);
+  // Patterns and expressions stay as written.
+  const pattern: ConditionView = { ...from, operator: "matches", values: ["*@example.org"] };
+  assert.deepEqual(withPart(pattern, "domain").values, ["*@example.org"]);
 });
 
 test("a single condition is written bare, two start with all", () => {

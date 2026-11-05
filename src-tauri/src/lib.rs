@@ -6,6 +6,7 @@ mod passwords;
 mod rules;
 mod server;
 mod tags;
+mod update;
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -119,6 +120,8 @@ pub fn run() {
             server::resolve_copy,
             folders::list_folders,
             tags::provider_tags,
+            update::update_channel,
+            update::install_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

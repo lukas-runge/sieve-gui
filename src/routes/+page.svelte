@@ -16,6 +16,7 @@
   import { ROOT_SCRIPT, session } from "../lib/session.svelte";
   import { trial } from "../lib/trial.svelte";
   import { accountView, routeNav } from "../lib/scope.svelte";
+  import { checkForUpdate } from "../lib/update.svelte";
 
   let accountDialog = $state<{ account: Account | null } | null>(null);
   let deploying = $state(false);
@@ -142,6 +143,7 @@
       await session.loadAccounts();
       for (const account of session.accounts) void session.connect(account.id);
     })();
+    void checkForUpdate();
     return session.watchProviders();
   });
 

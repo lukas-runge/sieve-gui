@@ -249,6 +249,8 @@
       <ConditionGroup
         group={step.case.conditions!}
         {extensions}
+        {folders}
+        {singleFolder}
         mutate={(fn, merge) => mutate((r) => fn(groupIn(blockOf(r), step!.index), null), merge)}
       />
     {/if}

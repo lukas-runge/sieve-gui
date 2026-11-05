@@ -304,6 +304,9 @@ fn actions(commands: &[Command], single_folder: bool) -> Option<Vec<Action>> {
 }
 
 fn conditions(test: &Test) -> Option<Conditions> {
+    if let Some(compare) = compare_test(test) {
+        return Some(Conditions { join: Join::Any, items: vec![Condition { negate: false, test: compare }] });
+    }
     let join = if test.is("allof") {
         Join::All
     } else if test.is("anyof") {
@@ -493,7 +496,58 @@ fn single_string_list(arguments: &crate::ast::Arguments) -> Option<Vec<String>> 
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
+/// `allof (<kind> :matches <headers> "*", [not] <kind> :is <other> "${1}")`
+/// as a [`ConditionTest::Compare`], with `<kind>` `header`, or `address`
+/// with the same address part on both sides.
+fn compare_test(test: &Test) -> Option<ConditionTest> {
+    use crate::export::{COMPARE_KEY, COMPARE_PATTERN};
+    if !test.is("allof") || !test.arguments.args.is_empty() {
+        return None;
+    }
+    let Some(Tests::List(list)) = &test.arguments.tests else { return None };
+    let [capture, compare] = list.tests.as_slice() else { return None };
+    let (compare, differs) = if compare.is("not") {
+        let Some(Tests::Single(inner)) = &compare.arguments.tests else { return None };
+        if !compare.arguments.args.is_empty() {
+            return None;
+        }
+        (&**inner, true)
+    } else {
+        (compare, false)
+    };
+    // The headers, address part and match type of one side.
+    let side = |t: &Test, key: &str| -> Option<(Vec<String>, Option<AddressPart>, MatchType)> {
+        if t.arguments.tests.is_some() {
+            return None;
+        }
+        let address = t.is("address");
+        if !address && !t.is("header") {
+            return None;
+        }
+        let a = Args::split(&t.arguments.args, if address { &[MATCH_TAGS, ADDRESS_PART_TAGS] } else { &[MATCH_TAGS] })?;
+        let [fields, keys] = <[_; 2]>::try_from(a.string_lists(2)?).ok()?;
+        let matcher = a.matcher()?;
+        if matcher.comparator.is_some() || keys != [key] {
+            return None;
+        }
+        Some((fields, address.then(|| a.address_part()).flatten(), matcher.match_type))
+    };
+    let (headers, part, capture_type) = side(capture, COMPARE_PATTERN)?;
+    let (other, other_part, compare_type) = side(compare, COMPARE_KEY)?;
+    if !(capture.name.name.eq_ignore_ascii_case(&compare.name.name)
+        && part == other_part
+        && capture_type == MatchType::Matches
+        && compare_type == MatchType::Is)
+    {
+        return None;
+    }
+    Some(ConditionTest::Compare { headers, part, other, differs })
+}
+
 fn condition_test(test: &Test) -> Option<ConditionTest> {
+    if let Some(compare) = compare_test(test) {
+        return Some(compare);
+    }
     // Nested groups; `true`/`false` are the empty ones.
     if test.is("allof") || test.is("anyof") {
         let join = if test.is("allof") { Join::All } else { Join::Any };
@@ -528,6 +582,11 @@ fn condition_test(test: &Test) -> Option<ConditionTest> {
             } else {
                 ConditionTest::Envelope { parts: fields, part, matcher, keys }
             }
+        }
+        "string" => {
+            let a = Args::split(args, &[MATCH_TAGS])?;
+            let [sources, keys] = <[_; 2]>::try_from(a.string_lists(2)?).ok()?;
+            ConditionTest::String { sources, matcher: a.matcher()?, keys }
         }
         "exists" => {
             let a = Args::split(args, &[])?;
@@ -598,13 +657,16 @@ fn action(cmd: &Command, single_folder: bool) -> Option<Action> {
     let args = &cmd.arguments.args;
     let name = cmd.name.name.to_ascii_lowercase();
     Some(match name.as_str() {
-        "set" if single_folder => {
-            let a = Args::split(args, &[])?;
-            let [variable, mailbox] = <[_; 2]>::try_from(a.single_strings(2)?).ok()?;
-            if !variable.eq_ignore_ascii_case(FOLDER_VARIABLE) {
-                return None;
+        "set" => {
+            let tags: Vec<_> = SetModifier::ALL.iter().map(|m| (m.tag(), TagArg::None)).collect();
+            let a = Args::split(args, &[&tags])?;
+            let [name, value] = <[_; 2]>::try_from(a.single_strings(2)?).ok()?;
+            if single_folder && a.tags.is_empty() && name.eq_ignore_ascii_case(FOLDER_VARIABLE) {
+                return Some(Action::FileInto { mailbox: value, copy: false, create: false, flags: None });
             }
-            Action::FileInto { mailbox, copy: false, create: false, flags: None }
+            // Tags in the order written; `Args::split` lower-cased them.
+            let modifiers = a.tags.iter().map(|(tag, _)| SetModifier::ALL.into_iter().find(|m| m.tag() == tag)).collect::<Option<_>>()?;
+            Action::Set { name, value, modifiers }
         }
         "return" if single_folder && args.is_empty() => Action::Stop,
         "fileinto" => {

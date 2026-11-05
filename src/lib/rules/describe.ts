@@ -51,6 +51,16 @@ export function print(c: Condition): string {
           ? "true"
           : "false";
       break;
+    case "string":
+      out = `string ${matcher(t.matcher)} ${list(t.sources)} ${list(t.keys)}`;
+      break;
+    case "compare": {
+      const kind = t.part === null ? "header" : "address";
+      const part = t.part === null || t.part === "all" ? "" : `:${t.part.toLowerCase()} `;
+      const compare = `${kind} ${part}:is ${list(t.other)} ${str("${1}")}`;
+      out = `allof (${kind} ${part}:matches ${list(t.headers)} ${str("*")}, ${t.differs ? `not ${compare}` : compare})`;
+      break;
+    }
     case "date": {
       const zone = t.zone.type === "zone" ? `:zone ${str(t.zone.value)} ` : t.zone.type === "original" ? ":originalzone " : "";
       out = `date ${zone}${matcher(t.matcher)} ${str(t.header)} ${str(t.datePart)} ${list(t.keys)}`;

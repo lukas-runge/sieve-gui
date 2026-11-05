@@ -2,7 +2,7 @@
 // values per condition, and a kind plus parameters per action. Anything the
 // editor can't express is shown read-only and left untouched.
 
-import type { Action, AddressPart, Condition, Conditions, ConditionTest, Join, Matcher, Rule } from "#tauri/types";
+import type { Action, AddressPart, Condition, Conditions, ConditionTest, Join, Matcher, Rule, SetModifier } from "#tauri/types";
 
 // ── Conditions ────────────────────────────────────────────────────────────────
 
@@ -19,8 +19,17 @@ export const FIELDS = [
   "parts",
   "size",
   "date",
+  "folder",
+  "variable",
 ] as const;
 export type Field = (typeof FIELDS)[number];
+
+/**
+ * The global variable that records the folder in single-folder mode
+ * (`sieve_core::root::FOLDER_VARIABLE`). The field "folder" compares it: the
+ * folder the rules so far chose, which the root files the message into.
+ */
+export const FOLDER_VARIABLE = "move_to_folder";
 
 export const TEXT_OPERATORS = [
   "contains",
@@ -48,11 +57,23 @@ export const DATE_OPERATORS = ["onOrAfter", "onOrBefore"] as const;
  * <types> :contains ""`: the empty key matches every part of those types).
  */
 export const PART_OPERATORS = ["hasType", "notHasType"] as const;
+/**
+ * Whether the first value of the field is one of the values of another
+ * field (`compare` test, needs `variables`).
+ */
+export const COMPARE_OPERATORS = ["sameAs", "differsFrom"] as const;
+/** The folder chosen so far. */
+export const FOLDER_OPERATORS = ["is", "notIs", "startsWith", "notStartsWith"] as const;
 export type Operator =
   | (typeof TEXT_OPERATORS)[number]
   | (typeof SIZE_OPERATORS)[number]
   | (typeof DATE_OPERATORS)[number]
-  | (typeof PART_OPERATORS)[number];
+  | (typeof PART_OPERATORS)[number]
+  | (typeof COMPARE_OPERATORS)[number];
+
+export function isCompare(op: Operator): op is (typeof COMPARE_OPERATORS)[number] {
+  return op === "sameAs" || op === "differsFrom";
+}
 
 /**
  * What a condition compares: the whole header (`header` test) or a part of
@@ -64,9 +85,20 @@ export const PARTS: readonly Part[] = ["header", "all", "domain", "localPart", "
 /** Fields that hold addresses, so an address part can be chosen. */
 const ADDRESS_FIELDS: readonly Field[] = ["from", "to", "cc", "toOrCc", "recipients", "delivered", "header"];
 
+/** The field a comparison compares with. */
+export interface OtherField {
+  field: Field;
+  /** Header name(s) for the `header` field. */
+  header: string;
+}
+
+/** Fields a comparison can compare (on either side). */
+export const COMPARE_FIELDS: readonly Field[] = ["from", "to", "cc", "toOrCc", "recipients", "delivered", "subject", "header"];
+
 export interface ConditionView {
   field: Field;
-  /** Header name(s) for the `header` field, several separated by commas. */
+  /** Header name(s) for the `header` field, several separated by commas;
+   * the variable's name for the `variable` field. */
   header: string;
   part: Part;
   operator: Operator;
@@ -75,6 +107,8 @@ export interface ConditionView {
   values: string[];
   /** Time zone of a date condition (`+0100`), kept when editing. */
   zone?: string | null;
+  /** What a comparison compares with. */
+  other?: OtherField;
 }
 
 const FIELD_HEADERS: Partial<Record<Field, string[]>> = {
@@ -235,6 +269,23 @@ export function viewCondition(c: Condition, picked?: Operator): ConditionView | 
         zone: test.zone,
       };
     }
+    case "string": {
+      // One variable, as the editor writes it: "${name}".
+      const name = test.sources.length === 1 ? /^\$\{([A-Za-z_][A-Za-z0-9_]*)?\}$/.exec(test.sources[0]) : null;
+      if (!name) return null;
+      const folder = (name[1] ?? "").toLowerCase() === FOLDER_VARIABLE;
+      const m = textOperator(test.matcher, test.keys, c.negate, "header", picked);
+      if (!m || (folder && m.operator.endsWith("WithSubdomains"))) return null;
+      return { field: folder ? "folder" : "variable", header: folder ? "" : (name[1] ?? ""), part: "header", ...m };
+    }
+    case "compare": {
+      const f = fieldOf(test.headers);
+      const other = fieldOf(test.other);
+      if (c.negate || !f || !other || !COMPARE_FIELDS.includes(f.field) || !COMPARE_FIELDS.includes(other.field)) return null;
+      const part = test.part ?? "header";
+      if (part !== "header" && (!ADDRESS_FIELDS.includes(f.field) || !ADDRESS_FIELDS.includes(other.field))) return null;
+      return { ...f, part, operator: test.differs ? "differsFrom" : "sameAs", values: [], other };
+    }
     default:
       return null;
   }
@@ -314,6 +365,13 @@ export function buildCondition(v: ConditionView): Condition {
       },
     };
   }
+  if (isCompare(v.operator)) {
+    const o = v.other ?? defaultOther(v.field);
+    const typedOther = headerNames(o.header);
+    const other = o.field === "header" ? (typedOther.length ? typedOther : ["x-header"]) : (FIELD_HEADERS[o.field] ?? ["from"]);
+    const part = v.part === "header" ? null : v.part;
+    return { negate: false, test: { type: "compare", headers, part, other, differs: v.operator === "differsFrom" } };
+  }
   const negate = v.operator.startsWith("not");
   const base = negate ? v.operator[3].toLowerCase() + v.operator.slice(4) : v.operator;
   if (base === "exists") {
@@ -344,22 +402,42 @@ export function buildCondition(v: ConditionView): Condition {
   }
   const matcher: Matcher = { matchType, comparator: null };
   let test: ConditionTest;
-  if (v.field === "body") test = { type: "body", transform: { type: "text" }, matcher, keys };
+  if (v.field === "folder" || v.field === "variable") {
+    const name = v.field === "folder" ? FOLDER_VARIABLE : v.header.trim();
+    test = { type: "string", sources: [`\${${name}}`], matcher, keys };
+  } else if (v.field === "body") test = { type: "body", transform: { type: "text" }, matcher, keys };
   else if (v.part !== "header" && ADDRESS_FIELDS.includes(v.field)) test = { type: "address", headers, part: v.part, matcher, keys };
   else test = { type: "header", headers, matcher, keys };
   return { negate, test };
+}
+
+/** The field a new comparison compares with: Reply-To for From, else From. */
+function defaultOther(field: Field): OtherField {
+  return field === "from" ? { field: "header", header: "reply-to" } : { field: "from", header: "" };
 }
 
 export function operatorsFor(field: Field, part: Part, extensions: string[]): readonly Operator[] {
   if (field === "size") return SIZE_OPERATORS;
   if (field === "date") return DATE_OPERATORS;
   if (field === "parts") return PART_OPERATORS;
+  if (field === "folder") return FOLDER_OPERATORS;
   let ops: readonly Operator[] = TEXT_OPERATORS;
-  // `address` has no "exists"; that is a header question.
-  if (field === "body" || part !== "header") ops = ops.filter((o) => !o.endsWith("xists"));
-  if (part !== "domain") ops = ops.filter((o) => !o.endsWith("WithSubdomains"));
+  // `address` has no "exists"; that is a header question. Variables always exist.
+  if (field === "body" || field === "variable" || part !== "header") ops = ops.filter((o) => !o.endsWith("xists"));
+  if (part !== "domain" || field === "variable") ops = ops.filter((o) => !o.endsWith("WithSubdomains"));
   if (!extensions.includes("regex")) ops = ops.filter((o) => !/regex/i.test(o));
+  if (extensions.includes("variables") && COMPARE_FIELDS.includes(field)) ops = [...ops, ...COMPARE_OPERATORS];
   return ops;
+}
+
+/** The fields a comparison of `v` can compare with: with an address part, only those holding addresses. */
+export function otherFieldsFor(v: ConditionView): readonly Field[] {
+  return v.part === "header" ? COMPARE_FIELDS : COMPARE_FIELDS.filter((f) => ADDRESS_FIELDS.includes(f));
+}
+
+/** Changing the field compared with. */
+export function withOther(v: ConditionView, other: OtherField): ConditionView {
+  return { ...v, other };
 }
 
 /** Headers that hold addresses (RFC 5322 and common delivery headers). */
@@ -392,7 +470,7 @@ const ADDRESS_HEADERS = new Set([
  * has none to pick from.
  */
 export function offersPart(v: ConditionView): boolean {
-  if (!ADDRESS_FIELDS.includes(v.field) || !hasValues(v.operator)) return false;
+  if (!ADDRESS_FIELDS.includes(v.field) || (!hasValues(v.operator) && !isCompare(v.operator))) return false;
   if (v.field !== "header" || v.part !== "header") return true;
   const names = headerNames(v.header);
   return names.length > 0 && names.every((n) => ADDRESS_HEADERS.has(n.toLowerCase()));
@@ -405,16 +483,22 @@ export function partsFor(field: Field, extensions: string[], current: Part): rea
   return PARTS.filter((p) => p === current || subaddress || (p !== "user" && p !== "detail"));
 }
 
-export function fieldsFor(extensions: string[]): readonly Field[] {
+/**
+ * The fields the server supports. "Folder so far" only exists in
+ * single-folder mode, where the folder is recorded in a variable.
+ */
+export function fieldsFor(extensions: string[], singleFolder = false): readonly Field[] {
   return FIELDS.filter(
     (f) =>
       ((f !== "body" && f !== "parts") || extensions.includes("body")) &&
-      (f !== "date" || (extensions.includes("date") && extensions.includes("relational"))),
+      (f !== "date" || (extensions.includes("date") && extensions.includes("relational"))) &&
+      (f !== "variable" || extensions.includes("variables")) &&
+      (f !== "folder" || singleFolder),
   );
 }
 
 export function hasValues(op: Operator): boolean {
-  return op !== "exists" && op !== "notExists";
+  return op !== "exists" && op !== "notExists" && !isCompare(op);
 }
 
 /** Changing the field keeps part, operator and values where they still make sense. */
@@ -424,11 +508,19 @@ export function withField(v: ConditionView, field: Field): ConditionView {
     return { field, header: "", part: "header", operator: "onOrAfter", values: [new Date().toISOString().slice(0, 10)] };
   }
   if (field === "parts") return { field, header: "", part: "header", operator: "hasType", values: [""] };
-  if (v.field === "size" || v.field === "date" || v.field === "parts") {
+  if (field === "folder") return { field, header: "", part: "header", operator: "is", values: [""] };
+  if (field === "variable") {
+    const values = hasValues(v.operator) && v.field !== "folder" ? v.values : [""];
+    return keepOperator({ field, header: "", part: "header", operator: v.operator, values });
+  }
+  if (v.field === "size" || v.field === "date" || v.field === "parts" || v.field === "folder") {
     return { field, header: "", part: "header", operator: "contains", values: [""] };
   }
   const part = ADDRESS_FIELDS.includes(field) ? v.part : "header";
-  return keepOperator({ ...v, field, part });
+  // "From is the same as From" tests nothing: compare with another field then.
+  const next: ConditionView = { ...v, field, header: v.field === "variable" ? "" : v.header, part };
+  if (v.other && v.other.field === field && field !== "header") next.other = defaultOther(field);
+  return keepOperator(next);
 }
 
 /**
@@ -438,6 +530,7 @@ export function withField(v: ConditionView, field: Field): ConditionView {
  */
 export function withPart(v: ConditionView, part: Part): ConditionView {
   const next = keepOperator({ ...v, part });
+  if (v.other && part !== "header" && !ADDRESS_FIELDS.includes(v.other.field)) next.other = defaultOther(v.field);
   if (/matches|regex/i.test(next.operator)) return next;
   return { ...next, values: next.values.map((value) => partOfAddress(value, part)) };
 }
@@ -463,7 +556,7 @@ function partOfAddress(value: string, part: Part): string {
 
 /** Swaps an operator the field and part don't offer for the closest one. */
 function keepOperator(v: ConditionView): ConditionView {
-  if (operatorsFor(v.field, v.part, ["regex"]).includes(v.operator)) return v;
+  if (operatorsFor(v.field, v.part, ["regex", "variables"]).includes(v.operator)) return v;
   const negate = v.operator.startsWith("not");
   if (v.operator.endsWith("WithSubdomains")) return { ...v, operator: negate ? "notIs" : "is" };
   return { ...v, operator: negate ? "notContains" : "contains", values: hasValues(v.operator) ? v.values : [""] };
@@ -485,6 +578,7 @@ export const ACTION_KINDS = [
   "addFlags",
   "setFlags",
   "removeFlags",
+  "setVariable",
   "vacation",
   "reject",
   "keep",
@@ -493,6 +587,9 @@ export const ACTION_KINDS = [
   "check",
 ] as const;
 export type ActionKind = (typeof ACTION_KINDS)[number];
+
+/** The changes `set` offers for a value, in the order shown. */
+export const SET_MODIFIERS: readonly SetModifier[] = ["lower", "upper", "lowerFirst", "upperFirst", "quoteWildcard", "quoteRegex", "length"];
 
 /** What has branches: a rule, or a nested `if` ("also check"). */
 export interface Branches {
@@ -527,6 +624,8 @@ export function actionKind(a: Action): ActionKind {
       return "stop";
     case "vacation":
       return "vacation";
+    case "set":
+      return "setVariable";
     case "if":
       return "check";
   }
@@ -551,6 +650,8 @@ export function actionExtension(kind: ActionKind): string | null {
       return "vacation";
     case "reject":
       return "reject";
+    case "setVariable":
+      return "variables";
     default:
       return null;
   }
@@ -594,6 +695,8 @@ export function buildAction(kind: ActionKind, from?: Action): Action {
       return { type: "stop" };
     case "check":
       return from?.type === "if" ? from : { type: "if", ...newBranch(), elsif: [], otherwise: null };
+    case "setVariable":
+      return from?.type === "set" ? from : { type: "set", name: "", value: "", modifiers: [] };
     case "vacation":
       return from?.type === "vacation"
         ? from

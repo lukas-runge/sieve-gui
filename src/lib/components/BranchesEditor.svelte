@@ -153,7 +153,7 @@
 
 {#if !several}
   <div class="grid grid-cols-1 gap-4" data-case="{path}0">
-    <ConditionGroup group={block.conditions} heading={depth > 0 ? t("branch.andIf") : undefined} {extensions} mutate={conditionsMutate((b) => b.conditions)} />
+    <ConditionGroup group={block.conditions} heading={depth > 0 ? t("branch.andIf") : undefined} {extensions} {folders} {singleFolder} mutate={conditionsMutate((b) => b.conditions)} />
     {@render actions(block.actions, { branch: "if" }, `${path}0`)}
   </div>
 {:else}
@@ -161,7 +161,7 @@
     <li class="grid grid-cols-1 gap-3" data-case="{path}0">
       {@render caseHead(0, 1, false, block.conditions, block.actions, null)}
       {#if open.has(0)}
-        <ConditionGroup group={block.conditions} {extensions} mutate={conditionsMutate((b) => b.conditions)} />
+        <ConditionGroup group={block.conditions} {extensions} {folders} {singleFolder} mutate={conditionsMutate((b) => b.conditions)} />
         {@render actions(block.actions, { branch: "if" }, `${path}0`)}
       {/if}
     </li>
@@ -169,7 +169,7 @@
       <li class="grid grid-cols-1 gap-3" data-case="{path}{index + 1}">
         {@render caseHead(index + 1, index + 2, false, branch.conditions, branch.actions, (b) => b.elsif.splice(index, 1))}
         {#if open.has(index + 1)}
-          <ConditionGroup group={branch.conditions} heading={t("branch.elsif")} {extensions} mutate={conditionsMutate((b) => b.elsif[index].conditions)} />
+          <ConditionGroup group={branch.conditions} heading={t("branch.elsif")} {extensions} {folders} {singleFolder} mutate={conditionsMutate((b) => b.elsif[index].conditions)} />
           {@render actions(branch.actions, { branch: "elsif", index }, `${path}${index + 1}`)}
         {/if}
       </li>

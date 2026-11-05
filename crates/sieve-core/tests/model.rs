@@ -126,7 +126,7 @@ fn unknown_constructs_become_raw_blocks_verbatim() {
 # rule:[ok]
 if header :contains "subject" "a" { fileinto "A"; }
 # my own comment
-if header :matches "subject" "*" { set "s" "${1}"; }
+if header :matches "subject" "*" { addheader "X-S" "${1}"; }
 if true { keep; } else { debug_log "no"; }
 # rule:[comment inside]
 if exists "x" {
@@ -140,7 +140,7 @@ if header :index 2 :is "received" "x" { stop; }
     let set = import(src).unwrap();
     assert_eq!(set.items.len(), 7);
     assert_eq!(rule(&set, 0).name, "ok");
-    assert_eq!(raw(&set, 1), "# my own comment\nif header :matches \"subject\" \"*\" { set \"s\" \"${1}\"; }");
+    assert_eq!(raw(&set, 1), "# my own comment\nif header :matches \"subject\" \"*\" { addheader \"X-S\" \"${1}\"; }");
     assert_eq!(raw(&set, 2), "if true { keep; } else { debug_log \"no\"; }");
     assert!(raw(&set, 3).starts_with("# rule:[comment inside]\nif exists"));
     assert_eq!(raw(&set, 4), "debug_log \"hi\";");
@@ -457,10 +457,10 @@ fn single_folder_mode_reads_foreign_moves_and_stops() {
     let text = export(&set, &opts());
     assert!(text.contains("set \"move_to_folder\" \"A\";\n\treturn;"), "{text}");
 
-    // Other variables, `global` elsewhere or with comments stay raw.
+    // Other variables are set as such; `global` elsewhere or with comments stays raw.
     let set = import("require [\"include\", \"variables\"];\nglobal \"move_to_folder\";\nif true { set \"other\" \"x\"; }\n").unwrap();
     assert!(set.single_folder);
-    assert_eq!(raw(&set, 0), "if true { set \"other\" \"x\"; }");
+    assert_eq!(rule(&set, 0).actions, vec![Action::Set { name: "other".into(), value: "x".into(), modifiers: vec![] }]);
     let set = import("require [\"include\", \"variables\"];\n# note\nglobal \"move_to_folder\";\n").unwrap();
     assert!(!set.single_folder);
     let set = import("require \"variables\";\nif true { set \"move_to_folder\" \"x\"; return; }\n").unwrap();
@@ -676,4 +676,177 @@ fn canonical_ignores_comments_and_layout() {
     let c = "require \"fileinto\";\nif header :contains \"subject\" \"y\" { fileinto \"A\"; }\n";
     assert_ne!(sieve_core::canonical(a), sieve_core::canonical(c));
     assert_eq!(sieve_core::canonical("if {"), None);
+}
+
+/// "Reply-To differs from From": a capture plus a test of the captured value.
+#[test]
+fn comparisons_of_two_fields() {
+    let src = r#"require ["subaddress", "variables"];
+# rule:[Scam]
+if allof (address :matches "reply-to" "*", not address :is "from" "${1}") {
+	keep;
+}
+# rule:[Alias]
+if allof (exists "list-id", allof (address :domain :matches ["delivered-to", "x-original-to"] "*", address :domain :is ["to", "cc"] "${1}")) {
+	keep;
+}
+# rule:[Whole header]
+if not allof (header :matches "subject" "*", header :is "x-subject" "${1}") {
+	keep;
+}
+"#;
+    let set = import(src).unwrap();
+    let scam = rule(&set, 0);
+    assert_eq!(scam.conditions.join, Join::Any);
+    assert_eq!(
+        scam.conditions.items,
+        vec![Condition {
+            negate: false,
+            test: ConditionTest::Compare {
+                headers: vec!["reply-to".into()],
+                part: Some(AddressPart::All),
+                other: vec!["from".into()],
+                differs: true,
+            },
+        }]
+    );
+    assert_eq!(
+        rule(&set, 1).conditions.items[1].test,
+        ConditionTest::Compare {
+            headers: vec!["delivered-to".into(), "x-original-to".into()],
+            part: Some(AddressPart::Domain),
+            other: vec!["to".into(), "cc".into()],
+            differs: false,
+        }
+    );
+    let whole = &rule(&set, 2).conditions.items[0];
+    assert!(whole.negate);
+    assert!(matches!(&whole.test, ConditionTest::Compare { part: None, differs: false, .. }));
+
+    let text = assert_stable(&set);
+    assert!(text.contains(r#"if allof (address :matches "reply-to" "*", not address :is "from" "${1}") {"#), "{text}");
+
+    // Anything else that looks like it stays as written: other patterns or
+    // keys, mixed tests or address parts, a comparator.
+    for test in [
+        r#"allof (address :matches "a" "x*", address :is "b" "${1}")"#,
+        r#"allof (address :matches "a" "*", address :is "b" "${2}")"#,
+        r#"allof (address :matches "a" "*", header :is "b" "${1}")"#,
+        r#"allof (address :domain :matches "a" "*", address :is "b" "${1}")"#,
+        r#"allof (address :matches "a" "*", address :contains "b" "${1}")"#,
+        r#"allof (header :comparator "i;octet" :matches "a" "*", header :is "b" "${1}")"#,
+        r#"allof (not header :matches "a" "*", header :is "b" "${1}")"#,
+    ] {
+        let set = import(&format!("require \"variables\";\nif {test} {{ keep; }}\n")).unwrap();
+        assert!(
+            !format!("{:?}", rule(&set, 0).conditions).contains("Compare"),
+            "read as a comparison: {test}"
+        );
+    }
+}
+
+#[test]
+fn comparisons_need_variables() {
+    let set = RuleSet {
+        items: vec![RuleItem::Rule(Rule {
+            name: "x".into(),
+            enabled: true,
+            conditions: Conditions {
+                join: Join::Any,
+                items: vec![Condition {
+                    negate: false,
+                    test: ConditionTest::Compare {
+                        headers: vec!["reply-to".into()],
+                        part: Some(AddressPart::Detail),
+                        other: vec!["from".into()],
+                        differs: true,
+                    },
+                }],
+            },
+            actions: vec![Action::Keep { flags: None }],
+            ..Rule::default()
+        })],
+        ..RuleSet::default()
+    };
+    let text = assert_stable(&set);
+    assert_eq!(
+        text,
+        "require [\"subaddress\", \"variables\"];\n# rule:[x]\nif allof (address :detail :matches \"reply-to\" \"*\", not address :detail :is \"from\" \"${1}\") {\n\tkeep;\n}\n"
+    );
+}
+
+#[test]
+fn string_tests_and_set() {
+    let src = r#"require ["imap4flags", "regex", "variables"];
+# rule:[Remember]
+if header :matches "subject" "[*] *" {
+	set :lower :upperfirst "tag" "${1}";
+	set :quoteregex "pattern" "${2}";
+	set "note" text:
+two
+lines
+.
+;
+}
+# rule:[Use]
+if anyof (string :is "${tag}" ["Spam", "Junk"], string :regex ["${note}", "${tag}"] "^x") {
+	addflag "${tag}";
+}
+"#;
+    let set = import(src).unwrap();
+    let remember = rule(&set, 0);
+    assert_eq!(
+        remember.actions[0],
+        Action::Set {
+            name: "tag".into(),
+            value: "${1}".into(),
+            modifiers: vec![SetModifier::Lower, SetModifier::UpperFirst],
+        }
+    );
+    assert_eq!(remember.actions[2], Action::Set { name: "note".into(), value: "two\nlines\n".into(), modifiers: vec![] });
+    let used = rule(&set, 1);
+    assert_eq!(
+        used.conditions.items[0].test,
+        ConditionTest::String {
+            sources: vec!["${tag}".into()],
+            matcher: Matcher::new(MatchType::Is),
+            keys: vec!["Spam".into(), "Junk".into()],
+        }
+    );
+    let text = assert_stable(&set);
+    assert!(text.contains("set :lower :upperfirst \"tag\" \"${1}\";"), "{text}");
+    assert_eq!(set.needed_extensions(), vec!["imap4flags", "regex", "variables"]);
+
+    // Unknown modifiers (`:encodeurl` needs `enotify`) and repeated ones stay code.
+    for src in [r#"set :encodeurl "a" "b";"#, r#"set :lower :lower "a" "b";"#, r#"set "a";"#] {
+        let set = import(&format!("require \"variables\";\n{src}\n")).unwrap();
+        assert_eq!(raw(&set, 0), src);
+    }
+}
+
+/// In single-folder mode, only a plain `set` of the folder variable is a move.
+#[test]
+fn set_in_single_folder_mode() {
+    let src = r#"require ["variables", "include"];
+global "move_to_folder";
+if true {
+	set "move_to_folder" "Junk";
+	set :lower "move_to_folder" "Junk";
+	set "other" "x";
+}
+if string :is "${move_to_folder}" "Junk" {
+	addflag "$Junk";
+}
+"#;
+    let set = import(src).unwrap();
+    assert!(set.single_folder);
+    let actions = &rule(&set, 0).actions;
+    assert!(actions[0].is_plain_move());
+    assert_eq!(
+        actions[1],
+        Action::Set { name: "move_to_folder".into(), value: "Junk".into(), modifiers: vec![SetModifier::Lower] }
+    );
+    assert_eq!(actions[2], Action::Set { name: "other".into(), value: "x".into(), modifiers: vec![] });
+    assert!(matches!(rule(&set, 1).conditions.items[0].test, ConditionTest::String { .. }));
+    assert_stable(&set);
 }

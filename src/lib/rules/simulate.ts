@@ -4,8 +4,9 @@
 // writes (headers, addresses, envelope, size, body text, dates). Code blocks
 // and anything else it can't evaluate are reported as unknown, never guessed.
 
-import type { Action, Branch, Condition, Conditions, ConditionTest, Matcher, RuleItem } from "#tauri/types";
+import type { Action, Branch, Condition, Conditions, ConditionTest, Matcher, RuleItem, SetModifier } from "#tauri/types";
 import { toRegExp } from "./regex.ts";
+import { FOLDER_VARIABLE } from "./view.ts";
 
 // ── The sample message ───────────────────────────────────────────────────────
 
@@ -127,16 +128,23 @@ function caseless(m: Matcher): boolean | null {
   return null;
 }
 
-function glob(pattern: string, text: string, fold: boolean): boolean {
+/**
+ * Matches a `:matches` pattern; on a match, the whole text and what each
+ * wildcard matched (RFC 5229 match variables). Each `*` matches as little as
+ * the rest of the pattern allows, as in Pigeonhole: "*.*" on "a.b.c" gives
+ * "a" and "b.c".
+ */
+function glob(pattern: string, text: string, fold: boolean): string[] | null {
   let re = "";
   for (let i = 0; i < pattern.length; i++) {
     const ch = pattern[i];
     if (ch === "\\" && i + 1 < pattern.length) re += pattern[++i].replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
-    else if (ch === "*") re += "[\\s\\S]*";
-    else if (ch === "?") re += "[\\s\\S]";
+    else if (ch === "*") re += "([\\s\\S]*?)";
+    else if (ch === "?") re += "([\\s\\S])";
     else re += ch.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
   }
-  return new RegExp(`^${re}$`, fold ? "i" : "").test(text);
+  const m = new RegExp(`^${re}$`, fold ? "i" : "").exec(text);
+  return m ? [...m] : null;
 }
 
 function relate(op: string, a: string | number, b: string | number): boolean {
@@ -156,8 +164,99 @@ function relate(op: string, a: string | number, b: string | number): boolean {
   }
 }
 
-/** Whether any of `values` matches any of `keys`. */
-function matchValues(m: Matcher, values: string[], keys: string[]): Tri {
+// ── Variables ────────────────────────────────────────────────────────────────
+
+/** Variables while a script runs (RFC 5229). */
+export interface Scope {
+  /** The script uses variables; otherwise "${…}" is plain text. */
+  on: boolean;
+  /** Variables set so far, by lower-case name. */
+  vars: Map<string, string>;
+  /** `${0}` … `${9}`: what the last successful `:matches` / `:regex` matched. */
+  match: string[];
+  /** Global variables this scope reads elsewhere, e.g. the folder recorded so far. */
+  global?: (name: string) => string | undefined;
+}
+
+export function newScope(on = true): Scope {
+  return { on, vars: new Map(), match: [] };
+}
+
+/**
+ * `text` with its variables replaced. Unset variables are empty; text that
+ * isn't a variable reference (`${a-b}`) stays. Variables of a namespace
+ * (`${env.x}`) can't be known here: null.
+ */
+export function expand(text: string, scope: Scope | undefined): string | null {
+  if (!scope?.on || !text.includes("${")) return text;
+  let unknown = false;
+  const out = text.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*|[0-9]+)\}/g, (_, name: string) => {
+    if (/^[0-9]+$/.test(name)) return scope.match[Number(name)] ?? "";
+    if (name.includes(".")) {
+      unknown = true;
+      return "";
+    }
+    const lower = name.toLowerCase();
+    return scope.global?.(lower) ?? scope.vars.get(lower) ?? "";
+  });
+  return unknown ? null : out;
+}
+
+function expandAll(list: string[], scope: Scope | undefined): string[] | null {
+  const out: string[] = [];
+  for (const s of list) {
+    const v = expand(s, scope);
+    if (v === null) return null;
+    out.push(v);
+  }
+  return out;
+}
+
+/** The precedence of `set` modifiers (RFC 5229 §4.1): higher ones apply first. */
+const MODIFIER_PRECEDENCE: Record<SetModifier, number> = {
+  lower: 40,
+  upper: 40,
+  lowerFirst: 30,
+  upperFirst: 30,
+  quoteWildcard: 20,
+  quoteRegex: 20,
+  length: 10,
+};
+
+/** A value as `set` stores it with these modifiers. */
+export function modify(value: string, modifiers: SetModifier[]): string {
+  let v = value;
+  const ordered = [...modifiers].sort((a, b) => MODIFIER_PRECEDENCE[b] - MODIFIER_PRECEDENCE[a]);
+  for (const m of ordered) {
+    switch (m) {
+      case "lower":
+        v = v.toLowerCase();
+        break;
+      case "upper":
+        v = v.toUpperCase();
+        break;
+      case "lowerFirst":
+        v = v.charAt(0).toLowerCase() + v.slice(1);
+        break;
+      case "upperFirst":
+        v = v.charAt(0).toUpperCase() + v.slice(1);
+        break;
+      case "quoteWildcard":
+        v = v.replace(/[*?\\]/g, "\\$&");
+        break;
+      case "quoteRegex":
+        v = v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        break;
+      case "length":
+        v = String([...v].length);
+        break;
+    }
+  }
+  return v;
+}
+
+/** Whether any of `values` matches any of `keys`; a match sets the match variables of `scope`. */
+function matchValues(m: Matcher, values: string[], keys: string[], scope?: Scope): Tri {
   const mt = m.matchType;
   if (mt.type === "count") {
     if (m.comparator !== "i;ascii-numeric") return null;
@@ -180,11 +279,21 @@ function matchValues(m: Matcher, values: string[], keys: string[]): Tri {
     for (const k of keys) {
       if (mt.type === "is" && f(v) === f(k)) return true;
       if (mt.type === "contains" && f(v).includes(f(k))) return true;
-      if (mt.type === "matches" && glob(k, v, fold)) return true;
+      if (mt.type === "matches") {
+        const groups = glob(k, v, fold);
+        if (groups) {
+          if (scope) scope.match = groups;
+          return true;
+        }
+      }
       if (mt.type === "regex") {
         const re = toRegExp(k);
         if (!re) return null;
-        if ((fold ? re : new RegExp(re.source, re.flags.replace("i", ""))).test(v)) return true;
+        const found = (fold ? re : new RegExp(re.source, re.flags.replace("i", ""))).exec(v);
+        if (found) {
+          if (scope) scope.match = [...found].map((g) => g ?? "");
+          return true;
+        }
       }
     }
   }
@@ -238,19 +347,35 @@ function datePart(d: Date, part: string): string | null {
   }
 }
 
-function testValue(test: ConditionTest, msg: Message, now: Date): Tri {
+/** The values of headers, or of the given part of the addresses in them. */
+function fieldValues(msg: Message, headers: string[], part: string | null): string[] {
+  const values = headers.flatMap((h) => msg.headers.get(h.toLowerCase()) ?? []);
+  if (part === null) return values;
+  return addresses(values)
+    .map((a) => addressPart(a, part))
+    .filter((p): p is string => p !== null);
+}
+
+function testValue(test: ConditionTest, msg: Message, now: Date, scope?: Scope): Tri {
+  // Variables in the keys are replaced before comparing.
+  const keys = "keys" in test ? expandAll(test.keys, scope) : [];
+  if (keys === null) return null;
   switch (test.type) {
     case "header":
-      return matchValues(
-        test.matcher,
-        test.headers.flatMap((h) => msg.headers.get(h.toLowerCase()) ?? []),
-        test.keys,
-      );
-    case "address": {
-      const parts = addresses(test.headers.flatMap((h) => msg.headers.get(h.toLowerCase()) ?? []))
-        .map((a) => addressPart(a, test.part))
-        .filter((p): p is string => p !== null);
-      return matchValues(test.matcher, parts, test.keys);
+      return matchValues(test.matcher, fieldValues(msg, test.headers, null), keys, scope);
+    case "address":
+      return matchValues(test.matcher, fieldValues(msg, test.headers, test.part), keys, scope);
+    case "string": {
+      const sources = expandAll(test.sources, scope);
+      return sources === null ? null : matchValues(test.matcher, sources, keys, scope);
+    }
+    case "compare": {
+      // The capture: the first value; then whether the other field has it too.
+      const first = fieldValues(msg, test.headers, test.part)[0];
+      if (first === undefined) return false;
+      if (scope) scope.match = [first, first];
+      const same = fieldValues(msg, test.other, test.part).some((v) => v.toLowerCase() === first.toLowerCase());
+      return same !== test.differs;
     }
     case "envelope": {
       const list = test.parts
@@ -258,7 +383,7 @@ function testValue(test: ConditionTest, msg: Message, now: Date): Tri {
         .filter(Boolean)
         .map((a) => addressPart(a, test.part))
         .filter((p): p is string => p !== null);
-      return matchValues(test.matcher, list, test.keys);
+      return matchValues(test.matcher, list, keys, scope);
     }
     case "exists":
       return test.headers.every((h) => msg.headers.has(h.toLowerCase()));
@@ -266,10 +391,10 @@ function testValue(test: ConditionTest, msg: Message, now: Date): Tri {
       return test.over ? msg.size > test.limit : msg.size < test.limit;
     case "body":
       if (test.transform.type === "content") return null;
-      return matchValues(test.matcher, [msg.body], test.keys);
+      return matchValues(test.matcher, [msg.body], keys, scope);
     case "currentDate": {
       const v = datePart(now, test.datePart);
-      return v === null ? null : matchValues(test.matcher, [v], test.keys);
+      return v === null ? null : matchValues(test.matcher, [v], keys, scope);
     }
     case "date": {
       const raw = msg.headers.get(test.header.toLowerCase())?.[0];
@@ -277,24 +402,27 @@ function testValue(test: ConditionTest, msg: Message, now: Date): Tri {
       const d = new Date(raw);
       if (Number.isNaN(d.getTime())) return null;
       const v = datePart(d, test.datePart);
-      return v === null ? null : matchValues(test.matcher, [v], test.keys);
+      return v === null ? null : matchValues(test.matcher, [v], keys, scope);
     }
     case "group":
-      return conditionsValue({ join: test.join, items: test.items }, msg, now);
+      return conditionsValue({ join: test.join, items: test.items }, msg, now, scope);
   }
 }
 
-function conditionValue(c: Condition, msg: Message, now: Date): Tri {
-  const v = testValue(c.test, msg, now);
+function conditionValue(c: Condition, msg: Message, now: Date, scope?: Scope): Tri {
+  const v = testValue(c.test, msg, now, scope);
   return v === null ? null : c.negate ? !v : v;
 }
 
-/** Three-valued "all of" / "any of": unknown only if it decides the result. */
-export function conditionsValue(cs: Conditions, msg: Message, now = new Date()): Tri {
+/**
+ * Three-valued "all of" / "any of": unknown only if it decides the result.
+ * Tests run in order, so a capture can feed a later test (`scope`).
+ */
+export function conditionsValue(cs: Conditions, msg: Message, now = new Date(), scope?: Scope): Tri {
   if (cs.items.length === 0) return true;
   let unknown = false;
   for (const c of cs.items) {
-    const v = conditionValue(c, msg, now);
+    const v = conditionValue(c, msg, now, scope);
     if (v === null) unknown = true;
     else if (cs.join === "any" && v) return true;
     else if (cs.join === "all" && !v) return false;
@@ -356,6 +484,20 @@ export interface TrialScript {
   items: RuleItem[];
   /** Moves are recorded for "last move wins" and "stop" ends only this script. */
   singleFolder: boolean;
+  /** The script's `require` list: with `variables`, "${…}" in values are variables. */
+  requires?: string[];
+}
+
+/** Whether rules use variables (`set`, `string`, comparisons), which the exporter requires `variables` for. */
+export function usesVariables(items: RuleItem[]): boolean {
+  const inConditions = (cs: Condition[]): boolean =>
+    cs.some((c) => c.test.type === "string" || c.test.type === "compare" || (c.test.type === "group" && inConditions(c.test.items)));
+  const inBlock = (b: { conditions: Conditions; actions: Action[]; elsif: Branch[]; otherwise?: Action[] | null }): boolean =>
+    [b.conditions, ...b.elsif.map((e) => e.conditions)].some((cs) => inConditions(cs.items)) ||
+    [b.actions, ...b.elsif.map((e) => e.actions), b.otherwise ?? []].some((list) =>
+      list.some((a) => a.type === "set" || (a.type === "if" && inBlock(a))),
+    );
+  return items.some((item) => item.type === "rule" && inBlock(item));
 }
 
 function caseList(b: { conditions: Conditions; actions: Action[]; elsif: Branch[]; otherwise?: Action[] | null }) {
@@ -401,6 +543,23 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
     runs.push(run);
     if (stoppedAll) continue;
 
+    // Variables are local to a script, except the folder recorded so far.
+    const records = script.singleFolder && lastMoveWins;
+    const scope = newScope(
+      script.singleFolder || (script.requires ?? []).some((r) => r.toLowerCase() === "variables") || usesVariables(script.items),
+    );
+    if (records) scope.global = (name) => (name === FOLDER_VARIABLE ? (recorded?.folder ?? "") : undefined);
+    /** A value with its variables replaced; one that can't be known makes the result uncertain. */
+    const value = (text: string): string => {
+      const v = expand(text, scope);
+      if (v === null) uncertain = true;
+      return v ?? text;
+    };
+    const record = (folder: string, step: Step) => {
+      if (recorded) recorded.step.overridden = true;
+      recorded = { folder, step };
+    };
+
     /** Applies actions; returns true when a "stop" ends the script. */
     const apply = (index: number, path: string, actions: Action[]): boolean => {
       const step: Step = { script: script.name, index, path, actions: actions.filter((a) => a.type !== "if"), overridden: false };
@@ -410,16 +569,23 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
       for (const a of actions) {
         switch (a.type) {
           case "fileInto":
-            if (script.singleFolder && lastMoveWins && !a.copy && !a.create && !a.flags) {
-              if (recorded) recorded.step.overridden = true;
-              recorded = { folder: a.mailbox, step };
+            if (records && !a.copy && !a.create && !a.flags) {
+              record(value(a.mailbox), step);
             } else {
-              file(a.mailbox, script.name);
+              file(value(a.mailbox), script.name);
               if (!a.copy) keepCancelled = true;
             }
             break;
+          case "set": {
+            const v = modify(value(a.value), a.modifiers);
+            const name = a.name.toLowerCase();
+            // Another way to record a folder: `set :lower "move_to_folder" …`.
+            if (records && name === FOLDER_VARIABLE) record(v, step);
+            else scope.vars.set(name, v);
+            break;
+          }
           case "redirect":
-            delivery.forwards.push(a.address);
+            delivery.forwards.push(value(a.address));
             if (!a.copy) keepCancelled = true;
             break;
           case "reject":
@@ -434,7 +600,7 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
             delivery.inbox = true;
             break;
           case "flags":
-            setFlags(a.op, a.flags, script.name);
+            setFlags(a.op, a.flags.map(value), script.name);
             break;
           case "vacation":
             delivery.replied = true;
@@ -454,7 +620,7 @@ export function runTrial(scripts: TrialScript[], mail: SampleMail, lastMoveWins:
     /** Runs the first matching case of a rule or check; true on "stop". */
     const branch = (index: number, b: Parameters<typeof caseList>[0], prefix: string): boolean => {
       for (const [i, c] of caseList(b).entries()) {
-        const v = c.conditions ? conditionsValue(c.conditions, msg, now) : true;
+        const v = c.conditions ? conditionsValue(c.conditions, msg, now, scope) : true;
         if (v === null) {
           // Can't tell whether this case applies, so neither what follows.
           if (!run.unknown.includes(index)) run.unknown.push(index);

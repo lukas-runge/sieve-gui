@@ -18,7 +18,9 @@
 
   const cert = $derived(untrusted.certificate);
   const changed = $derived(untrusted.pinned !== null);
-  const service = $derived(t(untrusted.service === "manageSieve" ? "certificate.manageSieve" : "certificate.imap"));
+  const service = $derived(
+    t(untrusted.service === "manageSieve" ? "certificate.manageSieve" : untrusted.service === "mailPlus" ? "certificate.mailPlus" : "certificate.imap"),
+  );
   const invalidPeriod = $derived(outsideValidity(cert.notBefore, cert.notAfter));
 
   function date(seconds: number | null): string {

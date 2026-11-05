@@ -9,7 +9,7 @@
   import { session } from "../session.svelte";
   import Icon from "./Icon.svelte";
   import FolderPicker from "./FolderPicker.svelte";
-  import { flagFromText, flagName, labelHue, SYSTEM_FLAG_LIST } from "../rules/route";
+  import { flagFromText, flagName, labelStyle, SYSTEM_FLAG_LIST } from "../rules/route";
 
   let {
     action,
@@ -47,6 +47,7 @@
 
   const accountId = $derived(session.editor?.accountId ?? null);
   const keywordNames = $derived(accountId ? session.keywordNames(accountId) : {});
+  const keywordColors = $derived(accountId ? session.keywordColors(accountId) : {});
 
   async function nameKeyword(keyword: string) {
     if (!accountId) return;
@@ -122,11 +123,9 @@
       <label class="input input-sm flex h-auto min-h-8 w-full flex-wrap items-center gap-1 py-1">
         {#each flags as flag, i}
           {@const unnamed = isKeyword(flag) && !keywordNames[flag]}
-          <span
-            class="inline-flex items-center gap-0.5 rounded-full border py-px pr-0.5 pl-2 text-sm font-medium"
-            style="border-color: oklch(0.65 0.11 {labelHue(flagName(flag, keywordNames))} / 0.6); background: oklch(0.7 0.1 {labelHue(flagName(flag, keywordNames))} / 0.1)"
-          >
-            <span class="mr-0.5 size-2 rounded-full" style="background: oklch(0.62 0.13 {labelHue(flagName(flag, keywordNames))})"></span>
+          {@const style = labelStyle(flagName(flag, keywordNames), keywordColors[flag])}
+          <span class="inline-flex items-center gap-0.5 rounded-full border py-px pr-0.5 pl-2 text-sm font-medium" style={style.chip}>
+            <span class="mr-0.5 size-2 rounded-full" style={style.dot}></span>
             {#if isKeyword(flag) && accountId}
               <button
                 type="button"

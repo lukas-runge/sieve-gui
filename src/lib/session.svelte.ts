@@ -252,6 +252,11 @@ class Session {
     return this.accounts.find((a) => a.id === id)?.keywordNames ?? {};
   }
 
+  /** Colours (`#rrggbb`) of the account's custom keywords. */
+  keywordColors(id: string): Record<string, string> {
+    return this.accounts.find((a) => a.id === id)?.keywordColors ?? {};
+  }
+
   /** Names a keyword of the account (`null` removes the name). */
   async setKeywordName(id: string, keyword: string, name: string | null) {
     const names = { ...this.keywordNames(id) };
@@ -307,7 +312,7 @@ class Session {
       return;
     }
     if (untrusted.service === "manageSieve") await this.connect(id);
-    else await this.loadFolders(id);
+    else if (untrusted.service === "imap") await this.loadFolders(id);
   }
 
   async refreshScripts(id: string) {

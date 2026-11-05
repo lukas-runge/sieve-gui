@@ -4,7 +4,8 @@
   // lists those rules.
   import type { RuleItem } from "#tauri/types";
   import { t } from "../../i18n.svelte";
-  import { cases, labelHue, outcomes, type Case } from "../../rules/route";
+  import { cases, labelStyle, outcomes, type Case } from "../../rules/route";
+  import { session } from "../../session.svelte";
   import type { Target } from "../../rules/search";
   import { SvelteSet } from "svelte/reactivity";
   import Icon from "../Icon.svelte";
@@ -24,6 +25,8 @@
     onadd?: (target: Target & { text: string; folder: boolean }) => void;
     onpick: (target: Target & { text: string; folder: boolean }) => void;
   } = $props();
+  // Tag colours of the open script's account.
+  const colors = $derived(session.editor ? session.keywordColors(session.editor.accountId) : {});
 
   interface Folder {
     name: string;
@@ -133,14 +136,14 @@
       <h3 class="mb-2 px-1 text-[0.8125rem] font-semibold tracking-wide text-base-content/70 uppercase">{t("dest.labels")}</h3>
       <div class="flex flex-wrap gap-2 px-1">
         {#each tree.labels as l (l.key)}
-          {@const h = labelHue(l.text)}
+          {@const style = labelStyle(l.text, colors[l.key])}
           <button
             class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[0.875rem] font-medium hover:brightness-95"
-            style="border-color: oklch(0.65 0.11 {h} / 0.6); background: oklch(0.7 0.1 {h} / 0.1)"
+            style={style.chip}
             title={t("target.title", { name: l.text })}
             onclick={() => onpick({ kind: "label", key: l.key, text: l.text, folder: false })}
           >
-            <span class="size-2 rounded-full" style="background: oklch(0.62 0.13 {h})"></span>{l.text}
+            <span class="size-2 rounded-full" style={style.dot}></span>{l.text}
             <span class="font-normal text-base-content/70">{l.rules.size}</span>
           </button>
         {/each}

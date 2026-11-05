@@ -104,7 +104,28 @@ const account = {
     $label5: "Urgent",
     $label6: "Large",
   } as Record<string, string>,
+  keywordColors: {} as Record<string, string>,
+  mailplus: null as { port: number; certificate: string | null } | null,
 };
+
+// DSM on the NAS, with a certificate for another host name (as with a
+// Let's Encrypt certificate reached by IP): taking over its labels asks first.
+const DSM_CERTIFICATE = {
+  sha256: "8c1d2e3f405162738495a6b7c8d9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091",
+  subject: "CN=nas.example.org",
+  issuer: "C=US, O=Let's Encrypt, CN=R11",
+  notBefore: 1790000000,
+  notAfter: 1797776000,
+  names: ["nas.example.org"],
+};
+// MailPlus' labels, as the NAS' DSM would list them.
+const MAILPLUS_TAGS = [
+  { name: "Clients", color: "#cc3d9c", keyword: "$synolabel_c1i3nt5x" },
+  { name: "Clients/Invoices", color: "#997f00", keyword: "$synolabel_tu0exccz" },
+  { name: "Family", color: "#1470cc", keyword: "$synolabel_f4m1lyq2" },
+  { name: "Newsletter", color: "#50555a", keyword: "$synolabel_bsidz6vu" },
+  { name: "Old projects", color: "#64696e", keyword: null },
+];
 
 // A NAS with a self-signed certificate: connecting fails until it is trusted.
 const NAS_CERTIFICATE = {
@@ -329,8 +350,25 @@ export function installMock() {
       case "trust_certificate": {
         const target = accounts.find((x) => x.id === a.id)!;
         if (a.service === "manageSieve") target.certificate = a.sha256;
+        else if (a.service === "mailPlus") target.mailplus = { port: target.mailplus?.port ?? 5001, certificate: a.sha256 };
         else target.imap.certificate = a.sha256;
         return target;
+      }
+      case "provider_tags": {
+        await new Promise((r) => setTimeout(r, 700));
+        if (a.id !== nas.id || a.port !== 5001) {
+          throw { kind: "notFound", message: "no MailPlus web API at this address", diagnostics: [], certificate: null };
+        }
+        const target = accounts.find((x) => x.id === a.id)!;
+        if (target.mailplus?.certificate !== DSM_CERTIFICATE.sha256) {
+          throw {
+            kind: "untrustedCertificate",
+            message: "invalid peer certificate: NotValidForName",
+            diagnostics: [],
+            certificate: { service: "mailPlus", certificate: DSM_CERTIFICATE, pinned: target.mailplus?.certificate ?? null },
+          };
+        }
+        return MAILPLUS_TAGS;
       }
       case "roundcube_risks": {
         // Rough stand-in for sieve-core's check: every raw block counts.

@@ -30,6 +30,7 @@ sha2 = "0.10.9"
 uuid = { version = "1", features = ["v4"] }
 tokio = { version = "1", features = ["sync"] }
 mailstore = { version = "0.1.0", path = "../crates/mailstore" }
+mailplus = { version = "0.1.0", path = "../crates/mailplus" }
 
 # The OS keychain per platform (see accounts.rs). On Linux and the BSDs the
 # Secret Service through the system's libdbus, which WebKitGTK needs anyway.

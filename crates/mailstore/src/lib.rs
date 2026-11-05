@@ -1,5 +1,6 @@
 //! Read-only IMAP access to the user's mail store: the folder list for the
-//! folder picker (and, later, messages for the dry run).
+//! folder picker, the keywords of given messages (for matching a provider's
+//! labels to keywords) and, later, messages for the dry run.
 //!
 //! Connection security and TLS verification behave exactly like the
 //! ManageSieve client: STARTTLS never downgrades, certificates are verified
@@ -152,14 +153,7 @@ async fn list_folders_inner(
     username: &str,
     password: &str,
 ) -> Result<Vec<Folder>> {
-    let client = connect(opts).await?;
-    let mut session = client
-        .login(username, password)
-        .await
-        .map_err(|(e, _)| match e {
-            async_imap::error::Error::No(text) => Error::Auth(text),
-            e => Error::Imap(e),
-        })?;
+    let mut session = login(opts, username, password).await?;
     let mut folders: Vec<Folder> = session
         .list(Some(""), Some("*"))
         .await?
@@ -195,6 +189,141 @@ fn folder(name: &async_imap::types::Name) -> Folder {
     }
 }
 
+/// A message to look up by its `Message-ID` header in one folder.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MessageRef {
+    /// The folder as the user sees it (UTF-8); encoded as modified UTF-7
+    /// for the server.
+    pub folder: String,
+    /// The `Message-ID` without angle brackets.
+    pub message_id: String,
+}
+
+/// Logs in and returns the custom keywords (IMAP flags without a
+/// backslash, e.g. `$label1`) of each message, in the order given. A
+/// message that isn't found has none. Folders are opened read-only
+/// (`EXAMINE`), so nothing changes on the server.
+pub async fn message_keywords(
+    opts: &ConnectOptions,
+    username: &str,
+    password: &str,
+    messages: &[MessageRef],
+) -> Result<Vec<Vec<String>>> {
+    match tokio::time::timeout(opts.timeout, message_keywords_inner(opts, username, password, messages)).await {
+        Ok(result) => result,
+        Err(_) => Err(Error::Timeout),
+    }
+}
+
+async fn message_keywords_inner(
+    opts: &ConnectOptions,
+    username: &str,
+    password: &str,
+    messages: &[MessageRef],
+) -> Result<Vec<Vec<String>>> {
+    let mut session = login(opts, username, password).await?;
+    let mut keywords = vec![Vec::new(); messages.len()];
+    // One EXAMINE and one SEARCH per folder.
+    let mut folders: std::collections::BTreeMap<&str, Vec<usize>> = std::collections::BTreeMap::new();
+    for (i, message) in messages.iter().enumerate() {
+        folders.entry(message.folder.as_str()).or_default().push(i);
+    }
+    for (folder, wanted) in folders {
+        let queries: Vec<String> = wanted.iter().filter_map(|&i| message_id_search(&messages[i].message_id)).collect();
+        let Some(query) = any_of(&queries) else {
+            continue;
+        };
+        // A folder that is gone or can't be opened: its messages have none.
+        if session.examine(encode_folder_name(folder)).await.is_err() {
+            continue;
+        }
+        let uids = session.uid_search(&query).await?;
+        if uids.is_empty() {
+            continue;
+        }
+        let set = uids.iter().map(u32::to_string).collect::<Vec<_>>().join(",");
+        let fetches: Vec<_> = session.uid_fetch(set, "(FLAGS ENVELOPE)").await?.try_collect().await?;
+        for fetch in &fetches {
+            let Some(id) = fetch.envelope().and_then(|e| e.message_id.as_deref()) else {
+                continue;
+            };
+            let id = String::from_utf8_lossy(id);
+            for &i in &wanted {
+                if bare_message_id(&messages[i].message_id) != bare_message_id(&id) {
+                    continue;
+                }
+                for flag in fetch.flags() {
+                    if let async_imap::types::Flag::Custom(name) = flag
+                        && !name.starts_with('\\')
+                        && !keywords[i].iter().any(|k| *k == *name)
+                    {
+                        keywords[i].push(name.into_owned());
+                    }
+                }
+            }
+        }
+    }
+    let _ = session.logout().await;
+    Ok(keywords)
+}
+
+fn bare_message_id(id: &str) -> &str {
+    id.trim().trim_start_matches('<').trim_end_matches('>')
+}
+
+/// Search keys combined with `OR` (which takes two keys at a time).
+fn any_of(queries: &[String]) -> Option<String> {
+    let (last, rest) = queries.split_last()?;
+    Some(rest.iter().rev().fold(last.clone(), |acc, q| format!("OR {q} {acc}")))
+}
+
+/// `HEADER Message-ID "<id>"`, or `None` for an id that can't be searched
+/// for as plain ASCII.
+fn message_id_search(message_id: &str) -> Option<String> {
+    let id = bare_message_id(message_id);
+    let plain = !id.is_empty() && id.bytes().all(|b| b.is_ascii_graphic() && b != b'"' && b != b'\\');
+    plain.then(|| format!("HEADER Message-ID \"<{id}>\""))
+}
+
+/// A folder name in IMAP's modified UTF-7 (RFC 3501 §5.1.3): printable
+/// ASCII stays, `&` becomes `&-`, anything else is base64 of UTF-16 between
+/// `&` and `-`, with `,` instead of `/`.
+pub fn encode_folder_name(name: &str) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+,";
+    let mut out = String::with_capacity(name.len());
+    let mut pending: Vec<u16> = Vec::new();
+    let flush = |pending: &mut Vec<u16>, out: &mut String| {
+        if pending.is_empty() {
+            return;
+        }
+        let bytes: Vec<u8> = pending.iter().flat_map(|u| u.to_be_bytes()).collect();
+        out.push('&');
+        for chunk in bytes.chunks(3) {
+            let n = chunk.iter().enumerate().fold(0u32, |n, (i, &b)| n | u32::from(b) << (16 - 8 * i));
+            let digits = chunk.len() + 1;
+            for i in 0..digits {
+                out.push(char::from(ALPHABET[(n >> (18 - 6 * i) & 0x3f) as usize]));
+            }
+        }
+        out.push('-');
+        pending.clear();
+    };
+    for c in name.chars() {
+        if (' '..='~').contains(&c) {
+            flush(&mut pending, &mut out);
+            if c == '&' {
+                out.push_str("&-");
+            } else {
+                out.push(c);
+            }
+        } else {
+            pending.extend(c.encode_utf16(&mut [0; 2]).iter());
+        }
+    }
+    flush(&mut pending, &mut out);
+    out
+}
+
 /// INBOX first, then by name (byte order keeps children after parents).
 fn sort_folders(folders: &mut [Folder]) {
     folders.sort_by(|a, b| {
@@ -207,6 +336,18 @@ fn sort_folders(folders: &mut [Folder]) {
 // ── Connection ────────────────────────────────────────────────────────────────
 
 type Client = async_imap::Client<Stream>;
+type Session = async_imap::Session<Stream>;
+
+async fn login(opts: &ConnectOptions, username: &str, password: &str) -> Result<Session> {
+    connect(opts)
+        .await?
+        .login(username, password)
+        .await
+        .map_err(|(e, _)| match e {
+            async_imap::error::Error::No(text) => Error::Auth(text),
+            e => Error::Imap(e),
+        })
+}
 
 async fn connect(opts: &ConnectOptions) -> Result<Client> {
     let tcp = TcpStream::connect((opts.host.as_str(), opts.port)).await?;
@@ -324,6 +465,32 @@ mod tests {
             selectable: true,
             special_use: None,
         }
+    }
+
+    #[test]
+    fn folder_names_in_modified_utf7() {
+        assert_eq!(encode_folder_name("INBOX.Accounts"), "INBOX.Accounts");
+        assert_eq!(encode_folder_name("Accounts.Mitgliedschaften.GRÜNE"), "Accounts.Mitgliedschaften.GR&ANw-NE");
+        assert_eq!(encode_folder_name("Bücher & Co"), "B&APw-cher &- Co");
+        assert_eq!(encode_folder_name("日本語"), "&ZeVnLIqe-");
+        assert_eq!(encode_folder_name("📧"), "&2D3c5w-");
+    }
+
+    #[test]
+    fn message_id_queries() {
+        assert_eq!(message_id_search("abc@example.com").as_deref(), Some("HEADER Message-ID \"<abc@example.com>\""));
+        assert_eq!(message_id_search("<abc@example.com>").as_deref(), Some("HEADER Message-ID \"<abc@example.com>\""));
+        assert_eq!(message_id_search("a\"b@x"), None);
+        assert_eq!(message_id_search("ä@x"), None);
+        assert_eq!(message_id_search(""), None);
+    }
+
+    #[test]
+    fn searches_combined_with_or() {
+        let q = |s: &str| s.to_owned();
+        assert_eq!(any_of(&[]), None);
+        assert_eq!(any_of(&[q("A")]).as_deref(), Some("A"));
+        assert_eq!(any_of(&[q("A"), q("B"), q("C")]).as_deref(), Some("OR A OR B C"));
     }
 
     #[test]

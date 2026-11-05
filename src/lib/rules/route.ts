@@ -6,6 +6,8 @@
 
 import type { Action, Condition, Conditions } from "#tauri/types";
 import { flagLabel } from "../keywords";
+
+export { labelHex, labelHue, labelStyle } from "../keywords";
 import { i18n, t, type MessageKey } from "../i18n.svelte";
 import { formatDate, formatSize } from "./format";
 import { mailboxLabel } from "./mailbox";
@@ -252,6 +254,8 @@ export interface Outcome {
   text: string;
   /** What "everything that goes here" filters by: the folder or label as stored. */
   target?: Target;
+  /** For labels: the keyword, for its colour. */
+  keyword?: string;
 }
 
 const SYSTEM_FLAGS: Record<string, MessageKey> = {
@@ -329,6 +333,7 @@ export function outcomes(actions: Action[], keywords: Record<string, string>, de
             kind: a.op === "remove" ? "unlabel" : "label",
             path: [],
             text: flagName(f, keywords),
+            keyword: f,
             target: a.op === "remove" ? undefined : { kind: "label", key: f },
           });
         if (a.op === "set" && labels.length) out.push({ kind: "system", path: [], text: t("route.othersClearedNote") });
@@ -357,18 +362,6 @@ export function outcomes(actions: Action[], keywords: Record<string, string>, de
     }
   }
   return out;
-}
-
-/**
- * A stable, calm hue per label name, so the same label looks the same
- * everywhere. Green (matches, running) and blue (selection, actions) are
- * left out, so a label never looks like a state.
- */
-const LABEL_HUES = [25, 60, 95, 180, 210, 290, 330, 0];
-export function labelHue(name: string): number {
-  let h = 0;
-  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 997;
-  return LABEL_HUES[h % LABEL_HUES.length];
 }
 
 /** Everything a rule or check can do, each once: its summary when folded. */

@@ -13,6 +13,8 @@
   import Icon from "./Icon.svelte";
   import { flowView } from "../scope.svelte";
   import AccountIcon from "./AccountIcon.svelte";
+  import { describeError } from "../api";
+  import { startUpdate, update } from "../update.svelte";
 
   let {
     onaccount,
@@ -26,6 +28,20 @@
   /** The filter provider whose take-over dialog is open. */
   let providerPrompt = $state<{ accountId: string; detection: Detection } | null>(null);
   const providerName = (id: string) => t(`provider.${id}` as MessageKey);
+
+  /** The update notice, until "Not now" for this run of the app. */
+  let updateDismissed = $state(false);
+
+  async function installUpdate(version: string) {
+    if (!(await session.confirmLeave())) return;
+    const message = t(update.channel === "package" ? "update.confirmPackage" : "update.confirm", { version });
+    if (!(await ask(message, t("update.confirmAction")))) return;
+    try {
+      await startUpdate();
+    } catch (e) {
+      await tell(t("update.failed", { message: describeError(e) }));
+    }
+  }
 
 
   async function open(id: string, name: string) {
@@ -559,6 +575,17 @@
   {/each}
   </div>
   </div>
+  {#if update.available && !updateDismissed}
+    {@const version = update.available}
+    <!-- Linux only (see update.svelte.ts): the newer release, one click from installing it. -->
+    <aside class="m-2 grid shrink-0 gap-2 rounded-box border border-base-300 bg-base-100 px-3 py-2.5 text-[0.8125rem]" aria-live="polite">
+      <p class="flex items-center gap-2 font-medium"><Icon name="download" size={14} class="shrink-0 text-primary" />{t("update.available", { version })}</p>
+      <div class="flex gap-1.5">
+        <button class="btn btn-primary btn-xs" disabled={update.installing} onclick={() => installUpdate(version)}>{t("update.install")}</button>
+        <button class="btn btn-ghost btn-xs" onclick={() => (updateDismissed = true)}>{t("update.dismiss")}</button>
+      </div>
+    </aside>
+  {/if}
 
 </nav>
 

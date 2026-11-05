@@ -21,6 +21,8 @@ import heroFixtures from "./fixtures-hero.json";
 const HERO = new URLSearchParams(location.search).has("hero");
 // `?mailplusFilters`: the NAS has filters and list entries from MailPlus' web UI.
 const MAILPLUS_FILTERS = new URLSearchParams(location.search).has("mailplusFilters");
+// `?update`: a newer release is out, as on Linux (see update.svelte.ts).
+const UPDATE = new URLSearchParams(location.search).has("update");
 // `?mailplusReclaim`: its filters were taken over, then MailPlus made `synomc` active again.
 const MAILPLUS_RECLAIM = new URLSearchParams(location.search).has("mailplusReclaim");
 
@@ -223,12 +225,25 @@ function mailplusSave() {
 
 export function installMock() {
   Object.assign(window, { __mailplusSave: mailplusSave });
+  if (UPDATE) {
+    const fetch = window.fetch.bind(window);
+    window.fetch = (input, init) =>
+      String(input).includes("api.github.com/repos/lukas-runge/sieve-gui/releases/latest")
+        ? Promise.resolve(Response.json({ tag_name: "v0.2.0" }))
+        : fetch(input, init);
+  }
   mockIPC(async (cmd, args) => {
     const a = (args ?? {}) as Record<string, any>;
     const server = servers[a.id] ?? servers.preview;
     switch (cmd) {
       case "list_accounts":
         return accounts;
+      case "get_app_info":
+        return { name: "sieve-gui", version: "0.1.0" };
+      case "update_channel":
+        return UPDATE ? "package" : null;
+      case "install_update":
+        return null;
       case "connect_account":
         await new Promise((r) => setTimeout(r, 300));
         if (a.id === nas.id && nas.certificate !== NAS_CERTIFICATE.sha256) {

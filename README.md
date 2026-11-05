@@ -22,6 +22,24 @@ A lightweight, cross-platform desktop editor for **server-side Sieve mail filter
 
 ---
 
+## Install
+
+### Linux
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/lukas-runge/sieve-gui/main/scripts/install.sh | sh
+```
+
+The script takes the latest [release](https://github.com/lukas-runge/sieve-gui/releases/latest) for your system: the `.deb` with apt (Debian 12+, Ubuntu 22.04+, Mint, …), the `.rpm` with dnf or zypper (Fedora, openSUSE, …), otherwise the AppImage in `~/.local/bin` with a menu entry (AppImages need FUSE 2: `libfuse2` / `fuse2`). `sh -s -- --appimage` takes the AppImage everywhere, without root.
+
+**Updates:** when a new version is out, sieve-gui says so in the sidebar. "Update" closes the app, installs the new version (asking for the admin password for `.deb` and `.rpm`) and starts it again. Running the script again does the same.
+
+### macOS and Windows
+
+Download the installer from the [latest release](https://github.com/lukas-runge/sieve-gui/releases/latest).
+
+---
+
 ## Stack
 
 | Layer | Technology |

@@ -2,10 +2,11 @@
 
 use sieve_core::compat::RoundcubeRisks;
 use sieve_core::model::RuleSet;
+use sieve_core::providers::{Detection, ProviderScript, RuleNames};
 use sieve_core::root::{Root, ScriptLinks};
 use sieve_core::PrintOptions;
 
-use crate::error::AppResult;
+use crate::error::{AppError, AppResult, ErrorKind};
 
 /// What the script does, without comments, layout and equal spellings (see
 /// `sieve_core::content`), to show only the changes that matter; `None` if
@@ -60,4 +61,21 @@ pub fn script_links(source: String) -> ScriptLinks {
 #[tauri::command]
 pub fn parse_root(source: String) -> Option<Root> {
     sieve_core::root::parse_root(&source)
+}
+
+/// The setups of filter providers found among the account's scripts (see
+/// `sieve_core::providers`).
+#[tauri::command]
+pub fn detect_providers(scripts: Vec<ProviderScript>) -> Vec<Detection> {
+    sieve_core::providers::detect(&scripts)
+}
+
+/// A filter provider's filters as rules, to take them over, named in the
+/// app's language.
+#[tauri::command]
+pub fn import_provider(provider: String, scripts: Vec<ProviderScript>, names: RuleNames) -> AppResult<RuleSet> {
+    match sieve_core::providers::import(&provider, &scripts, &names) {
+        Some(rules) => Ok(rules?),
+        None => Err(AppError::new(ErrorKind::NotFound, format!("unknown filter provider {provider}"))),
+    }
 }

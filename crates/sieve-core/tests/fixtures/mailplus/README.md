@@ -14,6 +14,11 @@ lists in the MailPlus web UI:
   (subject contains `sieve-filter-test` → Junk), captured 2026-11-05. Each
   filter is an `if` that only records its folder in `filter_mailbox`,
   under a `# id: <n>` comment.
+- `spam_rule-two-entries.sieve`: `spam_rule` after adding one allow list
+  entry (`blah@example.com` → `INBOX`) and one block list entry
+  (`test.example@example.com` → `Junk`) in the web UI, captured 2026-11-05.
+  Each entry is an `if` guarded so that the first match wins, comparing
+  `from` with the address twice.
 
 Saving filters in the web UI rewrites `synomc` and `filter` completely and
 makes `synomc` the active script again (tested 2026-11-05: a comment added

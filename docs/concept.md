@@ -116,26 +116,34 @@ Some systems write Sieve themselves from their own filter settings: a webmail, a
 
 - **detects** its setup from the account's scripts by their content (structure and variables, not just script names) and reports what it found: its root, the scripts with filters, the number of filters and list entries;
 - **imports** its filters into the rule model: each filter becomes a rule with the provider's name for it, if it has one. Anything it can't map stays a code card, never dropped. The import is pure (scripts in, rules plus notes out) and tested against fixtures captured from the real system (`crates/sieve-core/tests/fixtures/<provider>`);
-- **describes its behavior** for the texts the app shows: whether saving in its UI rewrites its scripts and activates its root, where its filters are edited, and what it does on the server that ManageSieve can't see (e.g. a server-side spam filter, which keeps running);
-- **names what to keep**: what the sieve-gui root should still run after the take-over to keep features that don't belong to the filters (e.g. a global script included with `include :global`).
+- **describes its behavior** for the texts the app shows: whether saving in its UI rewrites its scripts and activates its root (`Detection::reactivates_root`);
+- **fingerprints its filters** (`Detection::fingerprint`, over their canonical form), so the app can tell filters added after a take-over from those taken over.
+
+The app passes the names for the rules it creates ("Filter", "Allowed", "Blocked") in its own language (`RuleNames`).
 
 Recognizing a provider is an explicit, extensible list, not an exception to the general rules: everything outside a provider module stays product-agnostic (D16), and without a matching provider a foreign setup is handled as under *Existing setups*.
 
 **Take-over flow.**
 
 1. When a provider is detected on an account, the sidebar offers: "Filters from <provider> found (n filters, m list entries). Take them over into sieve-gui?"
-2. A preview shows the imported rules as cards, in a new script (name suggested from the provider, editable), placed first in the order so they run where the provider's filters ran.
-3. On confirmation the app creates the script and changes the root: it no longer includes the provider's root, only what the provider names to keep. The provider's own scripts stay on the server untouched, as a fallback if sieve-gui is given up; they're just no longer run.
+2. A dialog explains why both side by side doesn't work and previews the imported rules (name, conditions, target folder), for a new script (name suggested from the provider, editable) placed first in the order, so the rules run where the provider's filters ran.
+3. On confirmation the app creates the script and changes the root: it no longer includes the provider's root. The provider's own scripts stay on the server untouched, as a fallback if sieve-gui is given up; they're just no longer run. The new script opens.
 4. The app tells the user what only they can do: delete the filters in the provider's UI (they live in its storage, not in the scripts, and would come back on its next save) and not create filters there anymore, because saving there switches sieve-gui off until it's opened again.
-5. The take-over turns on the account setting **"sieve-gui manages the filters alone"**. With it, if the provider has made its own script active again, the app re-activates its root on connect without asking and reports it ("<provider> had activated its own script; sieve-gui is active again"). If the provider's scripts contain filters that weren't there at the take-over, it offers to take those over too. What it can't do is close the gap: between a save in the provider's UI and the next time sieve-gui connects, sieve-gui's rules don't run. The texts say so.
+5. The take-over turns on the account setting **"sieve-gui manages the filters alone"** (stored with the provider, its root and scripts, and the fingerprint at the take-over; it can be turned off in the account dialog). With it, on connect:
+   - if the provider has made its own script active again, the app re-activates its root before anything else and reports it ("<provider> had made its own script active again …");
+   - differences in the local copy that only concern the provider's scripts (which it rewrote) are resolved by keeping the server's version, without asking;
+   - if the provider has filters again whose fingerprint differs from the one at the take-over, it offers to take them over too.
+
+   What it can't do is close the gap: between a save in the provider's UI and the next time sieve-gui connects, sieve-gui's rules don't run. The texts say so.
 
 **First provider: Synology MailPlus.**
 
 - Detection: a root (MailPlus: `synomc`) that includes personal scripts which record folders in global variables, and files into `${filter_mailbox}`, `${spam_rule_blacklist_mailbox}` and `${spam_rule_whitelist_mailbox}`.
 - Filters (`filter`): each is an `if` under a `# id: <n>` comment that sets `filter_mailbox`; it becomes a rule that moves to that folder (fixture `mailplus/filter-one-rule.sieve`). The `# id` comment is dropped.
-- Personal block and allow lists (`spam_rule`): block list entries become a rule that moves to `Junk`, allow list entries a rule that keeps the message in the inbox. They are taken over together with the filters. The format of non-empty lists still has to be captured as a fixture.
-- Kept: `include :global "spam_rewrite_subject"` (the subject marker for spam, if enabled in MailPlus). MailPlus' server-side spam filter (`sieve_after`: `X-Synology-Spam-Flag: YES` → `Junk`) runs regardless of the active script.
-- Lost and not replaced: the header `X-Synology-Personal-Spam-Rule` that MailPlus adds on list matches.
+- Personal block and allow lists (`spam_rule`): one guarded `if` per entry under `# id: <n>`, comparing `from` with the address (written twice), followed by fixed code for the subject and a header (fixture `mailplus/spam_rule-two-entries.sieve`). Block list entries become a rule that moves to `Junk`, allow list entries one that moves to `INBOX`. They are taken over together with the filters.
+- Order within the new script, where the last move wins: allow list entries, then filters, then block list entries. That is MailPlus' own priority (block list over filters over allow list).
+- Nothing needs to be kept: `spam_rewrite_subject` (`sieve_global`) only provides the subject marker so that `spam_rule` can remove it for allowed senders. The marker itself is set by MailPlus' spam filter outside Sieve, and its server-side script (`sieve_after`: `X-Synology-Spam-Flag: YES` → `Junk`) runs regardless of the active script.
+- Lost and not replaced: removing the spam marker from the subject for allowed senders, and the header `X-Synology-Personal-Spam-Rule` that MailPlus adds on list matches.
 - Value of the MailPlus UI next to sieve-gui: none that outweighs the cost. Its filters and lists are a subset of sieve-gui's rules; what remains is convenience (blocking a sender while reading mail, editing filters from any browser), and using it switches sieve-gui off. The allow list doesn't override the server-side spam filter either: `move_spam` only looks at `X-Synology-Spam-Flag`.
 
 ## 4. Features and milestones
@@ -161,6 +169,7 @@ Recognizing a provider is an explicit, extensible list, not an exception to the 
 - Undo/redo, keyboard shortcuts, light/dark theme
 - UI in English and German
 - Local copy of all scripts per account; on connect, differences to the server can be uploaded from the copy or taken over from the server (§3)
+- Filter providers: take over filters from systems that write their own Sieve, first Synology MailPlus; account setting "sieve-gui manages the filters alone" (§3, D19)
 
 ### v0.2 — dry run
 
@@ -189,10 +198,6 @@ Recognizing a provider is an explicit, extensible list, not an exception to the 
   - check the result against real scripts with many branches and nested checks
 - Test a rule against a pasted/selected sample message
 - "Create rule from this message"
-- **Filter providers (§3, D19):** take over filters from systems that write their own Sieve, starting with Synology MailPlus:
-  - `sieve_core::providers` with the provider interface (detect, import, behavior, keep) and MailPlus as the first provider; capture a non-empty `spam_rule` as a fixture first
-  - take-over flow: notice, preview as cards, new script first in the order, root without the provider's root, instructions for the provider's UI
-  - account setting "sieve-gui manages the filters alone": re-activate the root on connect and report it, offer filters added in the provider's UI later
 - **Variables (RFC 5229) in rules:** conditions that compare one part of a message with another, e.g. "Reply-To is a different address than From" (typical of advance-fee scams) or "Delivered-To is not in To/Cc". Sieve can't compare two headers directly. A test captures a value with `:matches`/`:regex` into `${0}`…`${9}` (or `set`), and a nested test checks against `"${…}"`. The rule model has no variables yet, so such rules only show as code cards. Needed:
   - a condition "same as / differs from <other field and part>" that is written as capture plus nested test and read back from that shape
   - capability check: only offered if the server lists `variables`
@@ -347,4 +352,4 @@ The project is **MIT-licensed**. To keep it that way:
 | D16 | General-purpose | Behavior never depends on the conventions of a particular user's scripts (comment style, variable names, include structure). Moving a personal setup to sieve-gui is a one-off migration outside the app; the app only has to import its result | 2026-11-03 |
 | D17 | Control structures | `if`/`elsif`/`else` as branches of one card, nested `if` as indented "also check" within actions (any depth), everything else (e.g. `include` inside a script) stays a code card | 2026-11-03 |
 | D18 | Tests | Sample messages with expected folders and flags are part of the app (v0.2): set up and run in it, checked before saving, stored with the local copy. Tests in a separate repository can only report after a change is live | 2026-11-03 |
-| D19 | Filter providers | Systems that write Sieve from their own filter settings (first: Synology MailPlus) can be taken over, not run side by side: they rewrite their scripts and re-activate their own on every save (tested on MailPlus). A provider module in `sieve_core::providers` detects the setup by content, imports its filters into rules (fixture-tested) and describes its behavior and what the root keeps. The take-over creates a sieve-gui script, stops running the provider's root without deleting it, asks the user to delete the filters in the provider's UI, and turns on "sieve-gui manages the filters alone", which re-activates the root on connect and offers to take over filters added there later (§3) | 2026-11-05 |
+| D19 | Filter providers | Systems that write Sieve from their own filter settings (first: Synology MailPlus) can be taken over, not run side by side: they rewrite their scripts and re-activate their own on every save (tested on MailPlus). A provider module in `sieve_core::providers` detects the setup by content, imports its filters into rules (fixture-tested) and describes its behavior. The take-over creates a sieve-gui script, stops running the provider's root without deleting it, asks the user to delete the filters in the provider's UI, and turns on "sieve-gui manages the filters alone", which re-activates the root on connect and offers to take over filters added there later (§3) | 2026-11-05 |

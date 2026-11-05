@@ -53,6 +53,27 @@ pub struct Account {
     /// in a colour derived from its name.
     #[serde(default)]
     pub icon: Option<AccountIcon>,
+    /// sieve-gui manages the filters alone, after taking them over from a
+    /// filter provider (`sieve_core::providers`, concept D19). `None`: off.
+    #[serde(default)]
+    pub filters_alone: Option<FiltersAlone>,
+}
+
+/// The filter provider whose filters sieve-gui took over: if it makes its
+/// root active again, the app re-activates its own root on connect.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FiltersAlone {
+    /// The provider (`sieve_core::providers::Detection::provider`).
+    pub provider: String,
+    /// The provider's root script.
+    pub root: String,
+    /// The provider's scripts with filters.
+    pub scripts: Vec<String>,
+    /// What its filters were when they were taken over
+    /// (`Detection::fingerprint`): only filters added since are offered.
+    #[serde(default)]
+    pub fingerprint: String,
 }
 
 /// An account's icon: a picture, or a short text on a colour.
@@ -151,6 +172,8 @@ pub struct AccountInput {
     pub copy_dir: Option<String>,
     #[serde(default)]
     pub icon: Option<AccountIcon>,
+    #[serde(default)]
+    pub filters_alone: Option<FiltersAlone>,
     /// `None` keeps the stored password.
     pub password: Option<String>,
 }
@@ -242,6 +265,7 @@ pub async fn save_account(
             Some(icon) => icon.checked()?,
             None => None,
         },
+        filters_alone: input.filters_alone,
     };
     if let Some(pw) = &input.password {
         crate::passwords::set(&account.id, pw)?;
@@ -274,6 +298,27 @@ pub fn set_keyword_names(
         .with(&app, |accounts| {
             let account = accounts.iter_mut().find(|a| a.id == id)?;
             account.keyword_names = names;
+            Some(account.clone())
+        })?
+        .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("unknown account {id}")))?;
+    store.save(&app)?;
+    Ok(account)
+}
+
+/// Turns "sieve-gui manages the filters alone" on (with the provider whose
+/// filters were taken over) or off, and returns the account. Unlike
+/// `save_account`, this keeps the connection.
+#[tauri::command]
+pub fn set_filters_alone(
+    app: AppHandle,
+    store: State<'_, AccountStore>,
+    id: String,
+    value: Option<FiltersAlone>,
+) -> AppResult<Account> {
+    let account = store
+        .with(&app, |accounts| {
+            let account = accounts.iter_mut().find(|a| a.id == id)?;
+            account.filters_alone = value;
             Some(account.clone())
         })?
         .ok_or_else(|| AppError::new(ErrorKind::NotFound, format!("unknown account {id}")))?;

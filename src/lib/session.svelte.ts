@@ -8,8 +8,10 @@ import {
   deleteAccount,
   deleteScript,
   deployScript,
+  detectProviders,
   exportRules,
   getScript,
+  importProvider,
   importRules,
   importRulesSingleFolder,
   listAccounts,
@@ -20,6 +22,7 @@ import {
   rootScript,
   saveAccount,
   scriptLinks,
+  setFiltersAlone,
   setKeywordNames,
   trustCertificate,
 } from "#tauri/commands";
@@ -27,7 +30,9 @@ import type {
   Account,
   AccountInput,
   CopyStatus,
+  Detection,
   Folder,
+  ProviderScript,
   Root,
   RuleSet,
   ScriptLinks,
@@ -93,6 +98,20 @@ class Session {
    * runs unchanged inside the root or is taken over (see `adopt`).
    */
   adoption = $state<Record<string, { active: string }>>({});
+  /**
+   * Per account: filter providers whose filters can be taken over (concept
+   * §3, D19): they still run, or sieve-gui manages the filters alone and
+   * filters were added there since.
+   */
+  providers = $state<Record<string, Detection[]>>({});
+  /**
+   * Per account: the provider that had made its own script active again,
+   * until the notice is dismissed. sieve-gui re-activated its root on
+   * connect ("sieve-gui manages the filters alone").
+   */
+  reclaimed = $state<Record<string, string>>({});
+  /** Per account: the scripts read for detecting providers. */
+  #providerScripts: Record<string, ProviderScript[]> = {};
   /** Per account: differences between the server and the local copy, until resolved. */
   copies = $state<Record<string, CopyStatus>>({});
   /** The account whose copy differences are shown. */
@@ -127,6 +146,7 @@ class Session {
     try {
       const info = await connectAccount(id);
       await this.#loadRoot(id, info);
+      await this.#reclaim(id, info);
       this.servers[id] = { status: "ready", info, error: null, certificate: null };
     } catch (e) {
       const certificate = untrustedCertificate(e);
@@ -137,6 +157,7 @@ class Session {
     }
     void this.loadFolders(id);
     void this.#loadLinks(id);
+    void this.#detectProviders(id);
     // Before the root is brought in line with the settings, which would
     // otherwise cover up what changed on the server (e.g. a webmail taking
     // over the active script).
@@ -168,6 +189,15 @@ class Session {
     try {
       const status = await copyStatus(id);
       if (status.differences.length === 0 && !status.active) {
+        delete this.copies[id];
+        return false;
+      }
+      // The provider whose filters sieve-gui took over rewrote its scripts,
+      // as it does on every save there. They no longer run; keep the server's.
+      const alone = this.#filtersAlone(id);
+      const own = alone ? [alone.root, ...alone.scripts] : [];
+      if (alone && !status.active && status.differences.every((d) => own.includes(d.name))) {
+        await resolveCopy(id, status.differences.map((d) => ({ name: d.name, keep: "server" as Side })), null);
         delete this.copies[id];
         return false;
       }
@@ -273,6 +303,7 @@ class Session {
       this.error = describeError(e);
     }
     void this.#loadLinks(id);
+    void this.#detectProviders(id);
   }
 
   /**
@@ -399,7 +430,18 @@ class Session {
           }
           // Ours, but something else was activated meanwhile. Leave it to the
           // user: taking over again here would undo what they just did there.
-          this.displaced[id] = { active: info.scripts.find((s) => s.active)?.name ?? null };
+          // Unless sieve-gui manages the filters alone and it's the provider's
+          // script: then that's what was decided.
+          const active = info.scripts.find((s) => s.active)?.name ?? null;
+          const alone = this.#filtersAlone(id);
+          if (alone && active === alone.root) {
+            await activateScript(id, ROOT_SCRIPT);
+            this.reclaimed[id] = alone.provider;
+            await this.refreshScripts(id);
+            await this.#applySettings(id);
+            return;
+          }
+          this.displaced[id] = { active };
           return;
         }
         const current = info.scripts.find((s) => s.active)?.name;
@@ -534,6 +576,116 @@ class Session {
       this.error = describeError(e);
     }
     await this.refreshScripts(id);
+  }
+
+  #filtersAlone(id: string) {
+    return this.accounts.find((a) => a.id === id)?.filtersAlone ?? null;
+  }
+
+  /**
+   * With "sieve-gui manages the filters alone": if the provider made its own
+   * script active again (it does on every save there), activates the root
+   * again before anything else looks at the server.
+   */
+  async #reclaim(id: string, info: ServerInfo) {
+    const alone = this.#filtersAlone(id);
+    const active = info.scripts.find((s) => s.active)?.name;
+    if (!alone || active !== alone.root || !info.scripts.some((s) => s.name === ROOT_SCRIPT)) return;
+    try {
+      await activateScript(id, ROOT_SCRIPT);
+      info.scripts = await listScripts(id);
+      await this.#loadRoot(id, info);
+      this.reclaimed[id] = alone.provider;
+    } catch (e) {
+      this.error = describeError(e);
+    }
+  }
+
+  /** Reads the account's scripts and looks for filter providers' setups. */
+  async #detectProviders(id: string) {
+    const names = (this.servers[id]?.info?.scripts ?? []).map((s) => s.name).filter((n) => n !== ROOT_SCRIPT);
+    const scripts: ProviderScript[] = [];
+    for (const name of names) {
+      try {
+        scripts.push({ name, source: await getScript(id, name) });
+      } catch {
+        // Not readable right now.
+      }
+    }
+    this.#providerScripts[id] = scripts;
+    try {
+      const alone = this.#filtersAlone(id);
+      // Offered while the provider's root runs, or once filters were added
+      // there after a take-over.
+      const found = (await detectProviders(scripts)).filter(
+        (d) =>
+          d.filters + d.listEntries > 0 &&
+          (this.isActive(id, d.root) || (alone?.provider === d.provider && alone.fingerprint !== d.fingerprint)),
+      );
+      if (found.length) this.providers[id] = found;
+      else delete this.providers[id];
+    } catch {
+      delete this.providers[id];
+    }
+  }
+
+  /** A provider's filters as rules, for the preview before taking them over. */
+  async previewProvider(id: string, detection: Detection): Promise<RuleSet> {
+    return importProvider(detection.provider, this.#providerScripts[id] ?? [], this.#ruleNames());
+  }
+
+  #ruleNames() {
+    return { filter: t("provider.nameFilter"), allowList: t("provider.nameAllow"), blockList: t("provider.nameBlock") };
+  }
+
+  /**
+   * Takes over a provider's filters (concept §3, D19): writes them as rules
+   * into a new script that runs first, stops running the provider's root
+   * (its scripts stay on the server) and, if the provider would take the
+   * active script back, turns on "sieve-gui manages the filters alone".
+   * Returns whether it worked.
+   */
+  async takeOverProvider(id: string, detection: Detection, name: string): Promise<boolean> {
+    const settings = this.rootSettings(id);
+    try {
+      const rules = await importProvider(detection.provider, this.#providerScripts[id] ?? [], this.#ruleNames());
+      rules.singleFolder = false;
+      await deployScript(id, name, await exportRules(rules, this.#roundcube(id)), null);
+      if (this.displaced[id]) {
+        await activateScript(id, ROOT_SCRIPT);
+        delete this.displaced[id];
+        await this.refreshScripts(id);
+      }
+      const root = this.roots[id];
+      if (root) {
+        const others = root.scripts.filter((n) => n !== detection.root && n !== name);
+        const scripts = settings.multipleScripts ? [name, ...others] : [name];
+        await this.#writeRoot(id, scripts, root.lastMoveWins, root.unchanged.filter((n) => n !== detection.root));
+        if (root.lastMoveWins) await this.#setSingleFolder(id, name, true);
+      } else if (settings.multipleScripts || settings.lastMoveWins) {
+        // The provider's root runs alone today (see `adoption`): the root
+        // takes over with the new script only.
+        delete this.adoption[id];
+        await deployScript(id, ROOT_SCRIPT, await rootScript([name], [], settings.lastMoveWins), null);
+        await activateScript(id, ROOT_SCRIPT);
+        if (settings.lastMoveWins) await this.#setSingleFolder(id, name, true);
+      } else {
+        await activateScript(id, name);
+      }
+      if (detection.reactivatesRoot) {
+        const { provider, root, scripts, fingerprint } = detection;
+        const value = { provider, root, scripts, fingerprint };
+        await setFiltersAlone(id, value);
+        await this.loadAccounts();
+      }
+      delete this.providers[id];
+    } catch (e) {
+      this.error = describeError(e);
+      await this.refreshScripts(id);
+      return false;
+    }
+    await this.refreshScripts(id);
+    return true;
   }
 
   /** Makes the root script active again after something else replaced it. */

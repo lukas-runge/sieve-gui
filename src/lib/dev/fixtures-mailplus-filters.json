@@ -1,0 +1,144 @@
+{
+  "filter": {
+    "source": "require [\"body\",\"copy\",\"fileinto\",\"imap4flags\",\"include\",\"variables\"];\nglobal \"filter_mailbox\";\n# id: 1\nif header :contains \"subject\" \"sieve-filter-test\"\n{\n\tset \"filter_mailbox\" \"Junk\";\n}\n",
+    "rules": null
+  },
+  "spam_rule": {
+    "source": "require [\"editheader\",\"include\",\"variables\"];\nglobal [\"spam_rule_blacklist_mailbox\",\"spam_rule_whitelist_mailbox\",\"spam_enable_rewrite\",\"spam_rewrite_subject\"];\n# id: 2\nif allof(string :is \"${spam_rule_blacklist_mailbox}\" \"\", string :is \"${spam_rule_whitelist_mailbox}\" \"\")\n{\n\tif anyof(address :is :all \"from\" \"blah@example.com\", address :is :all \"from\" \"blah@example.com\")\n\t{\n\t\tset \"spam_rule_whitelist_mailbox\" \"INBOX\";\n\t}\n}\n# id: 1\nif allof(string :is \"${spam_rule_blacklist_mailbox}\" \"\", string :is \"${spam_rule_whitelist_mailbox}\" \"\")\n{\n\tif anyof(address :is :all \"from\" \"test.example@example.com\", address :is :all \"from\" \"test.example@example.com\")\n\t{\n\t\tset \"spam_rule_blacklist_mailbox\" \"Junk\";\n\t}\n}\nif string :is \"${spam_enable_rewrite}\" \"yes\"\n{\n\tif not string :is \"${spam_rule_whitelist_mailbox}\" \"\"\n\t{\n\t\tif header :matches \"subject\" \"${spam_rewrite_subject} *\"\n\t\t{\n\t\t\tset \"subject\" \"${1}\";\n\t\t\tdeleteheader \"subject\";\n\t\t\taddheader :last \"subject\" \"${subject}\";\n\t\t}\n\t}\n}\nif not allof(string :is \"${spam_rule_blacklist_mailbox}\" \"\", string :is \"${spam_rule_whitelist_mailbox}\" \"\")\n{\n\tif not string :is \"${spam_rule_whitelist_mailbox}\" \"\"\n\t{\n\t\taddheader :last \"X-Synology-Personal-Spam-Rule\" \"whitelist\";\n\t}\n\telse\t{\n\t\taddheader :last \"X-Synology-Personal-Spam-Rule\" \"blacklist\";\n\t}\n}\n",
+    "rules": null
+  },
+  "import": {
+    "preamble": null,
+    "requires": [
+      "fileinto",
+      "editheader",
+      "include",
+      "variables",
+      "body",
+      "copy",
+      "imap4flags"
+    ],
+    "singleFolder": false,
+    "items": [
+      {
+        "type": "rule",
+        "name": "Allow list: blah@example.com",
+        "enabled": true,
+        "conditions": {
+          "join": "any",
+          "items": [
+            {
+              "negate": false,
+              "test": {
+                "type": "address",
+                "headers": [
+                  "from"
+                ],
+                "part": "all",
+                "matcher": {
+                  "matchType": {
+                    "type": "is"
+                  },
+                  "comparator": null
+                },
+                "keys": [
+                  "blah@example.com"
+                ]
+              }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "fileInto",
+            "mailbox": "INBOX",
+            "copy": false,
+            "create": false,
+            "flags": null
+          }
+        ],
+        "elsif": [],
+        "otherwise": null
+      },
+      {
+        "type": "rule",
+        "name": "Filter 1",
+        "enabled": true,
+        "conditions": {
+          "join": "any",
+          "items": [
+            {
+              "negate": false,
+              "test": {
+                "type": "header",
+                "headers": [
+                  "subject"
+                ],
+                "matcher": {
+                  "matchType": {
+                    "type": "contains"
+                  },
+                  "comparator": null
+                },
+                "keys": [
+                  "sieve-filter-test"
+                ]
+              }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "fileInto",
+            "mailbox": "Junk",
+            "copy": false,
+            "create": false,
+            "flags": null
+          }
+        ],
+        "elsif": [],
+        "otherwise": null
+      },
+      {
+        "type": "rule",
+        "name": "Block list: test.example@example.com",
+        "enabled": true,
+        "conditions": {
+          "join": "any",
+          "items": [
+            {
+              "negate": false,
+              "test": {
+                "type": "address",
+                "headers": [
+                  "from"
+                ],
+                "part": "all",
+                "matcher": {
+                  "matchType": {
+                    "type": "is"
+                  },
+                  "comparator": null
+                },
+                "keys": [
+                  "test.example@example.com"
+                ]
+              }
+            }
+          ]
+        },
+        "actions": [
+          {
+            "type": "fileInto",
+            "mailbox": "Junk",
+            "copy": false,
+            "create": false,
+            "flags": null
+          }
+        ],
+        "elsif": [],
+        "otherwise": null
+      }
+    ]
+  }
+}

@@ -6,15 +6,23 @@
 // English scripts that show most kinds of rules at once (cases, nested
 // checks, condition groups, folder sections, labels, forwarding, code, a rule
 // that is off). It is also what the README screenshot shows.
+// fixtures-mailplus-filters.json holds MailPlus' `filter` and `spam_rule`
+// with one filter and two list entries, and what sieve-core's MailPlus
+// provider imports from them (`?mailplusFilters`).
 
 import { mockIPC } from "@tauri-apps/api/mocks";
 import roundcubeFixtures from "./fixtures.json";
 import mailplusFixtures from "./fixtures-mailplus.json";
+import mailplusFilters from "./fixtures-mailplus-filters.json";
 import showcaseFixtures from "./fixtures-showcase.json";
 import heroFixtures from "./fixtures-hero.json";
 
 // `?hero`: one calm account for the README screenshot (see README).
 const HERO = new URLSearchParams(location.search).has("hero");
+// `?mailplusFilters`: the NAS has filters and list entries from MailPlus' web UI.
+const MAILPLUS_FILTERS = new URLSearchParams(location.search).has("mailplusFilters");
+// `?mailplusReclaim`: its filters were taken over, then MailPlus made `synomc` active again.
+const MAILPLUS_RECLAIM = new URLSearchParams(location.search).has("mailplusReclaim");
 
 type Fixture = { source: string; rules: unknown };
 // The Roundcube fixtures under English names (their keys are the scripts' names in the fixture set).
@@ -51,7 +59,18 @@ const servers: Record<string, Server> = {
     deleted: new Set(),
   },
   // Like Synology MailPlus: its own root script `synomc` is active.
-  nas: { scripts: mailplusFixtures as Record<string, Fixture>, active: "synomc", saved: new Map(), deleted: new Set() },
+  nas: {
+    scripts: {
+      ...(mailplusFixtures as Record<string, Fixture>),
+      ...(MAILPLUS_FILTERS ? { filter: mailplusFilters.filter, spam_rule: mailplusFilters.spam_rule } : {}),
+      ...(MAILPLUS_RECLAIM
+        ? { MailPlus: { source: "# rule:[Filter 1]\n", rules: mailplusFilters.import }, "sieve-gui": { source: showcaseRoot(["MailPlus"]), rules: null } }
+        : {}),
+    },
+    active: "synomc",
+    saved: new Map(),
+    deleted: new Set(),
+  },
 };
 const allFixtures = [...Object.values(servers).flatMap((s) => Object.values(s.scripts))];
 /** Rules of generated scripts, so that they can be imported again. */
@@ -103,6 +122,13 @@ const nas = {
   host: "192.168.1.20",
   imap: { ...account.imap, host: "192.168.1.20" },
 };
+if (MAILPLUS_RECLAIM) {
+  Object.assign(nas, {
+    certificate: NAS_CERTIFICATE.sha256,
+    imap: { ...nas.imap, certificate: NAS_CERTIFICATE.sha256 },
+    filtersAlone: { provider: "mailplus", root: "synomc", scripts: ["spam_rule", "filter"], fingerprint: "0" },
+  });
+}
 // `?nasChanged` starts with another certificate trusted, as after a new one.
 if (new URLSearchParams(location.search).has("nasChanged")) nas.certificate = "aa".repeat(32);
 if (HERO) Object.assign(account, { username: "alex", host: "example.com", keywordNames: { $label1: "Family" }, icon: { text: "A", hue: 250 } });
@@ -249,6 +275,40 @@ export function installMock() {
       case "resolve_copy":
         copyResolved = true;
         return null;
+      case "detect_providers": {
+        // Rough stand-in for sieve-core's MailPlus provider.
+        const scripts = a.scripts as { name: string; source: string }[];
+        const root = scripts.find((s) => s.source.includes('fileinto "${filter_mailbox}"'));
+        if (!root) return [];
+        const count = (re: RegExp) => scripts.reduce((n, s) => n + (s.source.match(re)?.length ?? 0), 0);
+        return [
+          {
+            provider: "mailplus",
+            root: root.name,
+            scripts: ["spam_rule", "filter"],
+            filters: count(/set "filter_mailbox"/g),
+            listEntries: count(/set "spam_rule_(black|white)list_mailbox"/g),
+            reactivatesRoot: true,
+            fingerprint: String(scripts.filter((s) => s.name === "filter" || s.name === "spam_rule").reduce((n, s) => n + s.source.length, 0)),
+          },
+        ];
+      }
+      case "import_provider": {
+        const names = a.names as { filter: string; allowList: string; blockList: string };
+        const rules = structuredClone(mailplusFilters.import) as { items: { name?: string }[] };
+        for (const item of rules.items) {
+          item.name = item.name
+            ?.replace(/^Allow list/, names.allowList)
+            .replace(/^Block list/, names.blockList)
+            .replace(/^Filter/, names.filter);
+        }
+        return rules;
+      }
+      case "set_filters_alone": {
+        const target = accounts.find((x) => x.id === a.id)!;
+        Object.assign(target, { filtersAlone: a.value });
+        return target;
+      }
       case "set_keyword_names": {
         const target = accounts.find((x) => x.id === a.id)!;
         target.keywordNames = a.names;

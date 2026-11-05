@@ -18,6 +18,7 @@ A lightweight, cross-platform desktop editor for **server-side Sieve mail filter
 - **Edit one case at a time.** The inspector shows a case with its context; folders come from the server (searchable), labels as chips with names you give them.
 - **Safe saving.** The server checks the script (`CHECKSCRIPT`) before it is saved, conflicts are detected, and the diff can show only the changes in what the script does: comments and layout aside.
 - **Several accounts.** One account at a time in the sidebar, switched by its icon (initials, an emoji or a picture). Code sieve-gui can't show as rules stays as written. Roundcube-written scripts and Synology MailPlus scripts are read as they are.
+- **Take over filters from other systems.** Systems that write Sieve from their own filter settings rewrite their scripts on every save, so they can't run next to sieve-gui. sieve-gui finds their filters and turns them into rules, then manages them alone. Synology MailPlus is the first such provider: its web UI filters and block and allow lists become rules, and if MailPlus makes its own script active again, sieve-gui takes over again when it connects.
 
 ---
 

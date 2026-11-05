@@ -157,6 +157,10 @@ Roundcube writes no marker of its own, and sieve-gui deliberately uses the same 
   - check the result against real scripts with many branches and nested checks
 - Test a rule against a pasted/selected sample message
 - "Create rule from this message"
+- **Variables (RFC 5229) in rules:** conditions that compare one part of a message with another, e.g. "Reply-To is a different address than From" (typical of advance-fee scams) or "Delivered-To is not in To/Cc". Sieve can't compare two headers directly. A test captures a value with `:matches`/`:regex` into `${0}`…`${9}` (or `set`), and a nested test checks against `"${…}"`. The rule model has no variables yet, so such rules only show as code cards. Needed:
+  - a condition "same as / differs from <other field and part>" that is written as capture plus nested test and read back from that shape
+  - capability check: only offered if the server lists `variables`
+  - showing variables a rule sets with `set` (other than the generated `move_to_folder`) instead of turning the rule into code
 - Rule templates (newsletters, invoices, mailing lists)
 - Own Lezer grammar for the code editor (folding, context-aware completion)
 - Headings to group long rule lists, with a marker of their own (not derived from existing comments)

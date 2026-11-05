@@ -45,7 +45,7 @@ Updates: `brew upgrade sieve-gui`. The app isn't notarized yet; the cask removes
 ### Windows (Scoop)
 
 ```powershell
-scoop bucket add lukas https://github.com/lukas-runge/scoop-bucket
+scoop bucket add lukas-runge https://github.com/lukas-runge/scoop-bucket
 scoop install sieve-gui
 ```
 
